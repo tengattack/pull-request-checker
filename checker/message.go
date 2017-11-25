@@ -52,7 +52,7 @@ func HandleMessage(message string) error {
 	log.WriteString("Pull Request Checker/" + GetVersion() + "\n\n")
 	log.WriteString(fmt.Sprintf("Start fetching %s/pull/%s\n", repository, pull))
 
-	p, err := GetGithubPull(repository, pull)
+	_, err = GetGithubPull(repository, pull)
 	if err != nil {
 		return err
 	}
@@ -102,16 +102,23 @@ func HandleMessage(message string) error {
 		return err
 	}
 
+	// this works not accurately
 	// git diff -U3 <base_commits>
-	log.WriteString("$ git diff -U3 " + p.Base.Sha + "\n")
-	cmd = exec.Command("git", "diff", "-U3", p.Base.Sha)
-	cmd.Dir = repoPath
-	out, err := cmd.Output()
+	// log.WriteString("$ git diff -U3 " + p.Base.Sha + "\n")
+	// cmd = exec.Command("git", "diff", "-U3", p.Base.Sha)
+	// cmd.Dir = repoPath
+	// out, err := cmd.Output()
+	// if err != nil {
+	// 	return err
+	// }
+
+	// get diff from github
+	out, err := GetGithubPullDiff(repository, pull)
 	if err != nil {
 		return err
 	}
 
-	log.WriteString("\ndiff.ParseMultiFileDiff\n\n")
+	log.WriteString("\nParsing diff...\n\n")
 	diffs, err := diff.ParseMultiFileDiff(out)
 	if err != nil {
 		return err
@@ -130,7 +137,6 @@ func HandleMessage(message string) error {
 					return err
 				}
 				for _, hunk := range d.Hunks {
-					showHunk := false
 					if hunk.NewLines > 0 {
 						lines := strings.Split(string(hunk.Body), "\n")
 						for _, lint := range lints {
@@ -148,11 +154,6 @@ func HandleMessage(message string) error {
 								}
 								if i < len(lines) && len(lines[i]) > 0 && lines[i][0] == '+' {
 									// ensure this line is a definitely new line
-									if !showHunk {
-										// only show once
-										log.Write(hunk.Body)
-										showHunk = true
-									}
 									log.WriteString(fmt.Sprintf("%d:%d %s %s\n",
 										lint.Line, lint.Column, lint.Message, lint.RuleID))
 									comment := fmt.Sprintf("`%s` %d:%d %s",

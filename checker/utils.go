@@ -41,7 +41,9 @@ func DoHTTPRequest(req *http.Request, isJSONResponse bool, v interface{}) error 
 			return errors.New("HTTP " + resp.Status)
 		}
 	} else {
-		v = body
+		if ret, ok := v.(*[]byte); ok {
+			*ret = body
+		}
 	}
 
 	return err

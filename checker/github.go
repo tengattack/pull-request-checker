@@ -76,9 +76,6 @@ func GetGithubPull(repo, pull string) (*GithubPull, error) {
 	apiURI := fmt.Sprintf("/repos/%s/pulls/%s", repo, pull)
 
 	query := url.Values{}
-	query.Set("base", "master")
-	// default is open
-	// query.Set("state", "open")
 	query.Set("access_token", Conf.GitHub.AccessToken)
 
 	LogAccess.Debugf("GET %s?%s", apiURI, query.Encode())
@@ -96,6 +93,30 @@ func GetGithubPull(repo, pull string) (*GithubPull, error) {
 	}
 
 	return &resp, nil
+}
+
+func GetGithubPullDiff(repo, pull string) ([]byte, error) {
+	apiURI := fmt.Sprintf("/repos/%s/pulls/%s", repo, pull)
+
+	query := url.Values{}
+	query.Set("access_token", Conf.GitHub.AccessToken)
+
+	LogAccess.Debugf("GET %s?%s", apiURI, query.Encode())
+
+	req, err := http.NewRequest(http.MethodGet,
+		fmt.Sprintf("%s%s?%s", GITHUB_API_URL, apiURI, query.Encode()), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/vnd.github.v3.diff")
+
+	var resp []byte
+	err = DoHTTPRequest(req, false, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
 }
 
 func (ref *GithubRef) UpdateState(context, state, targetURL, description string) error {
