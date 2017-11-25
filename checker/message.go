@@ -140,20 +140,25 @@ func HandleMessage(message string) error {
 					if hunk.NewLines > 0 {
 						lines := strings.Split(string(hunk.Body), "\n")
 						for _, lint := range lints {
-							if int32(lint.Line) >= hunk.NewStartLine &&
-								int32(lint.Line) <= hunk.NewStartLine+hunk.NewLines {
-								lineNum := int(hunk.NewStartLine)
+							if lint.Line >= int(hunk.NewStartLine) &&
+								lint.Line < int(hunk.NewStartLine+hunk.NewLines) {
+								lineNum := 0
 								i := 0
 								for ; i < len(lines); i++ {
+									if len(lines[i]) <= 0 || lines[i][0] != '-' {
+										if lineNum <= 0 {
+											lineNum = int(hunk.NewStartLine)
+										} else {
+											lineNum++
+										}
+									}
 									if lineNum >= lint.Line {
 										break
-									}
-									if len(lines[i]) <= 0 || lines[i][0] != '-' {
-										lineNum++
 									}
 								}
 								if i < len(lines) && len(lines[i]) > 0 && lines[i][0] == '+' {
 									// ensure this line is a definitely new line
+									log.WriteString(lines[i] + "\n")
 									log.WriteString(fmt.Sprintf("%d:%d %s %s\n",
 										lint.Line, lint.Column, lint.Message, lint.RuleID))
 									comment := fmt.Sprintf("`%s` %d:%d %s",
