@@ -279,6 +279,8 @@ func webhookHandler(c *gin.Context) {
 		return
 	}
 
+	LogAccess.Debugf("%s", hook.Payload)
+
 	if hook.Event == "ping" {
 		// pass
 		c.JSON(http.StatusOK, gin.H{
@@ -292,6 +294,13 @@ func webhookHandler(c *gin.Context) {
 			abortWithError(c, 400, "payload error: "+err.Error())
 			return
 		}
+		if payload.Action != "open" && payload.Action != "synchronize" {
+			c.JSON(http.StatusOK, gin.H{
+				"code": 0,
+				"info": "no need to handle the action: " + payload.Action,
+			})
+		}
+		// opend or synchronized
 		message := fmt.Sprintf("%s/pull/%d/commits/%s",
 			payload.Repository.FullName,
 			payload.PullRequest.Number,
