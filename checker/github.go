@@ -299,6 +299,7 @@ func webhookHandler(c *gin.Context) {
 				"code": 0,
 				"info": "no need to handle the action: " + payload.Action,
 			})
+			return
 		}
 		// opend or synchronized
 		message := fmt.Sprintf("%s/pull/%d/commits/%s",
