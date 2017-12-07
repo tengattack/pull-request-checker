@@ -5,8 +5,8 @@ import (
 	"os/exec"
 )
 
-// Lint is a single lint result for PHPLint
-type Lint struct {
+// LintMessage is a single lint message for PHPLint
+type LintMessage struct {
 	RuleID     string `json:"ruleId"`
 	Severity   int    `json:"severity"`
 	Line       int    `json:"line"`
@@ -15,9 +15,15 @@ type Lint struct {
 	SourceCode string `json:"sourceCode"`
 }
 
+// LintResult is a single lint result for PHPLint
+type LintResult struct {
+	FilePath string        `json:"filePath"`
+	Messages []LintMessage `json:"messages"`
+}
+
 // PHPLint lints the php file
-func PHPLint(fileName string) ([]Lint, error) {
-	cmd := exec.Command("php", Conf.Core.PHPLint, fileName)
+func PHPLint(fileName string) ([]LintMessage, error) {
+	cmd := exec.Command("php", Conf.Core.PHPLint, "-f", "json", fileName)
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, err
@@ -25,11 +31,14 @@ func PHPLint(fileName string) ([]Lint, error) {
 
 	LogAccess.Debugf("PHPLint Result:\n%s", out)
 
-	var lints []Lint
-	err = json.Unmarshal(out, &lints)
+	var results []LintResult
+	err = json.Unmarshal(out, &results)
 	if err != nil {
 		return nil, err
 	}
 
-	return lints, nil
+	if len(results) <= 0 {
+		return []LintMessage{}, nil
+	}
+	return results[0].Messages, nil
 }
