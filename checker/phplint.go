@@ -23,7 +23,12 @@ type LintResult struct {
 
 // PHPLint lints the php file
 func PHPLint(fileName string) ([]LintMessage, error) {
-	cmd := exec.Command("php", Conf.Core.PHPLint, "-f", "json", fileName)
+	var cmd *exec.Cmd
+	if len(Conf.Core.PHPLintConfig) > 0 {
+		cmd = exec.Command("php", Conf.Core.PHPLint, "-f", "json", "-c", Conf.Core.PHPLintConfig, fileName)
+	} else {
+		cmd = exec.Command("php", Conf.Core.PHPLint, "-f", "json", fileName)
+	}
 	out, err := cmd.Output()
 	if err != nil {
 		return nil, err

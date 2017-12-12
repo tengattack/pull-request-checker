@@ -12,6 +12,7 @@ core:
   logs_dir: 'logs'
   check_log_uri: 'http://example.com/checker/logs/'
   phplint: 'phplint'
+  phplint_config: ''
 
 api:
   webhook_uri: "/api/webhook"

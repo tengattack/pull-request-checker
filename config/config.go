@@ -27,6 +27,7 @@ type SectionCore struct {
 	LogsDir       string `yaml:"logs_dir"`
 	CheckLogURI   string `yaml:"check_log_uri"`
 	PHPLint       string `yaml:"phplint"`
+	PHPLintConfig string `yaml:"phplint_config"`
 }
 
 // SectionAPI is sub section of config.
@@ -77,6 +78,7 @@ func BuildDefaultConf() Config {
 	conf.Core.LogsDir = "logs"
 	conf.Core.CheckLogURI = ""
 	conf.Core.PHPLint = "phplint"
+	conf.Core.PHPLintConfig = ""
 
 	// API
 	conf.API.WebHookURI = "/api/webhook"
