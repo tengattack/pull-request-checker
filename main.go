@@ -55,6 +55,11 @@ func main() {
 		return checker.RunHTTPServer()
 	})
 
+	g.Go(func() error {
+		// Run local repo watcher
+		return checker.WatchLocalRepo()
+	})
+
 	if err = g.Wait(); err != nil {
 		checker.LogError.Fatal(err)
 	}

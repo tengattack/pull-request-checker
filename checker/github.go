@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
+	"path/filepath"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	githubhook "gopkg.in/rjz/githubhook.v0"
@@ -72,6 +75,29 @@ type GithubWebHookPullRequest struct {
 	Repository  GithubRepo `json:"repository"`
 }
 
+func GetGithubPulls(repo string) ([]GithubPull, error) {
+	apiURI := fmt.Sprintf("/repos/%s/pulls", repo)
+
+	query := url.Values{}
+	query.Set("access_token", Conf.GitHub.AccessToken)
+
+	LogAccess.Debugf("GET %s?%s", apiURI, query.Encode())
+
+	req, err := http.NewRequest(http.MethodGet,
+		fmt.Sprintf("%s%s?%s", GITHUB_API_URL, apiURI, query.Encode()), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var resp []GithubPull
+	err = DoHTTPRequest(req, true, &resp)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
 func GetGithubPull(repo, pull string) (*GithubPull, error) {
 	apiURI := fmt.Sprintf("/repos/%s/pulls/%s", repo, pull)
 
@@ -117,6 +143,27 @@ func GetGithubPullDiff(repo, pull string) ([]byte, error) {
 	}
 
 	return resp, nil
+}
+
+func (ref *GithubRef) GetStatuses() ([]GithubRefState, error) {
+	apiURI := fmt.Sprintf("/repos/%s/commits/%s/statuses", ref.Repo, ref.Sha)
+	query := url.Values{}
+	query.Set("access_token", Conf.GitHub.AccessToken)
+
+	LogAccess.Debugf("GET %s?%s", apiURI, query.Encode())
+
+	req, err := http.NewRequest(http.MethodGet,
+		fmt.Sprintf("%s%s?%s", GITHUB_API_URL, apiURI, query.Encode()), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var s []GithubRefState
+	err = DoHTTPRequest(req, true, &s)
+	if err != nil {
+		return nil, err
+	}
+	return s, nil
 }
 
 func (ref *GithubRef) UpdateState(context, state, targetURL, description string) error {
@@ -334,4 +381,59 @@ func webhookHandler(c *gin.Context) {
 	} else {
 		abortWithError(c, 415, "unsupported event: "+hook.Event)
 	}
+}
+
+func WatchLocalRepo() error {
+	var err error
+	for {
+		files, err := ioutil.ReadDir(Conf.Core.WorkDir)
+		if err != nil {
+			break
+		}
+		for _, file := range files {
+			if file.IsDir() {
+				path := filepath.Join(Conf.Core.WorkDir, file.Name())
+				subfiles, err := ioutil.ReadDir(path)
+				if err != nil {
+					break
+				}
+				for _, subfile := range subfiles {
+					if subfile.IsDir() {
+						repository := file.Name() + "/" + subfile.Name()
+						pulls, err := GetGithubPulls(repository)
+						if err != nil {
+							continue
+						}
+						for _, pull := range pulls {
+							ref := GithubRef{
+								Repo: repository,
+								Sha:  pull.Head.Sha,
+							}
+							statuses, err := ref.GetStatuses()
+							if err != nil {
+								continue
+							}
+							lint := 0
+							for _, s := range statuses {
+								if s.Context == "lint" {
+									lint++
+								}
+							}
+							if lint <= 0 {
+								// no statuses, need check
+								message := fmt.Sprintf("%s/pull/%d/commits/%s", ref.Repo, pull.Number, ref.Sha)
+								LogAccess.Info("Push message: " + message)
+								MQ.Push(message)
+							}
+						}
+					}
+				}
+			}
+		}
+		time.Sleep(120 * time.Second)
+	}
+	if err != nil {
+		LogAccess.Error("Local repo watcher error: " + err.Error())
+	}
+	return err
 }
