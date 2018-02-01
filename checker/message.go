@@ -78,10 +78,10 @@ func HandleMessage(message string) error {
 		// return err
 	}
 
-	// git fetch origin pull/XX/head:pull-XX
-	log.WriteString("$ git fetch origin " +
+	// git fetch -f origin pull/XX/head:pull-XX
+	log.WriteString("$ git fetch -f origin " +
 		fmt.Sprintf("pull/%s/head:pull-%s\n", pull, pull))
-	cmd = exec.Command("git", "fetch", "origin",
+	cmd = exec.Command("git", "fetch", "-f", "origin",
 		fmt.Sprintf("pull/%s/head:pull-%s", pull, pull))
 	cmd.Dir = repoPath
 	cmd.Stdout = log
