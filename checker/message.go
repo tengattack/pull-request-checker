@@ -79,10 +79,11 @@ func HandleMessage(message string) error {
 	}
 
 	// git fetch -f origin pull/XX/head:pull-XX
+	branch := fmt.Sprintf("pull-%s", pull)
 	log.WriteString("$ git fetch -f origin " +
-		fmt.Sprintf("pull/%s/head:pull-%s\n", pull, pull))
+		fmt.Sprintf("pull/%s/head:%s\n", pull, branch))
 	cmd = exec.Command("git", "fetch", "-f", "origin",
-		fmt.Sprintf("pull/%s/head:pull-%s", pull, pull))
+		fmt.Sprintf("pull/%s/head:%s", pull, branch))
 	cmd.Dir = repoPath
 	cmd.Stdout = log
 	cmd.Stderr = log
@@ -91,9 +92,9 @@ func HandleMessage(message string) error {
 		return err
 	}
 
-	// git checkout <commits>
-	log.WriteString("$ git checkout " + commits + "\n")
-	cmd = exec.Command("git", "checkout", commits)
+	// git checkout -f <commits>/<branch>
+	log.WriteString("$ git checkout -f " + branch + "\n")
+	cmd = exec.Command("git", "checkout", "-f", branch)
 	cmd.Dir = repoPath
 	cmd.Stdout = log
 	cmd.Stderr = log
