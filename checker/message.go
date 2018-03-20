@@ -93,8 +93,8 @@ func HandleMessage(message string) error {
 	}
 
 	// git checkout -f <commits>/<branch>
-	log.WriteString("$ git checkout -f " + branch + "\n")
-	cmd = exec.Command("git", "checkout", "-f", branch)
+	log.WriteString("$ git checkout -f " + commits + "\n")
+	cmd = exec.Command("git", "checkout", "-f", commits)
 	cmd.Dir = repoPath
 	cmd.Stdout = log
 	cmd.Stderr = log
