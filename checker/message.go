@@ -125,18 +125,35 @@ func HandleMessage(message string) error {
 		return err
 	}
 
+	lintEnabled := LintEnabled{
+		PHP:        true,
+		TypeScript: false,
+	}
+
+	if _, err := os.Stat(filepath.Join(repoPath, "tslint.json")); err == nil {
+		lintEnabled.TypeScript = true
+	}
+
 	comments := []GithubRefComment{}
 	problems := 0
 	for _, d := range diffs {
 		if strings.HasPrefix(d.NewName, "b/") {
 			fileName := d.NewName[2:]
 			log.WriteString(fmt.Sprintf("Checking '%s'\n", fileName))
-			if strings.HasSuffix(fileName, ".php") {
+			var lints []LintMessage
+			if lintEnabled.PHP && strings.HasSuffix(fileName, ".php") {
 				log.WriteString(fmt.Sprintf("PHPLint '%s'\n", fileName))
-				lints, err := PHPLint(filepath.Join(repoPath, fileName))
-				if err != nil {
-					return err
+				lints, err = PHPLint(filepath.Join(repoPath, fileName), repoPath)
+			} else if lintEnabled.TypeScript {
+				if strings.HasSuffix(fileName, ".ts") || strings.HasSuffix(fileName, ".tsx") {
+					log.WriteString(fmt.Sprintf("TSLint '%s'\n", fileName))
+					lints, err = TSLint(filepath.Join(repoPath, fileName), repoPath)
 				}
+			}
+			if err != nil {
+				return err
+			}
+			if lints != nil {
 				for _, hunk := range d.Hunks {
 					if hunk.NewLines > 0 {
 						lines := strings.Split(string(hunk.Body), "\n")
@@ -176,6 +193,7 @@ func HandleMessage(message string) error {
 							}
 						}
 					}
+					// end for
 				}
 				log.WriteString("\n")
 			}

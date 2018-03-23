@@ -28,6 +28,7 @@ type SectionCore struct {
 	CheckLogURI   string `yaml:"check_log_uri"`
 	PHPLint       string `yaml:"phplint"`
 	PHPLintConfig string `yaml:"phplint_config"`
+	TSLint        string `yaml:"tslint"`
 }
 
 // SectionAPI is sub section of config.
