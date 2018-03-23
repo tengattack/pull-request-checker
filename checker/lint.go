@@ -10,6 +10,7 @@ import (
 type LintEnabled struct {
 	PHP        bool
 	TypeScript bool
+	SCSS       bool
 }
 
 // LintMessage is a single lint message for PHPLint
@@ -45,11 +46,21 @@ type TSLintPosition struct {
 	Position  int `json:"position"`
 }
 
-// TSLintSeverity is the map of rule severity name
-var TSLintSeverity map[string]int
+// SCSSLintResult is a single lint result for SCSSLint
+type SCSSLintResult struct {
+	Line     int    `json:"line"`
+	Column   int    `json:"column"`
+	Length   int    `json:"length"`
+	Severity string `json:"severity"`
+	Reason   string `json:"reason"`
+	Linter   string `json:"linter"`
+}
+
+// LintSeverity is the map of rule severity name
+var LintSeverity map[string]int
 
 func init() {
-	TSLintSeverity = map[string]int{
+	LintSeverity = map[string]int{
 		"off":     0,
 		"warning": 1,
 		"error":   2,
@@ -112,7 +123,7 @@ func TSLint(fileName, cwd string) ([]LintMessage, error) {
 	messages = make([]LintMessage, len(results))
 	for i, lint := range results {
 		ruleSeverity := strings.ToLower(lint.RuleSeverity)
-		level, ok := TSLintSeverity[ruleSeverity]
+		level, ok := LintSeverity[ruleSeverity]
 		if !ok {
 			level = 0
 		}
@@ -123,6 +134,52 @@ func TSLint(fileName, cwd string) ([]LintMessage, error) {
 			Column:   lint.StartPosition.Character + 1,
 			Message:  lint.Failure,
 		}
+	}
+	return messages, nil
+}
+
+// SCSSLint lints the scss files
+func SCSSLint(fileName, cwd string) ([]LintMessage, error) {
+	var cmd *exec.Cmd
+	cmd = exec.Command(Conf.Core.SCSSLint, "--format=JSON", fileName)
+	cmd.Dir = cwd
+	out, err := cmd.Output()
+	if err != nil {
+		if _, ok := err.(*exec.ExitError); !ok {
+			return nil, err
+		}
+	}
+
+	LogAccess.Debugf("SCSSLint Result:\n%s", out)
+
+	var results map[string][]SCSSLintResult
+	err = json.Unmarshal(out, &results)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(results) <= 0 {
+		return []LintMessage{}, nil
+	}
+
+	var messages []LintMessage
+	for _, lints := range results {
+		messages = make([]LintMessage, len(lints))
+		for i, lint := range lints {
+			ruleSeverity := strings.ToLower(lint.Severity)
+			level, ok := LintSeverity[ruleSeverity]
+			if !ok {
+				level = 0
+			}
+			messages[i] = LintMessage{
+				RuleID:   lint.Linter,
+				Severity: level,
+				Line:     lint.Line,
+				Column:   lint.Column,
+				Message:  lint.Reason,
+			}
+		}
+		break
 	}
 	return messages, nil
 }

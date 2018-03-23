@@ -14,6 +14,7 @@ core:
   phplint: 'phplint'
   phplint_config: ''
   tslint: './node_modules/.bin/tslint'
+  scsslint: 'scss-lint'
 
 api:
   webhook_uri: "/api/webhook"

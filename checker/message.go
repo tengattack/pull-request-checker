@@ -128,10 +128,14 @@ func HandleMessage(message string) error {
 	lintEnabled := LintEnabled{
 		PHP:        true,
 		TypeScript: false,
+		SCSS:       false,
 	}
 
 	if _, err := os.Stat(filepath.Join(repoPath, "tslint.json")); err == nil {
 		lintEnabled.TypeScript = true
+	}
+	if _, err := os.Stat(filepath.Join(repoPath, ".scss-lint.yml")); err == nil {
+		lintEnabled.SCSS = true
 	}
 
 	comments := []GithubRefComment{}
@@ -149,6 +153,9 @@ func HandleMessage(message string) error {
 					log.WriteString(fmt.Sprintf("TSLint '%s'\n", fileName))
 					lints, err = TSLint(filepath.Join(repoPath, fileName), repoPath)
 				}
+			} else if lintEnabled.SCSS && strings.HasSuffix(fileName, ".scss") {
+				log.WriteString(fmt.Sprintf("SCSSLint '%s'\n", fileName))
+				lints, err = SCSSLint(filepath.Join(repoPath, fileName), repoPath)
 			}
 			if err != nil {
 				return err

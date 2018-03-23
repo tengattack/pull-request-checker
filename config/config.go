@@ -29,6 +29,7 @@ type SectionCore struct {
 	PHPLint       string `yaml:"phplint"`
 	PHPLintConfig string `yaml:"phplint_config"`
 	TSLint        string `yaml:"tslint"`
+	SCSSLint      string `yaml:"scsslint"`
 }
 
 // SectionAPI is sub section of config.
@@ -80,6 +81,8 @@ func BuildDefaultConf() Config {
 	conf.Core.CheckLogURI = ""
 	conf.Core.PHPLint = "phplint"
 	conf.Core.PHPLintConfig = ""
+	conf.Core.TSLint = ""
+	conf.Core.SCSSLint = ""
 
 	// API
 	conf.API.WebHookURI = "/api/webhook"
