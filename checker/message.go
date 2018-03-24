@@ -148,12 +148,12 @@ func HandleMessage(message string) error {
 			if lintEnabled.PHP && strings.HasSuffix(fileName, ".php") {
 				log.WriteString(fmt.Sprintf("PHPLint '%s'\n", fileName))
 				lints, err = PHPLint(filepath.Join(repoPath, fileName), repoPath)
-			} else if lintEnabled.TypeScript {
-				if strings.HasSuffix(fileName, ".ts") || strings.HasSuffix(fileName, ".tsx") {
-					log.WriteString(fmt.Sprintf("TSLint '%s'\n", fileName))
-					lints, err = TSLint(filepath.Join(repoPath, fileName), repoPath)
-				}
-			} else if lintEnabled.SCSS && strings.HasSuffix(fileName, ".scss") {
+			} else if lintEnabled.TypeScript && (strings.HasSuffix(fileName, ".ts") ||
+				strings.HasSuffix(fileName, ".tsx")) {
+				log.WriteString(fmt.Sprintf("TSLint '%s'\n", fileName))
+				lints, err = TSLint(filepath.Join(repoPath, fileName), repoPath)
+			} else if lintEnabled.SCSS && (strings.HasSuffix(fileName, ".scss") ||
+				strings.HasSuffix(fileName, ".css")) {
 				log.WriteString(fmt.Sprintf("SCSSLint '%s'\n", fileName))
 				lints, err = SCSSLint(filepath.Join(repoPath, fileName), repoPath)
 			}
