@@ -2,7 +2,9 @@ package checker
 
 import (
 	"encoding/json"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -11,6 +13,8 @@ type LintEnabled struct {
 	PHP        bool
 	TypeScript bool
 	SCSS       bool
+	JS         string
+	ES         string
 }
 
 // LintMessage is a single lint message for PHPLint
@@ -20,7 +24,7 @@ type LintMessage struct {
 	Line       int    `json:"line"`
 	Column     int    `json:"column"`
 	Message    string `json:"message"`
-	SourceCode string `json:"sourceCode"`
+	SourceCode string `json:"sourceCode,omitempty"`
 }
 
 // LintResult is a single lint result for PHPLint
@@ -67,6 +71,31 @@ func init() {
 	}
 }
 
+func (lintEnabled *LintEnabled) Init(cwd string) {
+
+	// reset to defaults
+	lintEnabled.PHP = true
+	lintEnabled.TypeScript = false
+	lintEnabled.SCSS = false
+	lintEnabled.JS = ""
+	lintEnabled.ES = ""
+
+	if _, err := os.Stat(filepath.Join(cwd, "tslint.json")); err == nil {
+		lintEnabled.TypeScript = true
+	}
+	if _, err := os.Stat(filepath.Join(cwd, ".scss-lint.yml")); err == nil {
+		lintEnabled.SCSS = true
+	}
+	if _, err := os.Stat(filepath.Join(cwd, ".eslintrc")); err == nil {
+		lintEnabled.ES = filepath.Join(cwd, ".eslintrc")
+	}
+	if _, err := os.Stat(filepath.Join(cwd, ".eslintrc.js")); err == nil {
+		lintEnabled.JS = filepath.Join(cwd, ".eslintrc.js")
+	} else {
+		lintEnabled.JS = lintEnabled.ES
+	}
+}
+
 // PHPLint lints the php files
 func PHPLint(fileName, cwd string) ([]LintMessage, error) {
 	var cmd *exec.Cmd
@@ -95,10 +124,38 @@ func PHPLint(fileName, cwd string) ([]LintMessage, error) {
 	return results[0].Messages, nil
 }
 
+// ESLint lints the js, jsx, es, esx files
+func ESLint(fileName, cwd, eslintrc string) ([]LintMessage, error) {
+	var cmd *exec.Cmd
+	if eslintrc != "" {
+		cmd = exec.Command(Conf.Core.ESLint, "-c", eslintrc, "-f", "json", fileName)
+	} else {
+		cmd = exec.Command(Conf.Core.ESLint, "-f", "json", fileName)
+	}
+	cmd.Dir = cwd
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	LogAccess.Debugf("TSLint Result:\n%s", out)
+
+	var results []LintResult
+	err = json.Unmarshal(out, &results)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(results) <= 0 {
+		return []LintMessage{}, nil
+	}
+	return results[0].Messages, nil
+}
+
 // TSLint lints the ts and tsx files
 func TSLint(fileName, cwd string) ([]LintMessage, error) {
 	var cmd *exec.Cmd
-	cmd = exec.Command("node", Conf.Core.TSLint, "--format", "json", fileName)
+	cmd = exec.Command(Conf.Core.TSLint, "--format", "json", fileName)
 	cmd.Dir = cwd
 	out, err := cmd.Output()
 	if err != nil {

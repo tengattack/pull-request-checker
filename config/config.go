@@ -28,6 +28,7 @@ type SectionCore struct {
 	CheckLogURI   string `yaml:"check_log_uri"`
 	PHPLint       string `yaml:"phplint"`
 	PHPLintConfig string `yaml:"phplint_config"`
+	ESLint        string `yaml:"eslint"`
 	TSLint        string `yaml:"tslint"`
 	SCSSLint      string `yaml:"scsslint"`
 }
@@ -81,6 +82,7 @@ func BuildDefaultConf() Config {
 	conf.Core.CheckLogURI = ""
 	conf.Core.PHPLint = "phplint"
 	conf.Core.PHPLintConfig = ""
+	conf.Core.ESLint = ""
 	conf.Core.TSLint = ""
 	conf.Core.SCSSLint = ""
 

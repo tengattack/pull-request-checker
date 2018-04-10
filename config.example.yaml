@@ -13,6 +13,7 @@ core:
   check_log_uri: 'http://example.com/checker/logs/'
   phplint: 'phplint'
   phplint_config: ''
+  eslint: './node_modules/.bin/eslint'
   tslint: './node_modules/.bin/tslint'
   scsslint: 'scss-lint'
 

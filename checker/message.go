@@ -125,18 +125,8 @@ func HandleMessage(message string) error {
 		return err
 	}
 
-	lintEnabled := LintEnabled{
-		PHP:        true,
-		TypeScript: false,
-		SCSS:       false,
-	}
-
-	if _, err := os.Stat(filepath.Join(repoPath, "tslint.json")); err == nil {
-		lintEnabled.TypeScript = true
-	}
-	if _, err := os.Stat(filepath.Join(repoPath, ".scss-lint.yml")); err == nil {
-		lintEnabled.SCSS = true
-	}
+	lintEnabled := LintEnabled{}
+	lintEnabled.Init(repoPath)
 
 	comments := []GithubRefComment{}
 	problems := 0
@@ -156,6 +146,13 @@ func HandleMessage(message string) error {
 				strings.HasSuffix(fileName, ".css")) {
 				log.WriteString(fmt.Sprintf("SCSSLint '%s'\n", fileName))
 				lints, err = SCSSLint(filepath.Join(repoPath, fileName), repoPath)
+			} else if lintEnabled.JS != "" && strings.HasSuffix(fileName, ".js") {
+				log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
+				lints, err = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
+			} else if lintEnabled.ES != "" && (strings.HasSuffix(fileName, ".es") ||
+				strings.HasSuffix(fileName, ".esx") || strings.HasSuffix(fileName, ".jsx"))  {
+				log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
+				lints, err = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.ES)
 			}
 			if err != nil {
 				return err
