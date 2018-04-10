@@ -135,7 +135,9 @@ func ESLint(fileName, cwd, eslintrc string) ([]LintMessage, error) {
 	cmd.Dir = cwd
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, err
+		if _, ok := err.(*exec.ExitError); !ok {
+			return nil, err
+		}
 	}
 
 	LogAccess.Debugf("TSLint Result:\n%s", out)
