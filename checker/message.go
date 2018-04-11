@@ -150,12 +150,28 @@ func HandleMessage(message string) error {
 				log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
 				lints, err = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
 			} else if lintEnabled.ES != "" && (strings.HasSuffix(fileName, ".es") ||
-				strings.HasSuffix(fileName, ".esx") || strings.HasSuffix(fileName, ".jsx"))  {
+				strings.HasSuffix(fileName, ".esx") || strings.HasSuffix(fileName, ".jsx")) {
 				log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
 				lints, err = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.ES)
 			}
 			if err != nil {
 				return err
+			}
+			if lintEnabled.JS != "" && (strings.HasSuffix(fileName, ".html") ||
+				strings.HasSuffix(fileName, ".php")) {
+				// ESLint for HTML & PHP files (ES5)
+				log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
+				lints2, err := ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
+				if err != nil {
+					return err
+				}
+				if lints2 != nil {
+					if lints != nil {
+						lints = append(lints, lints2...)
+					} else {
+						lints = lints2
+					}
+				}
 			}
 			if lints != nil {
 				for _, hunk := range d.Hunks {
