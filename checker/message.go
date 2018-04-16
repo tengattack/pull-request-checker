@@ -22,8 +22,8 @@ func HandleMessage(message string) error {
 	LogAccess.Infof("Start fetching %s/pull/%s", repository, pull)
 
 	ref := GithubRef{
-		Repo: repository,
-		Sha:  commits,
+		RepoName: repository,
+		Sha:      commits,
 	}
 	targetURL := ""
 	if len(Conf.Core.CheckLogURI) > 0 {
@@ -52,7 +52,7 @@ func HandleMessage(message string) error {
 	log.WriteString("Pull Request Checker/" + GetVersion() + "\n\n")
 	log.WriteString(fmt.Sprintf("Start fetching %s/pull/%s\n", repository, pull))
 
-	_, err = GetGithubPull(repository, pull)
+	gpull, err := GetGithubPull(repository, pull)
 	if err != nil {
 		return err
 	}
@@ -68,10 +68,8 @@ func HandleMessage(message string) error {
 		return err
 	}
 
-	log.WriteString("$ git remote add origin " +
-		fmt.Sprintf("git@github.com:%s.git\n", repository))
-	cmd = exec.Command("git", "remote", "add", "origin",
-		fmt.Sprintf("git@github.com:%s.git", repository))
+	log.WriteString("$ git remote add " + gpull.User.Login + " " + gpull.Head.Repo.SSHURL + "\n")
+	cmd = exec.Command("git", "remote", "add", gpull.User.Login, gpull.Head.Repo.SSHURL)
 	cmd.Dir = repoPath
 	err = cmd.Run()
 	if err != nil {
@@ -80,10 +78,10 @@ func HandleMessage(message string) error {
 
 	// git fetch -f origin pull/XX/head:pull-XX
 	branch := fmt.Sprintf("pull-%s", pull)
-	log.WriteString("$ git fetch -f origin " +
-		fmt.Sprintf("pull/%s/head:%s\n", pull, branch))
-	cmd = exec.Command("git", "fetch", "-f", "origin",
-		fmt.Sprintf("pull/%s/head:%s", pull, branch))
+	log.WriteString("$ git fetch -f " + gpull.User.Login + " " +
+		fmt.Sprintf("%s:%s\n", gpull.Head.Ref, branch))
+	cmd = exec.Command("git", "fetch", "-f", gpull.User.Login,
+		fmt.Sprintf("%s:%s", gpull.Head.Ref, branch))
 	cmd.Dir = repoPath
 	cmd.Stdout = log
 	cmd.Stderr = log

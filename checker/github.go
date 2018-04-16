@@ -26,10 +26,18 @@ type GithubPull struct {
 	Title  string    `json:"title"`
 	Head   GithubRef `json:"head"`
 	Base   GithubRef `json:"base"`
+	User   struct {
+		ID    int64  `json:"id"`
+		Login string `json:"login"`
+	} `json:"user"`
 }
 
 type GithubRef struct {
-	Repo  string `json:"-"`
+	RepoName string `json:"-"`
+	Repo     struct {
+		HTMLURL string `json:"html_url"`
+		SSHURL  string `json:"ssh_url"`
+	} `json:"repo"`
 	Label string `json:"label"`
 	Ref   string `json:"ref"`
 	Sha   string `json:"sha"`
@@ -146,7 +154,7 @@ func GetGithubPullDiff(repo, pull string) ([]byte, error) {
 }
 
 func (ref *GithubRef) GetStatuses() ([]GithubRefState, error) {
-	apiURI := fmt.Sprintf("/repos/%s/commits/%s/statuses", ref.Repo, ref.Sha)
+	apiURI := fmt.Sprintf("/repos/%s/commits/%s/statuses", ref.RepoName, ref.Sha)
 	query := url.Values{}
 	query.Set("access_token", Conf.GitHub.AccessToken)
 
@@ -174,7 +182,7 @@ func (ref *GithubRef) UpdateState(context, state, targetURL, description string)
 		Description: description,
 	}
 
-	apiURI := fmt.Sprintf("/repos/%s/statuses/%s", ref.Repo, ref.Sha)
+	apiURI := fmt.Sprintf("/repos/%s/statuses/%s", ref.RepoName, ref.Sha)
 
 	query := url.Values{}
 	query.Set("access_token", Conf.GitHub.AccessToken)
@@ -206,7 +214,7 @@ func (ref *GithubRef) CreateComment(pull, path string, position int, body string
 	}
 
 	// /repos/:owner/:repo/pulls/:number/comments
-	apiURI := fmt.Sprintf("/repos/%s/pulls/%s/comments", ref.Repo, pull)
+	apiURI := fmt.Sprintf("/repos/%s/pulls/%s/comments", ref.RepoName, pull)
 
 	query := url.Values{}
 	query.Set("access_token", Conf.GitHub.AccessToken)
@@ -238,7 +246,7 @@ func (ref *GithubRef) CreateReview(pull, event, body string, comments []GithubRe
 	}
 
 	// POST /repos/:owner/:repo/pulls/:number/reviews
-	apiURI := fmt.Sprintf("/repos/%s/pulls/%s/reviews", ref.Repo, pull)
+	apiURI := fmt.Sprintf("/repos/%s/pulls/%s/reviews", ref.RepoName, pull)
 
 	query := url.Values{}
 	query.Set("access_token", Conf.GitHub.AccessToken)
@@ -263,7 +271,7 @@ func (ref *GithubRef) CreateReview(pull, event, body string, comments []GithubRe
 
 func (ref *GithubRef) GetReviews(pull string) ([]GithubRefReviewResponse, error) {
 	// GET /repos/:owner/:repo/pulls/:number/reviews
-	apiURI := fmt.Sprintf("/repos/%s/pulls/%s/reviews", ref.Repo, pull)
+	apiURI := fmt.Sprintf("/repos/%s/pulls/%s/reviews", ref.RepoName, pull)
 
 	query := url.Values{}
 	query.Set("access_token", Conf.GitHub.AccessToken)
@@ -294,7 +302,7 @@ func (ref *GithubRef) SubmitReview(pull string, id int64, event, body string) er
 	}
 
 	// POST /repos/:owner/:repo/pulls/:number/reviews/:id/events
-	apiURI := fmt.Sprintf("/repos/%s/pulls/%s/reviews/%d/events", ref.Repo, pull, id)
+	apiURI := fmt.Sprintf("/repos/%s/pulls/%s/reviews/%d/events", ref.RepoName, pull, id)
 
 	query := url.Values{}
 	query.Set("access_token", Conf.GitHub.AccessToken)
@@ -356,12 +364,12 @@ func webhookHandler(c *gin.Context) {
 		)
 		LogAccess.Info("Push message: " + message)
 		ref := GithubRef{
-			Repo: payload.Repository.FullName,
-			Sha:  payload.PullRequest.Head.Sha,
+			RepoName: payload.Repository.FullName,
+			Sha:      payload.PullRequest.Head.Sha,
 		}
 		targetURL := ""
 		if len(Conf.Core.CheckLogURI) > 0 {
-			targetURL = Conf.Core.CheckLogURI + ref.Repo + "/" + ref.Sha + ".log"
+			targetURL = Conf.Core.CheckLogURI + ref.RepoName + "/" + ref.Sha + ".log"
 		}
 		err = ref.UpdateState("lint", "pending", targetURL,
 			"check queueing")
@@ -406,8 +414,8 @@ func WatchLocalRepo() error {
 						}
 						for _, pull := range pulls {
 							ref := GithubRef{
-								Repo: repository,
-								Sha:  pull.Head.Sha,
+								RepoName: repository,
+								Sha:      pull.Head.Sha,
 							}
 							statuses, err := ref.GetStatuses()
 							if err != nil {
@@ -421,7 +429,7 @@ func WatchLocalRepo() error {
 							}
 							if lint <= 0 {
 								// no statuses, need check
-								message := fmt.Sprintf("%s/pull/%d/commits/%s", ref.Repo, pull.Number, ref.Sha)
+								message := fmt.Sprintf("%s/pull/%d/commits/%s", ref.RepoName, pull.Number, ref.Sha)
 								LogAccess.Info("Push message: " + message)
 								MQ.Push(message)
 							}
