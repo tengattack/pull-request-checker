@@ -180,8 +180,14 @@ func HandleMessage(message string) error {
 								lint.Line < int(hunk.NewStartLine+hunk.NewLines) {
 								lineNum := 0
 								i := 0
+								lastLineFromOrig := true
 								for ; i < len(lines); i++ {
-									if len(lines[i]) <= 0 || lines[i][0] != '-' {
+									lineExists := len(lines[i]) > 0
+									if !lineExists || lines[i][0] != '-' {
+										if lineExists && lines[i][0] == '\\' && lastLineFromOrig {
+											// `\ No newline at end of file` from original source file
+											continue
+										}
 										if lineNum <= 0 {
 											lineNum = int(hunk.NewStartLine)
 										} else {
@@ -190,6 +196,9 @@ func HandleMessage(message string) error {
 									}
 									if lineNum >= lint.Line {
 										break
+									}
+									if lineExists {
+										lastLineFromOrig = lines[i][0] == '-'
 									}
 								}
 								if i < len(lines) && len(lines[i]) > 0 && lines[i][0] == '+' {
