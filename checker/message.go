@@ -29,11 +29,6 @@ func HandleMessage(message string) error {
 	if len(Conf.Core.CheckLogURI) > 0 {
 		targetURL = Conf.Core.CheckLogURI + repository + "/" + commits + ".log"
 	}
-	err := ref.UpdateState("lint", "pending", targetURL,
-		"checking")
-	if err != nil {
-		LogAccess.Error("Update pull request status error: " + err.Error())
-	}
 
 	repoLogsPath := filepath.Join(Conf.Core.LogsDir, repository)
 	os.MkdirAll(repoLogsPath, os.ModePerm)
@@ -55,6 +50,16 @@ func HandleMessage(message string) error {
 	gpull, err := GetGithubPull(repository, pull)
 	if err != nil {
 		return err
+	}
+	if gpull.State != "open" {
+		log.WriteString("PR " + gpull.State + ".")
+		return nil
+	}
+
+	err = ref.UpdateState("lint", "pending", targetURL,
+		"checking")
+	if err != nil {
+		LogAccess.Error("Update pull request status error: " + err.Error())
 	}
 
 	repoPath := filepath.Join(Conf.Core.WorkDir, repository)
