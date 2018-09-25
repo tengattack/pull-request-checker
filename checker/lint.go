@@ -91,7 +91,7 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 	}
 	if _, err := os.Stat(filepath.Join(cwd, ".eslintrc.js")); err == nil {
 		lintEnabled.JS = filepath.Join(cwd, ".eslintrc.js")
-		if (lintEnabled.ES == "") {
+		if lintEnabled.ES == "" {
 			lintEnabled.ES = lintEnabled.JS
 		}
 	} else {
