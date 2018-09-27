@@ -66,7 +66,7 @@ func RetryErrorMessages() {
 	}
 
 	for {
-		time.Sleep(60 * time.Second)
+		time.Sleep(6 * time.Second)
 		s, err := MQ.MoveErrorToPending()
 		if err != nil || len(s) <= 0 {
 			continue

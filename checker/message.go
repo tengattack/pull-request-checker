@@ -138,7 +138,10 @@ func HandleMessage(message string) error {
 			fileName := d.NewName[2:]
 			log.WriteString(fmt.Sprintf("Checking '%s'\n", fileName))
 			var lints []LintMessage
-			if lintEnabled.PHP && strings.HasSuffix(fileName, ".php") {
+			if lintEnabled.Go && strings.HasSuffix(fileName, ".go") {
+				log.WriteString(fmt.Sprintf("GoLint '%s'\n", fileName))
+				lints, err = GoLint(filepath.Join(repoPath, fileName), repoPath)
+			} else if lintEnabled.PHP && strings.HasSuffix(fileName, ".php") {
 				log.WriteString(fmt.Sprintf("PHPLint '%s'\n", fileName))
 				lints, err = PHPLint(filepath.Join(repoPath, fileName), repoPath)
 			} else if lintEnabled.TypeScript && (strings.HasSuffix(fileName, ".ts") ||
@@ -158,6 +161,7 @@ func HandleMessage(message string) error {
 				lints, err = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.ES)
 			}
 			if err != nil {
+				log.WriteString(err.Error())
 				return err
 			}
 			if lintEnabled.JS != "" && (strings.HasSuffix(fileName, ".html") ||
@@ -176,6 +180,7 @@ func HandleMessage(message string) error {
 					}
 				}
 			}
+
 			if lints != nil {
 				for _, hunk := range d.Hunks {
 					if hunk.NewLines > 0 {

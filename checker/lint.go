@@ -1,15 +1,26 @@
 package checker
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	"github.com/pmezard/go-difflib/difflib"
+
+	"sourcegraph.com/sourcegraph/go-diff/diff"
+
+	"github.com/sqs/goreturns/returns"
+	"golang.org/x/tools/imports"
 )
 
 // LintEnabled list enabled linter
 type LintEnabled struct {
+	Go         bool
 	PHP        bool
 	TypeScript bool
 	SCSS       bool
@@ -71,9 +82,11 @@ func init() {
 	}
 }
 
+// Init default LintEnabled struct
 func (lintEnabled *LintEnabled) Init(cwd string) {
 
 	// reset to defaults
+	lintEnabled.Go = true
 	lintEnabled.PHP = true
 	lintEnabled.TypeScript = false
 	lintEnabled.SCSS = false
@@ -244,4 +257,89 @@ func SCSSLint(fileName, cwd string) ([]LintMessage, error) {
 		break
 	}
 	return messages, nil
+}
+
+// GoLint with goreturns and golint
+func GoLint(filePath, repoPath string) (lints []LintMessage, err error) {
+	// goreturns
+	ruleID := "goreturns"
+	fileDiff, err := goreturns(filePath)
+	if err != nil {
+		return nil, err
+	}
+	if fileDiff != nil {
+		for _, hunk := range fileDiff.Hunks {
+			// scape the preceding common lines
+			delta := 0
+			lines := strings.Split(string(hunk.Body), "\n")
+			for i := 0; i < len(lines); i++ {
+				if len(lines[i]) > 0 && lines[i][0] != ' ' {
+					break
+				}
+				delta++
+			}
+			lints = append(lints, LintMessage{
+				RuleID:   ruleID,
+				Line:     int(hunk.OrigStartLine) + delta,
+				Column:   0,
+				Message:  "\n```\n" + string(hunk.Body) + "\n```",
+				Severity: 1,
+			})
+		}
+	}
+
+	// golint
+	ruleID = "golint"
+	return
+}
+
+func goreturns(filePath string) (*diff.FileDiff, error) {
+	pkgDir := filepath.Dir(filePath)
+
+	opt := &returns.Options{}
+
+	f, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	src, err := ioutil.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+	// src holds the original content.
+	var res = src
+
+	res, err = imports.Process(filePath, res, &imports.Options{
+		Fragment:  opt.Fragment,
+		AllErrors: opt.AllErrors,
+		Comments:  true,
+		TabIndent: true,
+		TabWidth:  8,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	res, err = returns.Process(pkgDir, filePath, res, opt)
+	if err != nil {
+		return nil, err
+	}
+
+	if !bytes.Equal(src, res) {
+		udf := difflib.UnifiedDiff{
+			A:        difflib.SplitLines(string(src)),
+			B:        difflib.SplitLines(string(res)),
+			FromFile: "original",
+			ToFile:   "formatted",
+			Context:  3,
+		}
+		data, _ := difflib.GetUnifiedDiffString(udf)
+		if err != nil {
+			return nil, fmt.Errorf("computing diff: %s", err)
+		}
+		return diff.ParseFileDiff([]byte(data))
+	}
+	return nil, nil
 }
