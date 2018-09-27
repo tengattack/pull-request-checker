@@ -10,12 +10,18 @@ import (
 	"path/filepath"
 	"strings"
 
+	"golang.org/x/lint"
+
 	"github.com/pmezard/go-difflib/difflib"
 
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 
 	"github.com/sqs/goreturns/returns"
 	"golang.org/x/tools/imports"
+)
+
+const (
+	golintMinConfidenceDefault = 0.8 // 0 ~ 1
 )
 
 // LintEnabled list enabled linter
@@ -290,7 +296,22 @@ func GoLint(filePath, repoPath string) (lints []LintMessage, err error) {
 
 	// golint
 	ruleID = "golint"
-	return
+	ps, err := golintFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	for _, p := range ps {
+		if p.Confidence >= golintMinConfidenceDefault {
+			lints = append(lints, LintMessage{
+				RuleID:   ruleID,
+				Severity: 1,
+				Line:     p.Position.Line,
+				Column:   p.Position.Column,
+				Message:  p.Text,
+			})
+		}
+	}
+	return lints, nil
 }
 
 func goreturns(filePath string) (*diff.FileDiff, error) {
@@ -342,4 +363,20 @@ func goreturns(filePath string) (*diff.FileDiff, error) {
 		return diff.ParseFileDiff([]byte(data))
 	}
 	return nil, nil
+}
+
+func golintFile(filePath string) ([]lint.Problem, error) {
+	files := make(map[string][]byte)
+	src, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+	files[filePath] = src
+
+	l := new(lint.Linter)
+	ps, err := l.LintFiles(files)
+	if err != nil {
+		return nil, err
+	}
+	return ps, nil
 }
