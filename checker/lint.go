@@ -10,18 +10,19 @@ import (
 	"path/filepath"
 	"strings"
 
-	"golang.org/x/lint"
-
 	"github.com/pmezard/go-difflib/difflib"
-
-	"sourcegraph.com/sourcegraph/go-diff/diff"
-
 	"github.com/sqs/goreturns/returns"
+	"golang.org/x/lint"
 	"golang.org/x/tools/imports"
+	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
 const (
 	golintMinConfidenceDefault = 0.8 // 0 ~ 1
+
+	lintOff     = 0
+	lintWarning = 1
+	lintError   = 2
 )
 
 // LintEnabled list enabled linter
@@ -82,9 +83,9 @@ var LintSeverity map[string]int
 
 func init() {
 	LintSeverity = map[string]int{
-		"off":     0,
-		"warning": 1,
-		"error":   2,
+		"off":     lintOff,
+		"warning": lintWarning,
+		"error":   lintError,
 	}
 }
 
@@ -206,7 +207,7 @@ func TSLint(fileName, cwd string) ([]LintMessage, error) {
 		ruleSeverity := strings.ToLower(lint.RuleSeverity)
 		level, ok := LintSeverity[ruleSeverity]
 		if !ok {
-			level = 0
+			level = lintOff
 		}
 		messages[i] = LintMessage{
 			RuleID:   lint.RuleName,
@@ -250,7 +251,7 @@ func SCSSLint(fileName, cwd string) ([]LintMessage, error) {
 			ruleSeverity := strings.ToLower(lint.Severity)
 			level, ok := LintSeverity[ruleSeverity]
 			if !ok {
-				level = 0
+				level = lintOff
 			}
 			messages[i] = LintMessage{
 				RuleID:   lint.Linter,
@@ -289,7 +290,7 @@ func GoLint(filePath, repoPath string) (lints []LintMessage, err error) {
 				Line:     int(hunk.OrigStartLine) + delta,
 				Column:   0,
 				Message:  "\n```\n" + string(hunk.Body) + "\n```",
-				Severity: 1,
+				Severity: lintWarning,
 			})
 		}
 	}
@@ -304,7 +305,7 @@ func GoLint(filePath, repoPath string) (lints []LintMessage, err error) {
 		if p.Confidence >= golintMinConfidenceDefault {
 			lints = append(lints, LintMessage{
 				RuleID:   ruleID,
-				Severity: 1,
+				Severity: lintWarning,
 				Line:     p.Position.Line,
 				Column:   p.Position.Column,
 				Message:  p.Text,
