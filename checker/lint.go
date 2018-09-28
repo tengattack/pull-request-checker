@@ -275,7 +275,7 @@ func GoLint(filePath, repoPath string) (lints []LintMessage, err error) {
 	}
 	if fileDiff != nil {
 		for _, hunk := range fileDiff.Hunks {
-			// scape the preceding common lines
+			// skip the preceding common lines
 			delta := 0
 			lines := strings.Split(string(hunk.Body), "\n")
 			for i := 0; i < len(lines); i++ {
@@ -356,7 +356,7 @@ func goreturns(filePath string) (*diff.FileDiff, error) {
 			ToFile:   "formatted",
 			Context:  3,
 		}
-		data, _ := difflib.GetUnifiedDiffString(udf)
+		data, err := difflib.GetUnifiedDiffString(udf)
 		if err != nil {
 			return nil, fmt.Errorf("computing diff: %s", err)
 		}
