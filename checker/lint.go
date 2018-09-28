@@ -289,7 +289,7 @@ func GoLint(filePath, repoPath string, logfile *os.File) (lints []LintMessage, e
 				Line:     int(hunk.OrigStartLine) + delta,
 				Column:   0,
 				Message:  "\n```diff\n" + string(hunk.Body) + "```",
-				Severity: severityLevelWarning,
+				Severity: severityLevelError,
 			})
 		}
 	}
@@ -304,7 +304,7 @@ func GoLint(filePath, repoPath string, logfile *os.File) (lints []LintMessage, e
 		if p.Confidence >= golintMinConfidenceDefault {
 			lints = append(lints, LintMessage{
 				RuleID:   ruleID,
-				Severity: severityLevelWarning,
+				Severity: severityLevelError,
 				Line:     p.Position.Line,
 				Column:   p.Position.Column,
 				Message:  p.Text,
@@ -355,7 +355,6 @@ func goreturns(filePath string, logfile *os.File) (*diff.FileDiff, error) {
 		logfile.WriteString(string(res1))
 		logfile.WriteString("\n---- goreturns ----\n")
 		logfile.WriteString(string(res2))
-
 
 		udf := difflib.UnifiedDiff{
 			A:        difflib.SplitLines(string(src)),
