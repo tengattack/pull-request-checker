@@ -17,12 +17,11 @@ import (
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
+const golintMinConfidenceDefault = 0.8 // 0 ~ 1
 const (
-	golintMinConfidenceDefault = 0.8 // 0 ~ 1
-
-	lintOff     = 0
-	lintWarning = 1
-	lintError   = 2
+	lintOff = iota
+	lintWarning
+	lintError
 )
 
 // LintEnabled list enabled linter
