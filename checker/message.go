@@ -73,8 +73,8 @@ func HandleMessage(message string) error {
 		return err
 	}
 
-	log.WriteString("$ git remote add " + gpull.Head.User.Login + " " + gpull.Head.Repo.SSHURL + "\n")
-	cmd = exec.Command("git", "remote", "add", gpull.Head.User.Login, gpull.Head.Repo.SSHURL)
+	log.WriteString("$ git remote add " + gpull.User.Login + " " + gpull.Head.Repo.SSHURL + "\n")
+	cmd = exec.Command("git", "remote", "add", gpull.User.Login, gpull.Head.Repo.SSHURL)
 	cmd.Dir = repoPath
 	err = cmd.Run()
 	if err != nil {
@@ -83,9 +83,9 @@ func HandleMessage(message string) error {
 
 	// git fetch -f origin pull/XX/head:pull-XX
 	branch := fmt.Sprintf("pull-%s", pull)
-	log.WriteString("$ git fetch -f " + gpull.Head.User.Login + " " +
+	log.WriteString("$ git fetch -f " + gpull.User.Login + " " +
 		fmt.Sprintf("%s:%s\n", gpull.Head.Ref, branch))
-	cmd = exec.Command("git", "fetch", "-f", gpull.Head.User.Login,
+	cmd = exec.Command("git", "fetch", "-f", gpull.User.Login,
 		fmt.Sprintf("%s:%s", gpull.Head.Ref, branch))
 	cmd.Dir = repoPath
 	cmd.Stdout = log

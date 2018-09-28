@@ -18,20 +18,18 @@ const (
 	GITHUB_API_URL = "https://api.github.com"
 )
 
-type githubUser struct {
-	ID    int64  `json:"id"`
-	Login string `json:"login"`
-}
-
 type GithubPull struct {
-	URL    string     `json:"url"`
-	ID     int64      `json:"id"`
-	Number int64      `json:"number"`
-	State  string     `json:"state"`
-	Title  string     `json:"title"`
-	Head   GithubRef  `json:"head"`
-	Base   GithubRef  `json:"base"`
-	User   githubUser `json:"user"`
+	URL    string    `json:"url"`
+	ID     int64     `json:"id"`
+	Number int64     `json:"number"`
+	State  string    `json:"state"`
+	Title  string    `json:"title"`
+	Head   GithubRef `json:"head"`
+	Base   GithubRef `json:"base"`
+	User   struct {
+		ID    int64  `json:"id"`
+		Login string `json:"login"`
+	} `json:"user"`
 }
 
 type GithubRef struct {
@@ -40,10 +38,9 @@ type GithubRef struct {
 		HTMLURL string `json:"html_url"`
 		SSHURL  string `json:"ssh_url"`
 	} `json:"repo"`
-	Label string     `json:"label"`
-	Ref   string     `json:"ref"`
-	Sha   string     `json:"sha"`
-	User  githubUser `json:"user"`
+	Label string `json:"label"`
+	Ref   string `json:"ref"`
+	Sha   string `json:"sha"`
 }
 
 type GithubRefState struct {
