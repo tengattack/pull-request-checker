@@ -232,8 +232,8 @@ func HandleMessage(message string) error {
 					}
 					// end for
 				}
-				log.WriteString("\n")
 			}
+			log.WriteString("\n")
 		}
 	}
 

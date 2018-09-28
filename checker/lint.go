@@ -289,7 +289,7 @@ func GoLint(filePath, repoPath string) (lints []LintMessage, err error) {
 				RuleID:   ruleID,
 				Line:     int(hunk.OrigStartLine) + delta,
 				Column:   0,
-				Message:  "\n```\n" + string(hunk.Body) + "\n```",
+				Message:  "\n```\n" + string(hunk.Body) + "```",
 				Severity: lintWarning,
 			})
 		}
