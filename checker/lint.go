@@ -19,9 +19,9 @@ import (
 
 const golintMinConfidenceDefault = 0.8 // 0 ~ 1
 const (
-	lintOff = iota
-	lintWarning
-	lintError
+	severityLevelOff = iota
+	severityLevelWarning
+	severityLevelError
 )
 
 // LintEnabled list enabled linter
@@ -82,9 +82,9 @@ var LintSeverity map[string]int
 
 func init() {
 	LintSeverity = map[string]int{
-		"off":     lintOff,
-		"warning": lintWarning,
-		"error":   lintError,
+		"off":     severityLevelOff,
+		"warning": severityLevelWarning,
+		"error":   severityLevelError,
 	}
 }
 
@@ -206,7 +206,7 @@ func TSLint(fileName, cwd string) ([]LintMessage, error) {
 		ruleSeverity := strings.ToLower(lint.RuleSeverity)
 		level, ok := LintSeverity[ruleSeverity]
 		if !ok {
-			level = lintOff
+			level = severityLevelOff
 		}
 		messages[i] = LintMessage{
 			RuleID:   lint.RuleName,
@@ -250,7 +250,7 @@ func SCSSLint(fileName, cwd string) ([]LintMessage, error) {
 			ruleSeverity := strings.ToLower(lint.Severity)
 			level, ok := LintSeverity[ruleSeverity]
 			if !ok {
-				level = lintOff
+				level = severityLevelOff
 			}
 			messages[i] = LintMessage{
 				RuleID:   lint.Linter,
@@ -289,7 +289,7 @@ func GoLint(filePath, repoPath string) (lints []LintMessage, err error) {
 				Line:     int(hunk.OrigStartLine) + delta,
 				Column:   0,
 				Message:  "\n```diff\n" + string(hunk.Body) + "```",
-				Severity: lintWarning,
+				Severity: severityLevelWarning,
 			})
 		}
 	}
@@ -304,7 +304,7 @@ func GoLint(filePath, repoPath string) (lints []LintMessage, err error) {
 		if p.Confidence >= golintMinConfidenceDefault {
 			lints = append(lints, LintMessage{
 				RuleID:   ruleID,
-				Severity: lintWarning,
+				Severity: severityLevelWarning,
 				Line:     p.Position.Line,
 				Column:   p.Position.Column,
 				Message:  p.Text,
