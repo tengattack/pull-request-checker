@@ -161,7 +161,7 @@ func HandleMessage(message string) error {
 				lints, err = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.ES)
 			}
 			if err != nil {
-				log.WriteString(err.Error())
+				log.WriteString(err.Error() + "\n")
 				return err
 			}
 			if lintEnabled.JS != "" && (strings.HasSuffix(fileName, ".html") ||
