@@ -266,10 +266,10 @@ func SCSSLint(fileName, cwd string) ([]LintMessage, error) {
 }
 
 // GoLint with goreturns and golint
-func GoLint(filePath, repoPath string, logfile *os.File) (lints []LintMessage, err error) {
+func GoLint(filePath, repoPath string) (lints []LintMessage, err error) {
 	// goreturns
 	ruleID := "goreturns"
-	fileDiff, err := goreturns(filePath, logfile)
+	fileDiff, err := goreturns(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +314,7 @@ func GoLint(filePath, repoPath string, logfile *os.File) (lints []LintMessage, e
 	return lints, nil
 }
 
-func goreturns(filePath string, logfile *os.File) (*diff.FileDiff, error) {
+func goreturns(filePath string) (*diff.FileDiff, error) {
 	pkgDir := filepath.Dir(filePath)
 
 	opt := &returns.Options{}
@@ -332,7 +332,7 @@ func goreturns(filePath string, logfile *os.File) (*diff.FileDiff, error) {
 	// src holds the original content.
 	var res = src
 
-	res1, err := imports.Process(filePath, res, &imports.Options{
+	res, err = imports.Process(filePath, res, &imports.Options{
 		Fragment:  opt.Fragment,
 		AllErrors: opt.AllErrors,
 		Comments:  true,
@@ -343,22 +343,15 @@ func goreturns(filePath string, logfile *os.File) (*diff.FileDiff, error) {
 		return nil, err
 	}
 
-	res2, err := returns.Process(pkgDir, filePath, res1, opt)
+	res, err = returns.Process(pkgDir, filePath, res, opt)
 	if err != nil {
 		return nil, err
 	}
 
-	if !bytes.Equal(src, res2) {
-		logfile.WriteString("\n---- src ----\n")
-		logfile.WriteString(string(src))
-		logfile.WriteString("\n---- goimports ----\n")
-		logfile.WriteString(string(res1))
-		logfile.WriteString("\n---- goreturns ----\n")
-		logfile.WriteString(string(res2))
-
+	if !bytes.Equal(src, res) {
 		udf := difflib.UnifiedDiff{
 			A:        difflib.SplitLines(string(src)),
-			B:        difflib.SplitLines(string(res2)),
+			B:        difflib.SplitLines(string(res)),
 			FromFile: "original",
 			ToFile:   "formatted",
 			Context:  3,

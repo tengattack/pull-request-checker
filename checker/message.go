@@ -140,7 +140,7 @@ func HandleMessage(message string) error {
 			var lints []LintMessage
 			if lintEnabled.Go && strings.HasSuffix(fileName, ".go") {
 				log.WriteString(fmt.Sprintf("GoLint '%s'\n", fileName))
-				lints, err = GoLint(filepath.Join(repoPath, fileName), repoPath, log)
+				lints, err = GoLint(filepath.Join(repoPath, fileName), repoPath)
 			} else if lintEnabled.PHP && strings.HasSuffix(fileName, ".php") {
 				log.WriteString(fmt.Sprintf("PHPLint '%s'\n", fileName))
 				lints, err = PHPLint(filepath.Join(repoPath, fileName), repoPath)
