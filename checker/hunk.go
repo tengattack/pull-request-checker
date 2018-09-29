@@ -42,10 +42,10 @@ func getNewEndingDelta(hunk *diff.Hunk) int {
 		return 0
 	}
 	lines := strings.Split(string(hunk.Body), "\n")
-	delta := len(lines) - 1
-	if delta < 0 {
-		delta = 0
+	if len(lines) == 0 {
+		return 0
 	}
+	delta := len(lines) - 1
 	for i := len(lines)-1; i>=0 && delta > 0; i-- {
 		if len(lines[i])>0 && lines[i][0] != ' ' {
 			break
