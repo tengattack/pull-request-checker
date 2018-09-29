@@ -36,3 +36,18 @@ func getNewBeginningDelta(hunk *diff.Hunk) int {
 	}
 	return delta
 }
+
+func getNewEndingDelta(hunk *diff.Hunk) int {
+	if hunk == nil {
+		return 0
+	}
+	lines := strings.Split(string(hunk.Body), "\n")
+	delta := len(lines) - 1
+	for i := len(lines)-1; i>=0 && delta > 0; i-- {
+		if len(lines[i])>0 && lines[i][0] != ' ' {
+			break
+		}
+		delta--
+	}
+	return delta
+}
