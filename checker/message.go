@@ -139,8 +139,32 @@ func HandleMessage(message string) error {
 			log.WriteString(fmt.Sprintf("Checking '%s'\n", fileName))
 			var lints []LintMessage
 			if lintEnabled.Go && strings.HasSuffix(fileName, ".go") {
-				log.WriteString(fmt.Sprintf("GoLint '%s'\n", fileName))
-				lints, err = GoLint(filepath.Join(repoPath, fileName), repoPath)
+				log.WriteString(fmt.Sprintf("Goreturns '%s'\n", fileName))
+				lintsGoreturns, err := Goreturns(filepath.Join(repoPath, fileName), repoPath)
+				if err != nil {
+					return err
+				}
+				for _, lint := range lintsGoreturns {
+					for _, hunk := range d.Hunks {
+						intersection := lint.Column > 0 && hunk.NewLines > 0
+						intersection = intersection && (lint.Line+lint.Column-1 >= int(hunk.NewStartLine))
+						intersection = intersection && (int(hunk.NewStartLine+hunk.NewLines-1) >= lint.Line)
+						if intersection {
+							log.WriteString(fmt.Sprintf("%d:%d %s %s\n",
+								lint.Line, 0, lint.Message, lint.RuleID))
+							comment := fmt.Sprintf("`%s` %d:%d %s",
+								lint.RuleID, lint.Line, 0, lint.Message)
+							comments = append(comments, GithubRefComment{
+								Path:     fileName,
+								Position: int(hunk.StartPosition),
+								Body:     comment,
+							})
+							problems++
+						}
+					}
+				}
+				log.WriteString(fmt.Sprintf("Golint '%s'\n", fileName))
+				lints, err = Golint(filepath.Join(repoPath, fileName), repoPath)
 			} else if lintEnabled.PHP && strings.HasSuffix(fileName, ".php") {
 				log.WriteString(fmt.Sprintf("PHPLint '%s'\n", fileName))
 				lints, err = PHPLint(filepath.Join(repoPath, fileName), repoPath)
@@ -161,7 +185,6 @@ func HandleMessage(message string) error {
 				lints, err = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.ES)
 			}
 			if err != nil {
-				log.WriteString(err.Error() + "\n")
 				return err
 			}
 			if lintEnabled.JS != "" && (strings.HasSuffix(fileName, ".html") ||

@@ -24,7 +24,7 @@ const (
 	severityLevelError
 )
 const (
-	ruleGolint = "golint"
+	ruleGolint    = "golint"
 	ruleGoreturns = "goreturns"
 )
 
@@ -269,9 +269,8 @@ func SCSSLint(fileName, cwd string) ([]LintMessage, error) {
 	return messages, nil
 }
 
-// GoLint with goreturns and golint
-func GoLint(filePath, repoPath string) (lints []LintMessage, err error) {
-	// goreturns
+// Goreturns formats the go code
+func Goreturns(filePath, repoPath string) (lints []LintMessage, err error) {
 	ruleID := ruleGoreturns
 	fileDiff, err := goreturns(filePath)
 	if err != nil {
@@ -282,7 +281,7 @@ func GoLint(filePath, repoPath string) (lints []LintMessage, err error) {
 			// skip the preceding common lines
 			delta := 0
 			lines := strings.Split(string(hunk.Body), "\n")
-			for i := 0; i < len(lines); i++ {
+			for i := 0; i < len(lines) && delta < int(hunk.OrigLines); i++ {
 				if len(lines[i]) > 0 && lines[i][0] != ' ' {
 					break
 				}
@@ -291,16 +290,19 @@ func GoLint(filePath, repoPath string) (lints []LintMessage, err error) {
 			lints = append(lints, LintMessage{
 				RuleID:   ruleID,
 				Line:     int(hunk.OrigStartLine) + delta,
-				Column:   0,
+				Column:   int(hunk.OrigLines) - delta,
 				Message:  "\n```diff\n" + string(hunk.Body) + "```",
 				Severity: severityLevelError,
 			})
 		}
 	}
+	return lints, nil
+}
 
-	// golint
-	ruleID = ruleGolint
-	ps, err := golintFile(filePath)
+// Golint lints the go file
+func Golint(filePath, repoPath string) (lints []LintMessage, err error) {
+	ruleID := ruleGolint
+	ps, err := golint(filePath)
 	if err != nil {
 		return nil, err
 	}
@@ -369,7 +371,7 @@ func goreturns(filePath string) (*diff.FileDiff, error) {
 	return nil, nil
 }
 
-func golintFile(filePath string) ([]lint.Problem, error) {
+func golint(filePath string) ([]lint.Problem, error) {
 	files := make(map[string][]byte)
 	src, err := ioutil.ReadFile(filePath)
 	if err != nil {
