@@ -23,6 +23,10 @@ const (
 	severityLevelWarning
 	severityLevelError
 )
+const (
+	ruleGolint = "golint"
+	ruleGoreturns = "goreturns"
+)
 
 // LintEnabled list enabled linter
 type LintEnabled struct {
@@ -268,7 +272,7 @@ func SCSSLint(fileName, cwd string) ([]LintMessage, error) {
 // GoLint with goreturns and golint
 func GoLint(filePath, repoPath string) (lints []LintMessage, err error) {
 	// goreturns
-	ruleID := "goreturns"
+	ruleID := ruleGoreturns
 	fileDiff, err := goreturns(filePath)
 	if err != nil {
 		return nil, err
@@ -295,7 +299,7 @@ func GoLint(filePath, repoPath string) (lints []LintMessage, err error) {
 	}
 
 	// golint
-	ruleID = "golint"
+	ruleID = ruleGolint
 	ps, err := golintFile(filePath)
 	if err != nil {
 		return nil, err
