@@ -278,15 +278,7 @@ func Goreturns(filePath, repoPath string) (lints []LintMessage, err error) {
 	}
 	if fileDiff != nil {
 		for _, hunk := range fileDiff.Hunks {
-			// skip the preceding common lines
-			delta := 0
-			lines := strings.Split(string(hunk.Body), "\n")
-			for i := 0; i < len(lines) && delta < int(hunk.OrigLines); i++ {
-				if len(lines[i]) > 0 && lines[i][0] != ' ' {
-					break
-				}
-				delta++
-			}
+			delta := getOrigBeginningDelta(hunk)
 			lints = append(lints, LintMessage{
 				RuleID:   ruleID,
 				Line:     int(hunk.OrigStartLine) + delta,

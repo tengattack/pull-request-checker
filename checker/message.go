@@ -156,7 +156,7 @@ func HandleMessage(message string) error {
 								lint.RuleID, lint.Line, 0, lint.Message)
 							comments  = append(comments, GithubRefComment{
 								Path:     fileName,
-								Position: int(hunk.StartPosition),
+								Position: int(hunk.StartPosition) + getNewBeginningDelta(hunk),
 								Body:     comment,
 							})
 							problems++
