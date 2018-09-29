@@ -146,15 +146,15 @@ func HandleMessage(message string) error {
 				}
 				for _, lint := range lintsGoreturns {
 					for _, hunk := range d.Hunks {
-						intersection := lint.Column > 0 && hunk.NewLines > 0
+						intersection  := lint.Column > 0 && hunk.NewLines > 0
 						intersection = intersection && (lint.Line+lint.Column-1 >= int(hunk.NewStartLine))
 						intersection = intersection && (int(hunk.NewStartLine+hunk.NewLines-1) >= lint.Line)
 						if intersection {
 							log.WriteString(fmt.Sprintf("%d:%d %s %s\n",
 								lint.Line, 0, lint.Message, lint.RuleID))
-							comment := fmt.Sprintf("`%s` %d:%d %s",
+							comment  := fmt.Sprintf("`%s` %d:%d %s",
 								lint.RuleID, lint.Line, 0, lint.Message)
-							comments = append(comments, GithubRefComment{
+							comments  = append(comments, GithubRefComment{
 								Path:     fileName,
 								Position: int(hunk.StartPosition),
 								Body:     comment,
