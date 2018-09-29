@@ -160,6 +160,7 @@ func HandleMessage(message string) error {
 								Body:     comment,
 							})
 							problems++
+							break
 						}
 					}
 				}
