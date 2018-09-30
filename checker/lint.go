@@ -352,7 +352,7 @@ func goreturns(filePath string) (*diff.FileDiff, error) {
 			B:        difflib.SplitLines(string(res)),
 			FromFile: "original",
 			ToFile:   "formatted",
-			Context:  3,
+			Context:  0,
 		}
 		data, err := difflib.GetUnifiedDiffString(udf)
 		if err != nil {
