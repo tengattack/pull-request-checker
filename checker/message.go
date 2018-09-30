@@ -118,6 +118,9 @@ func HandleMessage(message string) error {
 
 	// get diff from github
 	out, err := GetGithubPullDiff(repository, pull)
+	log.WriteString("\n---------------------\n")
+	log.WriteString(string(out))
+	log.WriteString("\n---------------------\n")
 	if err != nil {
 		return err
 	}
@@ -156,9 +159,10 @@ func HandleMessage(message string) error {
 								lint.RuleID, lint.Line, 0, lint.Message)
 							comments  = append(comments, GithubRefComment{
 								Path:     fileName,
-								Position: int(hunk.StartPosition) + getNewEndingDelta(hunk),
+								Position: int(hunk.StartPosition) + getOffsetNew(lint.Line, hunk),
 								Body:     comment,
 							})
+							LogAccess.Debugf("Position: %d, FileName: %s", comments[len(comments) - 1].Position, fileName)
 							problems++
 							break
 						}

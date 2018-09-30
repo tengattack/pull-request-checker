@@ -54,3 +54,45 @@ func getNewEndingDelta(hunk *diff.Hunk) int {
 	}
 	return delta
 }
+
+func getOffsetNew(targetLine int, hunk *diff.Hunk) int {
+	if hunk == nil {
+		return 0
+	}
+	if targetLine < int(hunk.NewStartLine) || targetLine >= int(hunk.NewStartLine+ hunk.NewLines) {
+		return 0
+	}
+	currentLine := int(hunk.NewStartLine)
+	currentLineOffset := 0
+
+	lines := strings.Split(string(hunk.Body), "\n")
+	i:=0;
+	for ; i<len(lines); i++ {
+		if len(lines[i]) <= 0 {
+			continue
+		}
+		if lines[i][0] == ' ' || lines[i][0] == '+' {
+			break
+		}
+		if lines[i][0] == '-' || lines[i][0] == '\\'{
+			currentLineOffset++
+		}
+	}
+
+	for ; i<len(lines); i++ {
+		if len(lines[i]) <= 0 {
+			continue
+		}
+		if currentLine >= targetLine {
+			break
+		}
+		if lines[i][0] == ' ' || lines[i][0] == '+' {
+			currentLine++
+			currentLineOffset++
+		}
+		if lines[i][0] == '-' || lines[i][0] == '\\'{
+			currentLineOffset++
+		}
+	}
+	return currentLineOffset
+}
