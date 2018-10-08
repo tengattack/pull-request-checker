@@ -278,7 +278,7 @@ func Goreturns(filePath, repoPath string) (lints []LintMessage, err error) {
 	}
 	if fileDiff != nil {
 		for _, hunk := range fileDiff.Hunks {
-			delta := getOrigBeginningDelta(hunk)
+			delta := getNumberofContextLines(hunk, hunk.OrigLines)
 			lints = append(lints, LintMessage{
 				RuleID:   ruleID,
 				Line:     int(hunk.OrigStartLine) + delta,

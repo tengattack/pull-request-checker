@@ -38,7 +38,7 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 								lint.RuleID, lint.Line, 0, lint.Message)
 							comments = append(comments, GithubRefComment{
 								Path:     fileName,
-								Position: int(hunk.StartPosition) + getOffsetNew(lint.Line, hunk),
+								Position: int(hunk.StartPosition) + getOffsetToUnifiedDiff(lint.Line, hunk),
 								Body:     comment,
 							})
 							problems++
