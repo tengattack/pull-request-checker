@@ -44,7 +44,10 @@ func getOffsetToUnifiedDiff(targetLine int, hunk *diff.Hunk) int {
 	currentLineOffset := i
 
 	for ; i > 0; i-- {
-		if len(lines[i]) == 0 || lines[i][0] == ' ' || lines[i][0] == '+' {
+		if len(lines[i]) == 0 {
+			break
+		}
+		if lines[i][0] == ' ' || lines[i][0] == '+' {
 			break
 		}
 		if lines[i][0] == '-' || lines[i][0] == '\\' {
@@ -56,9 +59,15 @@ func getOffsetToUnifiedDiff(targetLine int, hunk *diff.Hunk) int {
 		if currentLine <= targetLine {
 			break
 		}
-		if len(lines[i]) == 0 || lines[i][0] == ' ' || lines[i][0] == '+' {
+		if len(lines[i]) == 0 {
 			currentLine--
 			currentLineOffset--
+			continue
+		}
+		if lines[i][0] == ' ' || lines[i][0] == '+' {
+			currentLine--
+			currentLineOffset--
+			continue
 		}
 		if lines[i][0] == '-' || lines[i][0] == '\\' {
 			currentLineOffset--
