@@ -6,14 +6,14 @@ import (
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
-func getNumberofContextLines(hunk *diff.Hunk, limit int32) int {
+func getNumberofContextLines(hunk *diff.Hunk, limit int) int {
 	if hunk == nil {
 		return 0
 	}
 	// skip the preceding common context lines
 	delta := 0
 	lines := strings.Split(string(hunk.Body), "\n")
-	for i := 0; i < len(lines) && delta < int(limit); i++ {
+	for i := 0; i < len(lines) && delta < limit; i++ {
 		if len(lines[i]) == 0 {
 			continue
 		}

@@ -17,7 +17,9 @@ import (
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
-const golintMinConfidenceDefault = 0.8 // 0 ~ 1
+// A value in (0,1] estimating the confidence of correctness in golint reports
+// This value is used internally by golint. Its default value is 0.8
+const golintMinConfidenceDefault = 0.8
 const (
 	severityLevelOff = iota
 	severityLevelWarning
@@ -278,7 +280,7 @@ func Goreturns(filePath, repoPath string) (lints []LintMessage, err error) {
 	}
 	if fileDiff != nil {
 		for _, hunk := range fileDiff.Hunks {
-			delta := getNumberofContextLines(hunk, hunk.OrigLines)
+			delta := getNumberofContextLines(hunk, int(hunk.OrigLines))
 			size := int(hunk.OrigLines) - delta
 			if hunk.OrigLines == 0 {
 				size = 1
