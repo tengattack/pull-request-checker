@@ -2,6 +2,7 @@ package checker
 
 import (
 	"strings"
+
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
@@ -28,39 +29,39 @@ func getOffsetToUnifiedDiff(targetLine int, hunk *diff.Hunk) int {
 	if hunk == nil {
 		return 0
 	}
-	if targetLine < int(hunk.NewStartLine) || targetLine >= int(hunk.NewStartLine+ hunk.NewLines) {
+	lines := strings.Split(string(hunk.Body), "\n")
+	if len(lines) <= 1 {
 		return 0
 	}
-	currentLine := int(hunk.NewStartLine)
-	currentLineOffset := 0
+	i := len(lines) - 1
+	if lines[len(lines)-1] == "" {
+		i--
+	}
+	if targetLine < int(hunk.NewStartLine) || targetLine >= int(hunk.NewStartLine+hunk.NewLines) {
+		return i
+	}
+	currentLine := int(hunk.NewStartLine + hunk.NewLines - 1)
+	currentLineOffset := i
 
-	lines := strings.Split(string(hunk.Body), "\n")
-	i:=0;
-	for ; i<len(lines); i++ {
-		if len(lines[i]) <= 0 {
-			continue
-		}
-		if lines[i][0] == ' ' || lines[i][0] == '+' {
+	for ; i > 0; i-- {
+		if len(lines[i]) == 0 || lines[i][0] == ' ' || lines[i][0] == '+' {
 			break
 		}
-		if lines[i][0] == '-' || lines[i][0] == '\\'{
-			currentLineOffset++
+		if lines[i][0] == '-' || lines[i][0] == '\\' {
+			currentLineOffset--
 		}
 	}
 
-	for ; i<len(lines); i++ {
-		if len(lines[i]) <= 0 {
-			continue
-		}
-		if currentLine >= targetLine {
+	for ; i > 0; i-- {
+		if currentLine <= targetLine {
 			break
 		}
-		if lines[i][0] == ' ' || lines[i][0] == '+' {
-			currentLine++
-			currentLineOffset++
+		if len(lines[i]) == 0 || lines[i][0] == ' ' || lines[i][0] == '+' {
+			currentLine--
+			currentLineOffset--
 		}
-		if lines[i][0] == '-' || lines[i][0] == '\\'{
-			currentLineOffset++
+		if lines[i][0] == '-' || lines[i][0] == '\\' {
+			currentLineOffset--
 		}
 	}
 	return currentLineOffset

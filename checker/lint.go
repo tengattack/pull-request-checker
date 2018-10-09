@@ -1,9 +1,9 @@
 package checker
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"bytes"
 	"io/ioutil"
 	"os"
 	"os/exec"
