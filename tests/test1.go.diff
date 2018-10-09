@@ -1,0 +1,202 @@
+diff --git a/test1.go b/test1.go
+index 7147e53..2b88100 100644
+--- a/test1.go
++++ b/test1.go
+@@ -2,14 +2,35 @@ package checker
+
+ import (
+ 	"encoding/json"
++	"fmt"
++	"bytes"
++	"io/ioutil"
+ 	"os"
+ 	"os/exec"
+ 	"path/filepath"
+ 	"strings"
++
++	"github.com/pmezard/go-difflib/difflib"
++	"github.com/sqs/goreturns/returns"
++	"golang.org/x/lint"
++	"golang.org/x/tools/imports"
++	"sourcegraph.com/sourcegraph/go-diff/diff"
++)
++
++const golintMinConfidenceDefault = 0.8 // 0 ~ 1
++const (
++	severityLevelOff = iota
++	severityLevelWarning
++	severityLevelError
++)
++const (
++	ruleGolint    = "golint"
++	ruleGoreturns = "goreturns"
+ )
+
+ // LintEnabled list enabled linter
+ type LintEnabled struct {
++	Go         bool
+ 	PHP        bool
+ 	TypeScript bool
+ 	SCSS       bool
+@@ -65,15 +86,17 @@ var LintSeverity map[string]int
+
+ func init() {
+ 	LintSeverity = map[string]int{
+-		"off":     0,
+-		"warning": 1,
+-		"error":   2,
++		"off":     severityLevelOff,
++		"warning": severityLevelWarning,
++		"error":   severityLevelError,
+ 	}
+ }
+
++// Init default LintEnabled struct
+ func (lintEnabled *LintEnabled) Init(cwd string) {
+
+ 	// reset to defaults
++	lintEnabled.Go = true
+ 	lintEnabled.PHP = true
+ 	lintEnabled.TypeScript = false
+ 	lintEnabled.SCSS = false
+@@ -91,7 +114,7 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
+ 	}
+ 	if _, err := os.Stat(filepath.Join(cwd, ".eslintrc.js")); err == nil {
+ 		lintEnabled.JS = filepath.Join(cwd, ".eslintrc.js")
+-		if (lintEnabled.ES == "") {
++		if lintEnabled.ES == "" {
+ 			lintEnabled.ES = lintEnabled.JS
+ 		}
+ 	} else {
+@@ -187,7 +210,7 @@ func TSLint(fileName, cwd string) ([]LintMessage, error) {
+ 		ruleSeverity := strings.ToLower(lint.RuleSeverity)
+ 		level, ok := LintSeverity[ruleSeverity]
+ 		if !ok {
+-			level = 0
++			level = severityLevelOff
+ 		}
+ 		messages[i] = LintMessage{
+ 			RuleID:   lint.RuleName,
+@@ -231,7 +254,7 @@ func SCSSLint(fileName, cwd string) ([]LintMessage, error) {
+ 			ruleSeverity := strings.ToLower(lint.Severity)
+ 			level, ok := LintSeverity[ruleSeverity]
+ 			if !ok {
+-				level = 0
++				level = severityLevelOff
+ 			}
+ 			messages[i] = LintMessage{
+ 				RuleID:   lint.Linter,
+@@ -245,3 +268,113 @@ func SCSSLint(fileName, cwd string) ([]LintMessage, error) {
+ 	}
+ 	return messages, nil
+ }
++
++// Goreturns formats the go code
++func Goreturns(filePath, repoPath string) (lints []LintMessage, err error) {
++	ruleID := ruleGoreturns
++	fileDiff, err := goreturns(filePath)
++	if err != nil {
++		return nil, err
++	}
++	if fileDiff != nil {
++		for _, hunk := range fileDiff.Hunks {
++			delta := getOrigBeginningDelta(hunk)
++			lints = append(lints, LintMessage{
++				RuleID:   ruleID,
++				Line:     int(hunk.OrigStartLine) + delta,
++				Column:   int(hunk.OrigLines) - delta,
++				Message:  "\n```diff\n" + string(hunk.Body) + "```",
++				Severity: severityLevelError,
++			})
++		}
++	}
++	return lints, nil
++}
++
++// Golint lints the go file
++func Golint(filePath, repoPath string) (lints []LintMessage, err error) {
++	ruleID := ruleGolint
++	ps, err := golint(filePath)
++	if err != nil {
++		return nil, err
++	}
++	for _, p := range ps {
++		if p.Confidence >= golintMinConfidenceDefault {
++			lints = append(lints, LintMessage{
++				RuleID:   ruleID,
++				Severity: severityLevelError,
++				Line:     p.Position.Line,
++				Column:   p.Position.Column,
++				Message:  p.Text,
++			})
++		}
++	}
++	return lints, nil
++}
++
++func goreturns(filePath string) (*diff.FileDiff, error) {
++	pkgDir := filepath.Dir(filePath)
++
++	opt := &returns.Options{}
++
++	f, err := os.Open(filePath)
++	if err != nil {
++		return nil, err
++	}
++	defer f.Close()
++
++	src, err := ioutil.ReadAll(f)
++	if err != nil {
++		return nil, err
++	}
++	// src holds the original content.
++	var res = src
++
++	res, err = imports.Process(filePath, res, &imports.Options{
++		Fragment:  opt.Fragment,
++		AllErrors: opt.AllErrors,
++		Comments:  true,
++		TabIndent: true,
++		TabWidth:  8,
++	})
++	if err != nil {
++		return nil, err
++	}
++
++	res, err = returns.Process(pkgDir, filePath, res, opt)
++	if err != nil {
++		return nil, err
++	}
++
++	if !bytes.Equal(src, res) {
++		udf := difflib.UnifiedDiff{
++			A:        difflib.SplitLines(string(src)),
++			B:        difflib.SplitLines(string(res)),
++			FromFile: "original",
++			ToFile:   "formatted",
++			Context:  0,
++		}
++		data, err := difflib.GetUnifiedDiffString(udf)
++		if err != nil {
++			return nil, fmt.Errorf("computing diff: %s", err)
++		}
++		return diff.ParseFileDiff([]byte(data))
++	}
++	return nil, nil
++}
++
++func golint(filePath string) ([]lint.Problem, error) {
++	files := make(map[string][]byte)
++	src, err := ioutil.ReadFile(filePath)
++	if err != nil {
++		return nil, err
++	}
++	files[filePath] = src
++
++	l := new(lint.Linter)
++	ps, err := l.LintFiles(files)
++	if err != nil {
++		return nil, err
++	}
++	return ps, nil
++}
