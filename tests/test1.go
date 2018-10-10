@@ -1,9 +1,9 @@
 package checker
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
+	"bytes"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -17,9 +17,7 @@ import (
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
-// A value in (0,1] estimating the confidence of correctness in golint reports
-// This value is used internally by golint. Its default value is 0.8
-const golintMinConfidenceDefault = 0.8
+const golintMinConfidenceDefault = 0.8 // 0 ~ 1
 const (
 	severityLevelOff = iota
 	severityLevelWarning
@@ -280,15 +278,11 @@ func Goreturns(filePath, repoPath string) (lints []LintMessage, err error) {
 	}
 	if fileDiff != nil {
 		for _, hunk := range fileDiff.Hunks {
-			delta := getNumberofContextLines(hunk, int(hunk.OrigLines))
-			size := int(hunk.OrigLines) - delta
-			if hunk.OrigLines == 0 {
-				size = 1
-			}
+			delta := getOrigBeginningDelta(hunk)
 			lints = append(lints, LintMessage{
 				RuleID:   ruleID,
 				Line:     int(hunk.OrigStartLine) + delta,
-				Column:   size,
+				Column:   int(hunk.OrigLines) - delta,
 				Message:  "\n```diff\n" + string(hunk.Body) + "```",
 				Severity: severityLevelError,
 			})
