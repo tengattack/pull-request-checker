@@ -22,7 +22,7 @@ type CheckComment struct {
 	// add a comment. The line just below the "@@" line is position 1, the next line is position 2, and so on.
 	// The position in the diff continues to increase through lines of whitespace and additional hunks until the
 	// beginning of a new file.
-	// see more information: https://developer.github.com/v3/pulls/comments/
+	// See more information: https://developer.github.com/v3/pulls/comments/
 	Position int
 }
 
