@@ -136,8 +136,7 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 							}
 						}
 					}
-				}
-				// end for
+				} // end for
 			}
 			log.WriteString("\n")
 		}
