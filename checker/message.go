@@ -10,6 +10,16 @@ import (
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
+func isCpp(fileName string) bool {
+	ext := []string{".c", ".cc", ".h", ".hpp", ".c++", ".h++", ".cu", ".cpp", ".hxx", ".cxx", ".cuh"}
+	for i := 0; i < len(ext); i++ {
+		if strings.HasSuffix(fileName, ext[i]) {
+			return true
+		}
+	}
+	return false
+}
+
 // GenerateComments generate github comments from github diffs and lint option
 func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *LintEnabled, log *os.File) ([]GithubRefComment, int, error) {
 	comments := []GithubRefComment{}
@@ -20,7 +30,10 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 			fileName := d.NewName[2:]
 			log.WriteString(fmt.Sprintf("Checking '%s'\n", fileName))
 			var lints []LintMessage
-			if lintEnabled.Go && strings.HasSuffix(fileName, ".go") {
+			if lintEnabled.Cpp && isCpp(fileName) {
+				log.WriteString(fmt.Sprintf("CppLint '%s'\n", fileName))
+				lints, err = CppLint(fileName, repoPath)
+			} else if lintEnabled.Go && strings.HasSuffix(fileName, ".go") {
 				log.WriteString(fmt.Sprintf("Goreturns '%s'\n", fileName))
 				lintsGoreturns, err := Goreturns(filepath.Join(repoPath, fileName), repoPath)
 				if err != nil {
@@ -281,6 +294,10 @@ func HandleMessage(message string) error {
 
 	if problems > 0 {
 		comment := fmt.Sprintf("**lint**: %d problem(s) found.", problems)
+		// The API doc didn't say that but too many comments will cause CreateReview to fail with "HTTP 422 Unprocessable Entity: submitted too quickly"
+		if len(comments) > 30 {
+			comments = comments[:30]
+		}
 		err = ref.CreateReview(pull, "REQUEST_CHANGES", comment, comments)
 		if err != nil {
 			log.WriteString("error: " + err.Error() + "\n")
