@@ -31,8 +31,8 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 			log.WriteString(fmt.Sprintf("Checking '%s'\n", fileName))
 			var lints []LintMessage
 			if lintEnabled.CPP && isCPP(fileName) {
-				log.WriteString(fmt.Sprintf("CppLint '%s'\n", fileName))
-				lints, err = CppLint(fileName, repoPath)
+				log.WriteString(fmt.Sprintf("CPPLint '%s'\n", fileName))
+				lints, err = CPPLint(fileName, repoPath)
 			} else if lintEnabled.Go && strings.HasSuffix(fileName, ".go") {
 				log.WriteString(fmt.Sprintf("Goreturns '%s'\n", fileName))
 				lintsGoreturns, err := Goreturns(filepath.Join(repoPath, fileName), repoPath)
@@ -298,7 +298,7 @@ func HandleMessage(message string) error {
 		// with "HTTP 422 Unprocessable Entity: submitted too quickly"
 		if len(comments) > 30 {
 			comments = comments[:30]
-			LogAccess.Warning("Too many comments to push them all at once. Only 30 comments will be pushed right now.")
+			LogAccess.Warn("Too many comments to push them all at once. Only 30 comments will be pushed right now.")
 		}
 		err = ref.CreateReview(pull, "REQUEST_CHANGES", comment, comments)
 		if err != nil {
