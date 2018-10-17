@@ -294,9 +294,11 @@ func HandleMessage(message string) error {
 
 	if problems > 0 {
 		comment := fmt.Sprintf("**lint**: %d problem(s) found.", problems)
-		// The API doc didn't say that but too many comments will cause CreateReview to fail with "HTTP 422 Unprocessable Entity: submitted too quickly"
+		// The API doc didn't quite say this but too many comments will cause CreateReview to fail
+		// with "HTTP 422 Unprocessable Entity: submitted too quickly"
 		if len(comments) > 30 {
 			comments = comments[:30]
+			LogAccess.Warning("Too many comments to push them all at once. Only 30 comments will be pushed right now.")
 		}
 		err = ref.CreateReview(pull, "REQUEST_CHANGES", comment, comments)
 		if err != nil {
