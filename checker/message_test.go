@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"testing"
 
+	"../config"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"sourcegraph.com/sourcegraph/go-diff/diff"
@@ -75,6 +77,10 @@ func TestGenerateCommentsCPP(t *testing.T) {
 	assert.NotNil(assert)
 	require := require.New(t)
 	require.NotNil(require)
+
+	conf, err := config.LoadConfig("../config.yaml")
+	require.Nil(err)
+	Conf = conf
 
 	_, filename, _, ok := runtime.Caller(0)
 	require.True(ok)

@@ -130,7 +130,7 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 
 // CPPLint lints the cpp language files using github.com/cpplint/cpplint
 func CPPLint(filePath string, repoPath string) (lints []LintMessage, err error) {
-	cmd := exec.Command("cpplint", "--quiet", filePath)
+	cmd := exec.Command(Conf.Core.CPPLint, "--quiet", filePath)
 	cmd.Dir = repoPath
 
 	var output bytes.Buffer
