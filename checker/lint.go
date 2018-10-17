@@ -34,7 +34,7 @@ const (
 
 // LintEnabled list enabled linter
 type LintEnabled struct {
-	Cpp        bool
+	CPP        bool
 	Go         bool
 	PHP        bool
 	TypeScript bool
@@ -101,7 +101,7 @@ func init() {
 func (lintEnabled *LintEnabled) Init(cwd string) {
 
 	// reset to defaults
-	lintEnabled.Cpp = true
+	lintEnabled.CPP = true
 	lintEnabled.Go = true
 	lintEnabled.PHP = true
 	lintEnabled.TypeScript = false

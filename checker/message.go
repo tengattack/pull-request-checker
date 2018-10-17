@@ -10,7 +10,7 @@ import (
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
-func isCpp(fileName string) bool {
+func isCPP(fileName string) bool {
 	ext := []string{".c", ".cc", ".h", ".hpp", ".c++", ".h++", ".cu", ".cpp", ".hxx", ".cxx", ".cuh"}
 	for i := 0; i < len(ext); i++ {
 		if strings.HasSuffix(fileName, ext[i]) {
@@ -30,7 +30,7 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 			fileName := d.NewName[2:]
 			log.WriteString(fmt.Sprintf("Checking '%s'\n", fileName))
 			var lints []LintMessage
-			if lintEnabled.Cpp && isCpp(fileName) {
+			if lintEnabled.CPP && isCPP(fileName) {
 				log.WriteString(fmt.Sprintf("CppLint '%s'\n", fileName))
 				lints, err = CppLint(fileName, repoPath)
 			} else if lintEnabled.Go && strings.HasSuffix(fileName, ".go") {

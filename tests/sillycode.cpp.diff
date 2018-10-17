@@ -1,0 +1,24 @@
+diff --git a/sillycode.cpp b/sillycode.cpp
+index 0f3915f..c9b179d 100644
+--- a/sillycode.cpp
++++ b/sillycode.cpp
+@@ -1,8 +1,8 @@
+ class Date {
+     // ...
+-public:
++ public:
+     Month month() const;  // do
+-    int month();          // don't
++    int month();// don't
+     // ...
+ };
+ 
+@@ -77,7 +77,7 @@ class X3 {	// BAD: inexplicit, argument passing overhead
+     string s;
+     int j;
+ public:
+-    X3(int ii = 666, const string& ss = "qqq", int jj = 0)
++    X3(int ii = 666, const string& ss = "sss", int jj = 0)
+         :i{ii}, s{ss}, j{jj} { }		// all members are initialized to their defaults
+     // ...
+ };
