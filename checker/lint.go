@@ -137,7 +137,10 @@ func CPPLint(filePath string, repoPath string) (lints []LintMessage, err error) 
 	cmd.Stderr = &output
 
 	// the exit status is not 0 when cpplint finds a problem in code files
-	cmd.Run()
+	err = cmd.Run()
+	if err != nil && err.Error() != "exit status 1" {
+		LogError.Error("CPPLint: " + err.Error())
+	}
 	lines := strings.Split(output.String(), "\n")
 
 	// Sample output: "code.cpp:138:  Missing spaces around =  [whitespace/operators] [4]"

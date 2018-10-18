@@ -82,6 +82,9 @@ func TestGenerateCommentsCPP(t *testing.T) {
 	require.Nil(err)
 	Conf = conf
 
+	err = InitLog()
+	require.Nil(err)
+
 	_, filename, _, ok := runtime.Caller(0)
 	require.True(ok)
 
