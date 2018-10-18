@@ -144,7 +144,7 @@ func CPPLint(filePath string, repoPath string) (lints []LintMessage, err error) 
 	lines := strings.Split(output.String(), "\n")
 
 	// Sample output: "code.cpp:138:  Missing spaces around =  [whitespace/operators] [4]"
-	re := regexp.MustCompile(":(\\d+):(.+)\\[(.+?)\\] \\[\\d\\]$")
+	re := regexp.MustCompile(`:(\d+):(.+)\[(.+?)\] \[\d\]$`)
 	for _, line := range lines {
 		matched := false
 		lineNum := 0
