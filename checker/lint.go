@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/pmezard/go-difflib/difflib"
@@ -32,6 +34,7 @@ const (
 
 // LintEnabled list enabled linter
 type LintEnabled struct {
+	CPP        bool
 	Go         bool
 	PHP        bool
 	TypeScript bool
@@ -98,6 +101,7 @@ func init() {
 func (lintEnabled *LintEnabled) Init(cwd string) {
 
 	// reset to defaults
+	lintEnabled.CPP = true
 	lintEnabled.Go = true
 	lintEnabled.PHP = true
 	lintEnabled.TypeScript = false
@@ -122,6 +126,56 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 	} else {
 		lintEnabled.JS = lintEnabled.ES
 	}
+}
+
+// CPPLint lints the cpp language files using github.com/cpplint/cpplint
+func CPPLint(filePath string, repoPath string) (lints []LintMessage, err error) {
+	cmd := exec.Command(Conf.Core.CPPLint, "--quiet", filePath)
+	cmd.Dir = repoPath
+
+	var output bytes.Buffer
+	cmd.Stderr = &output
+
+	// the exit status is not 0 when cpplint finds a problem in code files
+	err = cmd.Run()
+	if err != nil && err.Error() != "exit status 1" {
+		LogError.Error("CPPLint: " + err.Error())
+	}
+	lines := strings.Split(output.String(), "\n")
+
+	// Sample output: "code.cpp:138:  Missing spaces around =  [whitespace/operators] [4]"
+	re := regexp.MustCompile(`:(\d+):(.+)\[(.+?)\] \[\d\]$`)
+	for _, line := range lines {
+		matched := false
+		lineNum := 0
+		msg := ""
+		rule := ""
+
+		match := re.FindStringSubmatch(line)
+		for i, m := range match {
+			switch i {
+			case 1:
+				// line number
+				lineNum, _ = strconv.Atoi(m)
+			case 2:
+				// warning message
+				msg = m
+			case 3:
+				rule = m
+				matched = true
+			}
+		}
+		if matched {
+			lints = append(lints, LintMessage{
+				RuleID:   rule,
+				Severity: severityLevelError,
+				Line:     lineNum,
+				Column:   0,
+				Message:  msg,
+			})
+		}
+	}
+	return lints, nil
 }
 
 // PHPLint lints the php files

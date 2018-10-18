@@ -11,6 +11,7 @@ core:
   work_dir: 'tmp'
   logs_dir: 'logs'
   check_log_uri: 'http://example.com/checker/logs/'
+  cpplint: 'cpplint'
   phplint: 'phplint'
   phplint_config: ''
   eslint: './node_modules/.bin/eslint'

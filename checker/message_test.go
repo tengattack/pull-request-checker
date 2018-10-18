@@ -7,6 +7,8 @@ import (
 	"runtime"
 	"testing"
 
+	"../config"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"sourcegraph.com/sourcegraph/go-diff/diff"
@@ -50,6 +52,58 @@ func TestGenerateCommentsGo(t *testing.T) {
 	log, err := os.Create(logFilePath)
 	require.NoError(err)
 	defer os.Remove(logFilePath)
+	defer log.Close()
+
+	diffs, err := diff.ParseMultiFileDiff(out)
+	require.NoError(err)
+
+	lintEnabled := LintEnabled{}
+	lintEnabled.Init(testRepoPath)
+
+	comments, problems, err := GenerateComments(testRepoPath, diffs, &lintEnabled, log)
+	require.NoError(err)
+	require.Equal(len(checkComments), problems)
+	for i, check := range checkComments {
+		assert.Equal(check.Position, comments[i].Position)
+		assert.Equal(check.Path, comments[i].Path)
+		for _, regexMessage := range check.Messages {
+			assert.Regexp(regexMessage, comments[i].Body)
+		}
+	}
+}
+
+func TestGenerateCommentsCPP(t *testing.T) {
+	assert := assert.New(t)
+	assert.NotNil(assert)
+	require := require.New(t)
+	require.NotNil(require)
+
+	conf, err := config.LoadConfig("../config.yaml")
+	require.Nil(err)
+	Conf = conf
+
+	err = InitLog()
+	require.Nil(err)
+
+	_, filename, _, ok := runtime.Caller(0)
+	require.True(ok)
+
+	checkComments := []CheckComment{
+		CheckComment{[]string{`two`}, "sillycode.cpp", 7},
+		CheckComment{[]string{`explicit`}, "sillycode.cpp", 16},
+	}
+
+	testRepoPath := path.Join(path.Dir(filename), "../tests")
+	CPPDiffPath := path.Join(testRepoPath, "sillycode.cpp.diff")
+	out, err := ioutil.ReadFile(CPPDiffPath)
+	require.NoError(err)
+
+	// log file
+	logFilePath := path.Join(testRepoPath, "sillycode.cpp.log")
+	log, err := os.Create(logFilePath)
+	require.NoError(err)
+	defer os.Remove(logFilePath)
+	defer log.Close()
 
 	diffs, err := diff.ParseMultiFileDiff(out)
 	require.NoError(err)
