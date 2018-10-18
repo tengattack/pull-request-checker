@@ -141,29 +141,32 @@ func CPPLint(filePath string, repoPath string) (lints []LintMessage, err error) 
 	lines := strings.Split(output.String(), "\n")
 
 	// Sample output: "code.cpp:138:  Missing spaces around =  [whitespace/operators] [4]"
-	re := regexp.MustCompile(":(\\d+):(.+)\\[\\d\\]$")
+	re := regexp.MustCompile(":(\\d+):(.+)\\[(.+?)\\] \\[\\d\\]$")
 	for _, line := range lines {
 		matched := false
-		ln := 0
+		lineNum := 0
 		msg := ""
+		rule := ""
 
 		match := re.FindStringSubmatch(line)
 		for i, m := range match {
 			switch i {
 			case 1:
 				// line number
-				ln, _ = strconv.Atoi(m)
+				lineNum, _ = strconv.Atoi(m)
 			case 2:
 				// warning message
 				msg = m
+			case 3:
+				rule = m
 				matched = true
 			}
 		}
 		if matched {
 			lints = append(lints, LintMessage{
-				RuleID:   "cpplint",
+				RuleID:   rule,
 				Severity: severityLevelError,
-				Line:     ln,
+				Line:     lineNum,
 				Column:   0,
 				Message:  msg,
 			})
