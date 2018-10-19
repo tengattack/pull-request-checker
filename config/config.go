@@ -3,6 +3,7 @@ package config
 import (
 	"io/ioutil"
 
+	mqredis "github.com/tengattack/unified-ci/mq/redis"
 	"gopkg.in/yaml.v2"
 )
 
@@ -56,15 +57,8 @@ type SectionLog struct {
 
 // SectionMessageQueue is sub section of config.
 type SectionMessageQueue struct {
-	Engine string       `yaml:"engine"`
-	Redis  SectionRedis `yaml:"redis"`
-}
-
-// SectionRedis is sub section of SectionStat.
-type SectionRedis struct {
-	Addr     string `yaml:"addr"`
-	Password string `yaml:"password"`
-	DB       int    `yaml:"db"`
+	Engine string         `yaml:"engine"`
+	Redis  mqredis.Config `yaml:"redis"`
 }
 
 // BuildDefaultConf is default config setting.
@@ -107,6 +101,7 @@ func BuildDefaultConf() Config {
 	conf.MessageQueue.Redis.Addr = "localhost:6379"
 	conf.MessageQueue.Redis.Password = ""
 	conf.MessageQueue.Redis.DB = 0
+	conf.MessageQueue.Redis.PoolSize = 10
 
 	return conf
 }

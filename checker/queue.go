@@ -5,7 +5,7 @@ import (
 	"math"
 	"time"
 
-	"../mq/redis"
+	"github.com/tengattack/unified-ci/mq/redis"
 )
 
 // InitMessageQueue for initialize message queue
@@ -13,7 +13,7 @@ func InitMessageQueue() error {
 	LogAccess.Debug("Init Message Queue Engine as ", Conf.MessageQueue.Engine)
 	switch Conf.MessageQueue.Engine {
 	case "redis":
-		MQ = redis.New(Conf)
+		MQ = redis.New(Conf.MessageQueue.Redis)
 	default:
 		LogError.Error("mq error: can't find mq driver")
 		return errors.New("can't find mq driver")

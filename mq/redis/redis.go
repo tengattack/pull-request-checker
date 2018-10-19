@@ -4,8 +4,7 @@ import (
 	"log"
 	"strconv"
 
-	"../../config"
-	"../../mq"
+	"github.com/tengattack/unified-ci/mq"
 
 	"gopkg.in/redis.v5"
 )
@@ -13,8 +12,16 @@ import (
 //
 var redisClient *redis.Client
 
+// Config redis message queue
+type Config struct {
+	Addr     string `yaml:"addr"`
+	Password string `yaml:"password"`
+	DB       int    `yaml:"db"`
+	PoolSize int    `yaml:"pool_size"`
+}
+
 // New func implements the storage interface for mpush
-func New(config config.Config) *MessageQueue {
+func New(config Config) *MessageQueue {
 	return &MessageQueue{
 		config: config,
 	}
@@ -22,15 +29,16 @@ func New(config config.Config) *MessageQueue {
 
 // MessageQueue is interface structure
 type MessageQueue struct {
-	config config.Config
+	config Config
 }
 
 // Init client storage.
 func (s *MessageQueue) Init() error {
 	redisClient = redis.NewClient(&redis.Options{
-		Addr:     s.config.MessageQueue.Redis.Addr,
-		Password: s.config.MessageQueue.Redis.Password,
-		DB:       s.config.MessageQueue.Redis.DB,
+		Addr:     s.config.Addr,
+		Password: s.config.Password,
+		DB:       s.config.DB,
+		PoolSize: s.config.PoolSize,
 	})
 
 	_, err := redisClient.Ping().Result()

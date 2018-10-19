@@ -1,8 +1,8 @@
 package checker
 
 import (
-	"../config"
-	"../mq"
+	"github.com/tengattack/unified-ci/config"
+	"github.com/tengattack/unified-ci/mq"
 
 	"github.com/sirupsen/logrus"
 )
