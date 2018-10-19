@@ -113,7 +113,7 @@ func BuildDefaultConf() Config {
 
 // LoadConfig loads config from file
 func LoadConfig(confPath string) (Config, error) {
-	var conf Config
+	conf := BuildDefaultConf()
 
 	configFile, err := ioutil.ReadFile(confPath)
 
