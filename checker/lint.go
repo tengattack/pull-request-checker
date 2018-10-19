@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	shellwords "github.com/mattn/go-shellwords"
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/sqs/goreturns/returns"
 	"golang.org/x/lint"
@@ -130,7 +131,13 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 
 // CPPLint lints the cpp language files using github.com/cpplint/cpplint
 func CPPLint(filePath string, repoPath string) (lints []LintMessage, err error) {
-	cmd := exec.Command(Conf.Core.CPPLint, "--quiet", filePath)
+	words, err := shellwords.Parse(Conf.Core.CPPLint)
+	if err != nil {
+		LogError.Error("CPPLint: " + err.Error())
+		return nil, err
+	}
+	words = append(words, "--quiet", filePath)
+	cmd := exec.Command(words[0], words[1:]...)
 	cmd.Dir = repoPath
 
 	var output bytes.Buffer
@@ -140,6 +147,7 @@ func CPPLint(filePath string, repoPath string) (lints []LintMessage, err error) 
 	err = cmd.Run()
 	if err != nil && err.Error() != "exit status 1" {
 		LogError.Error("CPPLint: " + err.Error())
+		return nil, err
 	}
 	lines := strings.Split(output.String(), "\n")
 
@@ -180,12 +188,13 @@ func CPPLint(filePath string, repoPath string) (lints []LintMessage, err error) 
 
 // PHPLint lints the php files
 func PHPLint(fileName, cwd string) ([]LintMessage, error) {
-	var cmd *exec.Cmd
-	if len(Conf.Core.PHPLintConfig) > 0 {
-		cmd = exec.Command("php", Conf.Core.PHPLint, "-f", "json", "-c", Conf.Core.PHPLintConfig, fileName)
-	} else {
-		cmd = exec.Command("php", Conf.Core.PHPLint, "-f", "json", fileName)
+	words, err := shellwords.Parse(Conf.Core.PHPLint)
+	if err != nil {
+		LogError.Error("PHPLint: " + err.Error())
+		return nil, err
 	}
+	words = append(words, "-f", "json", fileName)
+	cmd := exec.Command(words[0], words[1:]...)
 	cmd.Dir = cwd
 	out, err := cmd.Output()
 	if err != nil {
@@ -208,12 +217,17 @@ func PHPLint(fileName, cwd string) ([]LintMessage, error) {
 
 // ESLint lints the js, jsx, es, esx files
 func ESLint(fileName, cwd, eslintrc string) ([]LintMessage, error) {
-	var cmd *exec.Cmd
-	if eslintrc != "" {
-		cmd = exec.Command(Conf.Core.ESLint, "-c", eslintrc, "-f", "json", fileName)
-	} else {
-		cmd = exec.Command(Conf.Core.ESLint, "-f", "json", fileName)
+	words, err := shellwords.Parse(Conf.Core.ESLint)
+	if err != nil {
+		LogError.Error("ESLint: " + err.Error())
+		return nil, err
 	}
+	if eslintrc != "" {
+		words = append(words, "-c", eslintrc, "-f", "json", fileName)
+	} else {
+		words = append(words, "-f", "json", fileName)
+	}
+	cmd := exec.Command(words[0], words[1:]...)
 	cmd.Dir = cwd
 	out, err := cmd.Output()
 	if err != nil {
@@ -222,7 +236,7 @@ func ESLint(fileName, cwd, eslintrc string) ([]LintMessage, error) {
 		}
 	}
 
-	LogAccess.Debugf("TSLint Result:\n%s", out)
+	LogAccess.Debugf("ESLint Result:\n%s", out)
 
 	var results []LintResult
 	err = json.Unmarshal(out, &results)
@@ -238,8 +252,13 @@ func ESLint(fileName, cwd, eslintrc string) ([]LintMessage, error) {
 
 // TSLint lints the ts and tsx files
 func TSLint(fileName, cwd string) ([]LintMessage, error) {
-	var cmd *exec.Cmd
-	cmd = exec.Command(Conf.Core.TSLint, "--format", "json", fileName)
+	words, err := shellwords.Parse(Conf.Core.TSLint)
+	if err != nil {
+		LogError.Error("TSLint: " + err.Error())
+		return nil, err
+	}
+	words = append(words, "--format", "json", fileName)
+	cmd := exec.Command(words[0], words[1:]...)
 	cmd.Dir = cwd
 	out, err := cmd.Output()
 	if err != nil {
@@ -281,8 +300,13 @@ func TSLint(fileName, cwd string) ([]LintMessage, error) {
 
 // SCSSLint lints the scss files
 func SCSSLint(fileName, cwd string) ([]LintMessage, error) {
-	var cmd *exec.Cmd
-	cmd = exec.Command(Conf.Core.SCSSLint, "--format=JSON", fileName)
+	words, err := shellwords.Parse(Conf.Core.SCSSLint)
+	if err != nil {
+		LogError.Error("SCSSLint: " + err.Error())
+		return nil, err
+	}
+	words = append(words, "--format=JSON", fileName)
+	cmd := exec.Command(words[0], words[1:]...)
 	cmd.Dir = cwd
 	out, err := cmd.Output()
 	if err != nil {
