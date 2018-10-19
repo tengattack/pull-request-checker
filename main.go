@@ -8,8 +8,8 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	"./checker"
-	"./config"
+	"github.com/tengattack/unified-ci/checker"
+	"github.com/tengattack/unified-ci/config"
 )
 
 var (

@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"testing"
 
-	"../config"
+	"github.com/tengattack/unified-ci/config"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
