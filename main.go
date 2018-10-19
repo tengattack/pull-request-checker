@@ -1,7 +1,10 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	"log"
+	"os"
 
 	"golang.org/x/sync/errgroup"
 
@@ -10,17 +13,41 @@ import (
 )
 
 var (
-	// Version is the version of pull-request-checker
+	// Version is the version of unified-ci
 	Version = "0.1.2"
 )
 
 func main() {
-	var err error
 	checker.SetVersion(Version)
 
-	conf, err := config.LoadConfig("config.yaml")
+	configPath := flag.String("config", "", "config file")
+	showHelp := flag.Bool("help", false, "show help message")
+	showVerbose := flag.Bool("verbose", false, "show verbose debug log")
+	showVersion := flag.Bool("version", false, "show version")
+	flag.Parse()
+
+	if *showHelp {
+		fmt.Printf("unified-ci %s\n\n", Version)
+		flag.Usage()
+		return
+	}
+	if *showVersion {
+		fmt.Printf("unified-ci %s\n", Version)
+		return
+	}
+	if *configPath == "" {
+		fmt.Fprintln(os.Stderr, "Please specify a config file")
+		flag.Usage()
+		os.Exit(1)
+	}
+
+	conf, err := config.LoadConfig(*configPath)
 	if err != nil {
-		log.Fatalf("error: %v", err)
+		panic(err)
+	}
+	if *showVerbose {
+		conf.Log.AccessLevel = "debug"
+		conf.Log.ErrorLevel = "debug"
 	}
 
 	// set default parameters.
