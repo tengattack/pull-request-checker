@@ -16,7 +16,7 @@ A unified continuous integration tool for coding style check.
 ```sh
 cd path/to/workdir
 go get -u github.com/tengattack/unified-ci
-cp $GOPATH/src/github.com/tengattack/unified-ci/config.example.yaml config.yml
+cp $GOPATH/src/github.com/tengattack/unified-ci/config.example.yml config.yml
 # edit configuration
 vi config.yml
 $GOPATH/bin/unified-ci -config ./config.yml

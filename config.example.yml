@@ -1,10 +1,5 @@
-# a config for pull-request-checker
+# a config for unified-ci
 core:
-  enabled: true
-  mode: 'release'
-  address: '' # ip address to bind (default: any)
-  port: 8098
-
   enable_retries: true
   max_retries: 50
 
@@ -19,6 +14,10 @@ core:
   scsslint: 'scss-lint'
 
 api:
+  enabled: true
+  mode: 'release'
+  address: '' # ip address to bind (default: any)
+  port: 8098
   webhook_uri: "/api/webhook"
 
 github:

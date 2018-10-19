@@ -34,7 +34,7 @@ func rootHandler(c *gin.Context) {
 
 func routerEngine() *gin.Engine {
 	// set server mode
-	gin.SetMode(Conf.Core.Mode)
+	gin.SetMode(Conf.API.Mode)
 
 	r := gin.New()
 
@@ -57,19 +57,19 @@ func routerEngine() *gin.Engine {
 
 // RunHTTPServer provide run http or https protocol.
 func RunHTTPServer() (err error) {
-	if !Conf.Core.Enabled {
-		LogAccess.Debug("httpd server is disabled.")
+	if !Conf.API.Enabled {
+		LogAccess.Debug("HTTPD server is disabled.")
 		return nil
 	}
 
-	LogAccess.Debugf("HTTPD server is running on %s:%d.", Conf.Core.Address, Conf.Core.Port)
+	LogAccess.Infof("HTTPD server is running on %s:%d.", Conf.API.Address, Conf.API.Port)
 	/* if Conf.Core.AutoTLS.Enabled {
 		s := autoTLSServer()
 		err = s.ListenAndServeTLS("", "")
 	} else if Conf.Core.SSL && Conf.Core.CertPath != "" && Conf.Core.KeyPath != "" {
 		err = http.ListenAndServeTLS(Conf.Core.Address+":"+Conf.Core.Port, Conf.Core.CertPath, Conf.Core.KeyPath, routerEngine())
 	} else { */
-	err = http.ListenAndServe(fmt.Sprintf("%s:%d", Conf.Core.Address, Conf.Core.Port), routerEngine())
+	err = http.ListenAndServe(fmt.Sprintf("%s:%d", Conf.API.Address, Conf.API.Port), routerEngine())
 	// }
 
 	return err

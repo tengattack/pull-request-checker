@@ -18,10 +18,6 @@ type Config struct {
 
 // SectionCore is sub section of config.
 type SectionCore struct {
-	Enabled       bool   `yaml:"enabled"`
-	Mode          string `yaml:"mode"`
-	Address       string `yaml:"address"`
-	Port          int    `yaml:"port"`
 	EnableRetries bool   `yaml:"enable_retries"`
 	MaxRetries    int64  `yaml:"max_retries"`
 	WorkDir       string `yaml:"work_dir"`
@@ -37,6 +33,10 @@ type SectionCore struct {
 
 // SectionAPI is sub section of config.
 type SectionAPI struct {
+	Enabled    bool   `yaml:"enabled"`
+	Mode       string `yaml:"mode"`
+	Address    string `yaml:"address"`
+	Port       int    `yaml:"port"`
 	WebHookURI string `yaml:"webhook_uri"`
 }
 
@@ -66,10 +66,6 @@ func BuildDefaultConf() Config {
 	var conf Config
 
 	// Core
-	conf.Core.Enabled = true
-	conf.Core.Mode = "release"
-	conf.Core.Address = ""
-	conf.Core.Port = 8098
 	conf.Core.EnableRetries = true
 	conf.Core.MaxRetries = 50
 	conf.Core.WorkDir = "tmp"
@@ -83,6 +79,10 @@ func BuildDefaultConf() Config {
 	conf.Core.SCSSLint = ""
 
 	// API
+	conf.API.Enabled = true
+	conf.API.Mode = "release"
+	conf.API.Address = ""
+	conf.API.Port = 8098
 	conf.API.WebHookURI = "/api/webhook"
 
 	// GitHub
