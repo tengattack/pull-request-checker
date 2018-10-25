@@ -434,7 +434,20 @@ func WatchLocalRepo() error {
 								// no statuses, need check
 								message := fmt.Sprintf("%s/pull/%d/commits/%s", ref.RepoName, pull.Number, ref.Sha)
 								LogAccess.Info("Push message: " + message)
-								MQ.Push(message)
+								err = MQ.Push(message)
+								if err == nil {
+									targetURL := ""
+									if len(Conf.Core.CheckLogURI) > 0 {
+										targetURL = Conf.Core.CheckLogURI + ref.RepoName + "/" + ref.Sha + ".log"
+									}
+									err = ref.UpdateState("lint", "pending", targetURL,
+										"check queueing")
+									if err != nil {
+										LogAccess.Error("Update pull request status error: " + err.Error())
+									}
+								} else {
+									LogAccess.Error("Add message to queue error: " + err.Error())
+								}
 							}
 						}
 					}
