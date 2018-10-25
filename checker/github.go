@@ -425,7 +425,7 @@ func WatchLocalRepo() error {
 							if lint <= 0 {
 								// no statuses, need check
 								message := fmt.Sprintf("%s/pull/%d/commits/%s", ref.RepoName, pull.Number, ref.Sha)
-								LogAccess.WithField("entry", "localRepo").Info("Push message: " + message)
+								LogAccess.WithField("entry", "local").Info("Push message: " + message)
 								err = MQ.Push(message)
 								if err == nil {
 									markAsPending(ref)
