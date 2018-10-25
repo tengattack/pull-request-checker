@@ -365,25 +365,17 @@ func webhookHandler(c *gin.Context) {
 			payload.PullRequest.Number,
 			payload.PullRequest.Head.Sha,
 		)
-		LogAccess.Info("Push message: " + message)
+		LogAccess.WithField("entry", "webhook").Info("Push message: " + message)
 		ref := GithubRef{
 			RepoName: payload.Repository.FullName,
 			Sha:      payload.PullRequest.Head.Sha,
-		}
-		targetURL := ""
-		if len(Conf.Core.CheckLogURI) > 0 {
-			targetURL = Conf.Core.CheckLogURI + ref.RepoName + "/" + ref.Sha + ".log"
-		}
-		err = ref.UpdateState("lint", "pending", targetURL,
-			"check queueing")
-		if err != nil {
-			LogAccess.Error("Update pull request status error: " + err.Error())
 		}
 		err = MQ.Push(message)
 		if err != nil {
 			LogAccess.Error("Add message to queue error: " + err.Error())
 			abortWithError(c, 500, "add to queue error: "+err.Error())
 		} else {
+			markAsPending(ref)
 			c.JSON(http.StatusOK, gin.H{
 				"code": 0,
 				"info": "add to queue successfully",
@@ -433,8 +425,13 @@ func WatchLocalRepo() error {
 							if lint <= 0 {
 								// no statuses, need check
 								message := fmt.Sprintf("%s/pull/%d/commits/%s", ref.RepoName, pull.Number, ref.Sha)
-								LogAccess.Info("Push message: " + message)
-								MQ.Push(message)
+								LogAccess.WithField("entry", "local").Info("Push message: " + message)
+								err = MQ.Push(message)
+								if err == nil {
+									markAsPending(ref)
+								} else {
+									LogAccess.Error("Add message to queue error: " + err.Error())
+								}
 							}
 						}
 					}
@@ -447,4 +444,16 @@ func WatchLocalRepo() error {
 		LogAccess.Error("Local repo watcher error: " + err.Error())
 	}
 	return err
+}
+
+func markAsPending(ref GithubRef) {
+	targetURL := ""
+	if len(Conf.Core.CheckLogURI) > 0 {
+		targetURL = Conf.Core.CheckLogURI + ref.RepoName + "/" + ref.Sha + ".log"
+	}
+	err := ref.UpdateState("lint", "pending", targetURL,
+		"check queueing")
+	if err != nil {
+		LogAccess.Error("Update pull request status error: " + err.Error())
+	}
 }
