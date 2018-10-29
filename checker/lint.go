@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/martinlindhe/go-difflib/difflib"
 	shellwords "github.com/mattn/go-shellwords"
-	"github.com/pmezard/go-difflib/difflib"
 	"github.com/sqs/goreturns/returns"
 	"golang.org/x/lint"
 	"golang.org/x/tools/imports"
@@ -29,8 +29,9 @@ const (
 	severityLevelError
 )
 const (
-	ruleGolint    = "golint"
-	ruleGoreturns = "goreturns"
+	ruleGolint        = "golint"
+	ruleGoreturns     = "goreturns"
+	ruleMarkdownPangu = "remark-pangu"
 )
 
 // LintEnabled list enabled linter
@@ -42,6 +43,7 @@ type LintEnabled struct {
 	SCSS       bool
 	JS         string
 	ES         string
+	MD         bool
 }
 
 // LintMessage is a single lint message for PHPLint
@@ -109,6 +111,7 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 	lintEnabled.SCSS = false
 	lintEnabled.JS = ""
 	lintEnabled.ES = ""
+	lintEnabled.MD = true
 
 	if _, err := os.Stat(filepath.Join(cwd, "tslint.json")); err == nil {
 		lintEnabled.TypeScript = true
@@ -356,22 +359,7 @@ func Goreturns(filePath, repoPath string) (lints []LintMessage, err error) {
 	if err != nil {
 		return nil, err
 	}
-	if fileDiff != nil {
-		for _, hunk := range fileDiff.Hunks {
-			delta := getNumberofContextLines(hunk, int(hunk.OrigLines))
-			size := int(hunk.OrigLines) - delta
-			if hunk.OrigLines == 0 {
-				size = 1
-			}
-			lints = append(lints, LintMessage{
-				RuleID:   ruleID,
-				Line:     int(hunk.OrigStartLine) + delta,
-				Column:   size,
-				Message:  "\n```diff\n" + string(hunk.Body) + "```",
-				Severity: severityLevelError,
-			})
-		}
-	}
+	lints = getLintsFromDiff(fileDiff, lints, ruleID)
 	return lints, nil
 }
 
@@ -461,4 +449,97 @@ func golint(filePath string) ([]lint.Problem, error) {
 		return nil, err
 	}
 	return ps, nil
+}
+
+// MDLint generates lint messages from the report of remark-lint
+func MDLint(rps []remarkReport) (lints []LintMessage, err error) {
+	for i, r := range rps {
+		if i == 0 {
+			for _, m := range r.Messages {
+				lints = append(lints, LintMessage{
+					RuleID:  m.RuleId,
+					Line:    m.Line,
+					Message: m.Reason,
+				})
+			}
+		}
+	}
+	return lints, nil
+}
+
+type remarkReport struct {
+	Messages []remarkMessage
+}
+
+type remarkMessage struct {
+	Line   int
+	Reason string
+	RuleId string
+}
+
+func remark(fileName string, repoPath string) (reports []remarkReport, out []byte, err error) {
+	cmd := exec.Command("remark", "--quiet", "-u", "pangu", "--report", "json", fileName)
+	cmd.Dir = repoPath
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, nil, err
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = cmd.Start()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	out, err = ioutil.ReadAll(stdout)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = json.NewDecoder(stderr).Decode(&reports)
+	if err != nil {
+		return nil, out, err
+	}
+	return reports, out, cmd.Wait()
+}
+
+func pangu(filePath string, res []byte) (*diff.FileDiff, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	src, err := ioutil.ReadAll(f)
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(src, res) {
+		udf := difflib.UnifiedDiff{
+			A:        difflib.SplitLines(string(src)),
+			B:        difflib.SplitLines(string(res)),
+			FromFile: "original",
+			ToFile:   "formatted",
+			Context:  0,
+		}
+		data, err := difflib.GetUnifiedDiffString(udf)
+		if err != nil {
+			return nil, fmt.Errorf("computing diff: %s", err)
+		}
+		return diff.ParseFileDiff([]byte(data))
+	}
+	return nil, nil
+}
+
+// MDPanguLint generates lint messages from diffs of remark-pangu
+func MDPanguLint(filePath string, res []byte) (lints []LintMessage, err error) {
+	ruleID := ruleMarkdownPangu
+	fileDiff, err := pangu(filePath, res)
+	if err != nil {
+		return nil, err
+	}
+	lints = getLintsFromDiff(fileDiff, lints, ruleID)
+	return lints, nil
 }
