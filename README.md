@@ -10,6 +10,7 @@ A unified continuous integration tool for coding style check.
 * [phplint](https://github.com/tengattack/phplint)
 * [scss-lint](https://github.com/brigade/scss-lint)
 * [tslint](https://github.com/palantir/tslint)
+* [remark](https://github.com/remarkjs/remark)
 
 ## Installation
 
@@ -32,6 +33,7 @@ It will read linter's configuration file from the root path of repository:
 * `.eslintrc.js`: `.html`, `.js`, `.php`
 * `.scss-lint.yml`: `.css`, `.scss`
 * `.tslint.json`: `.ts`, `.tsx`
+* `.remarkrc`: `.md`
 
 ## Support Languages
 
@@ -49,3 +51,5 @@ It will read linter's configuration file from the root path of repository:
   - `.php`
 7. TypeScript: [tslint](https://github.com/palantir/tslint)
   - `.ts` ...
+8. Markdown: [remark-lint](https://github.com/remarkjs/remark-lint), [remark-pangu](https://github.com/VincentBel/remark-pangu)
+  - `.md`

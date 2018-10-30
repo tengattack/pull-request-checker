@@ -31,7 +31,7 @@ const (
 const (
 	ruleGolint        = "golint"
 	ruleGoreturns     = "goreturns"
-	ruleMarkdownPangu = "remark-pangu"
+	ruleMarkdownPangu = "remark"
 )
 
 // LintEnabled list enabled linter

@@ -7,10 +7,9 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/tengattack/unified-ci/config"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tengattack/unified-ci/config"
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
@@ -78,7 +77,7 @@ func TestGenerateCommentsCPP(t *testing.T) {
 	require := require.New(t)
 	require.NotNil(require)
 
-	conf, err := config.LoadConfig("../config.yaml")
+	conf, err := config.LoadConfig("../config.yml")
 	require.Nil(err)
 	Conf = conf
 
