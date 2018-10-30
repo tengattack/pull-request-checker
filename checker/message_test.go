@@ -27,55 +27,26 @@ type CheckComment struct {
 	Position int
 }
 
-func TestGenerateCommentsMD(t *testing.T) {
-
+// TestsData contains the meta-data for a sub-test.
+type TestsData struct {
+	Language      string
+	TestRepoPath  string
+	FileName      string
+	CheckComments []CheckComment
 }
 
-func TestGenerateCommentsGo(t *testing.T) {
-	assert := assert.New(t)
-	assert.NotNil(assert)
-	require := require.New(t)
-	require.NotNil(require)
-
-	_, filename, _, ok := runtime.Caller(0)
-	require.True(ok)
-
-	checkComments := []CheckComment{
+var dataSet = []TestsData{
+	{"CPP", "../tests", "sillycode.cpp", []CheckComment{
+		CheckComment{[]string{`two`}, "sillycode.cpp", 7},
+		CheckComment{[]string{`explicit`}, "sillycode.cpp", 16},
+	}},
+	{"Go", "../tests", "test1.go", []CheckComment{
 		CheckComment{[]string{`\n\+\s*"bytes"`}, "test1.go", 2},
 		CheckComment{[]string{`\n\-\s*"bytes"`}, "test1.go", 5},
-	}
-
-	testRepoPath := path.Join(path.Dir(filename), "../tests")
-	goDiffPath := path.Join(testRepoPath, "test1.go.diff")
-	out, err := ioutil.ReadFile(goDiffPath)
-	require.NoError(err)
-
-	// log file
-	logFilePath := path.Join(testRepoPath, "test1.go.log")
-	log, err := os.Create(logFilePath)
-	require.NoError(err)
-	defer os.Remove(logFilePath)
-	defer log.Close()
-
-	diffs, err := diff.ParseMultiFileDiff(out)
-	require.NoError(err)
-
-	lintEnabled := LintEnabled{}
-	lintEnabled.Init(testRepoPath)
-
-	comments, problems, err := GenerateComments(testRepoPath, diffs, &lintEnabled, log)
-	require.NoError(err)
-	require.Equal(len(checkComments), problems)
-	for i, check := range checkComments {
-		assert.Equal(check.Position, comments[i].Position)
-		assert.Equal(check.Path, comments[i].Path)
-		for _, regexMessage := range check.Messages {
-			assert.Regexp(regexMessage, comments[i].Body)
-		}
-	}
+	}},
 }
 
-func TestGenerateCommentsCPP(t *testing.T) {
+func TestGenerateComments(t *testing.T) {
 	assert := assert.New(t)
 	assert.NotNil(assert)
 	require := require.New(t)
@@ -90,38 +61,33 @@ func TestGenerateCommentsCPP(t *testing.T) {
 
 	_, filename, _, ok := runtime.Caller(0)
 	require.True(ok)
+	currentDir := path.Dir(filename)
 
-	checkComments := []CheckComment{
-		CheckComment{[]string{`two`}, "sillycode.cpp", 7},
-		CheckComment{[]string{`explicit`}, "sillycode.cpp", 16},
-	}
+	for _, v := range dataSet {
+		testRepoPath := path.Join(currentDir, v.TestRepoPath)
+		out, err := ioutil.ReadFile(path.Join(testRepoPath, v.FileName+".diff"))
+		require.NoError(err)
+		logFilePath := path.Join(testRepoPath, v.FileName+".log")
+		log, err := os.Create(logFilePath)
+		require.NoError(err)
 
-	testRepoPath := path.Join(path.Dir(filename), "../tests")
-	CPPDiffPath := path.Join(testRepoPath, "sillycode.cpp.diff")
-	out, err := ioutil.ReadFile(CPPDiffPath)
-	require.NoError(err)
+		diffs, err := diff.ParseMultiFileDiff(out)
+		require.NoError(err)
 
-	// log file
-	logFilePath := path.Join(testRepoPath, "sillycode.cpp.log")
-	log, err := os.Create(logFilePath)
-	require.NoError(err)
-	defer os.Remove(logFilePath)
-	defer log.Close()
+		lintEnabled := LintEnabled{}
+		lintEnabled.Init(testRepoPath)
 
-	diffs, err := diff.ParseMultiFileDiff(out)
-	require.NoError(err)
-
-	lintEnabled := LintEnabled{}
-	lintEnabled.Init(testRepoPath)
-
-	comments, problems, err := GenerateComments(testRepoPath, diffs, &lintEnabled, log)
-	require.NoError(err)
-	require.Equal(len(checkComments), problems)
-	for i, check := range checkComments {
-		assert.Equal(check.Position, comments[i].Position)
-		assert.Equal(check.Path, comments[i].Path)
-		for _, regexMessage := range check.Messages {
-			assert.Regexp(regexMessage, comments[i].Body)
+		comments, problems, err := GenerateComments(testRepoPath, diffs, &lintEnabled, log)
+		require.NoError(err)
+		require.Equal(len(v.CheckComments), problems)
+		for i, check := range v.CheckComments {
+			assert.Equal(check.Position, comments[i].Position)
+			assert.Equal(check.Path, comments[i].Path)
+			for _, regexMessage := range check.Messages {
+				assert.Regexp(regexMessage, comments[i].Body)
+			}
 		}
+		log.Close()
+		os.Remove(logFilePath)
 	}
 }

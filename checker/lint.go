@@ -505,7 +505,7 @@ func remark(fileName string, repoPath string) (reports []remarkReport, out []byt
 	return reports, out, cmd.Wait()
 }
 
-func markdownFormatted(filePath string, res []byte) (*diff.FileDiff, error) {
+func markdownFormatted(filePath string, result []byte) (*diff.FileDiff, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
@@ -516,10 +516,10 @@ func markdownFormatted(filePath string, res []byte) (*diff.FileDiff, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !bytes.Equal(src, res) {
+	if !bytes.Equal(src, result) {
 		udf := difflib.UnifiedDiff{
 			A:        difflib.SplitLines(string(src)),
-			B:        difflib.SplitLines(string(res)),
+			B:        difflib.SplitLines(string(result)),
 			FromFile: "original",
 			ToFile:   "formatted",
 			Context:  0,
@@ -534,9 +534,9 @@ func markdownFormatted(filePath string, res []byte) (*diff.FileDiff, error) {
 }
 
 // MDFormattedLint generates lint messages from diffs of remark
-func MDFormattedLint(filePath string, res []byte) (lints []LintMessage, err error) {
+func MDFormattedLint(filePath string, result []byte) (lints []LintMessage, err error) {
 	ruleID := ruleMarkdownFormatted
-	fileDiff, err := markdownFormatted(filePath, res)
+	fileDiff, err := markdownFormatted(filePath, result)
 	if err != nil {
 		return nil, err
 	}
