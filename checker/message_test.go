@@ -27,6 +27,10 @@ type CheckComment struct {
 	Position int
 }
 
+func TestGenerateCommentsMD(t *testing.T) {
+
+}
+
 func TestGenerateCommentsGo(t *testing.T) {
 	assert := assert.New(t)
 	assert.NotNil(assert)

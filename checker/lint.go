@@ -29,9 +29,9 @@ const (
 	severityLevelError
 )
 const (
-	ruleGolint        = "golint"
-	ruleGoreturns     = "goreturns"
-	ruleMarkdownPangu = "remark"
+	ruleGolint            = "golint"
+	ruleGoreturns         = "goreturns"
+	ruleMarkdownFormatted = "remark"
 )
 
 // LintEnabled list enabled linter
@@ -478,7 +478,7 @@ type remarkMessage struct {
 }
 
 func remark(fileName string, repoPath string) (reports []remarkReport, out []byte, err error) {
-	cmd := exec.Command("remark", "--quiet", "-u", "pangu", "--report", "json", fileName)
+	cmd := exec.Command("remark", "--quiet", "--report", "json", fileName)
 	cmd.Dir = repoPath
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -505,7 +505,7 @@ func remark(fileName string, repoPath string) (reports []remarkReport, out []byt
 	return reports, out, cmd.Wait()
 }
 
-func pangu(filePath string, res []byte) (*diff.FileDiff, error) {
+func markdownFormatted(filePath string, res []byte) (*diff.FileDiff, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
@@ -533,10 +533,10 @@ func pangu(filePath string, res []byte) (*diff.FileDiff, error) {
 	return nil, nil
 }
 
-// MDPanguLint generates lint messages from diffs of remark-pangu
-func MDPanguLint(filePath string, res []byte) (lints []LintMessage, err error) {
-	ruleID := ruleMarkdownPangu
-	fileDiff, err := pangu(filePath, res)
+// MDFormattedLint generates lint messages from diffs of remark
+func MDFormattedLint(filePath string, res []byte) (lints []LintMessage, err error) {
+	ruleID := ruleMarkdownFormatted
+	fileDiff, err := markdownFormatted(filePath, res)
 	if err != nil {
 		return nil, err
 	}

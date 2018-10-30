@@ -60,11 +60,11 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 				if err != nil {
 					return nil, 0, err
 				}
-				lintsPangu, err := MDPanguLint(filepath.Join(repoPath, fileName), out)
+				lintsFormatted, err := MDFormattedLint(filepath.Join(repoPath, fileName), out)
 				if err != nil {
 					return nil, 0, err
 				}
-				comments, problems = pickDiffLintMessages(lintsPangu, d, comments, problems, log, fileName)
+				comments, problems = pickDiffLintMessages(lintsFormatted, d, comments, problems, log, fileName)
 				lints, err = MDLint(rps)
 			} else if lintEnabled.CPP && isCPP(fileName) {
 				log.WriteString(fmt.Sprintf("CPPLint '%s'\n", fileName))
