@@ -24,7 +24,7 @@ type CheckComment struct {
 	// The position in the diff continues to increase through lines of whitespace and additional hunks until the
 	// beginning of a new file.
 	// See more information: https://developer.github.com/v3/pulls/comments/
-	Position int
+	Position int // offset in the unified diff
 }
 
 // TestsData contains the meta-data for a sub-test.
@@ -43,6 +43,10 @@ var dataSet = []TestsData{
 	{"Go", "../tests", "test1.go", []CheckComment{
 		CheckComment{[]string{`\n\+\s*"bytes"`}, "test1.go", 2},
 		CheckComment{[]string{`\n\-\s*"bytes"`}, "test1.go", 5},
+	}},
+	{"Markdown", "../tests/markdown", "example.md", []CheckComment{
+		{[]string{"Hello 你好"}, "example.md", 2},
+		{[]string{"undefined"}, "example.md", 5},
 	}},
 }
 

@@ -1,0 +1,10 @@
+diff --git a/example.md b/example.md
+index eb0c801..e2385e5 100644
+--- a/example.md
++++ b/example.md
+@@ -1 +1 @@
+--   你好Hello
++-   Hello你好
+@@ -3 +3 @@
+-[世界**World**][]
++[**World**世界][]
