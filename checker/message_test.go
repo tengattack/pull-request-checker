@@ -64,30 +64,32 @@ func TestGenerateComments(t *testing.T) {
 	currentDir := path.Dir(filename)
 
 	for _, v := range dataSet {
-		testRepoPath := path.Join(currentDir, v.TestRepoPath)
-		out, err := ioutil.ReadFile(path.Join(testRepoPath, v.FileName+".diff"))
-		require.NoError(err)
-		logFilePath := path.Join(testRepoPath, v.FileName+".log")
-		log, err := os.Create(logFilePath)
-		require.NoError(err)
+		t.Run(v.Language, func(t *testing.T) {
+			testRepoPath := path.Join(currentDir, v.TestRepoPath)
+			out, err := ioutil.ReadFile(path.Join(testRepoPath, v.FileName+".diff"))
+			require.NoError(err)
+			logFilePath := path.Join(testRepoPath, v.FileName+".log")
+			log, err := os.Create(logFilePath)
+			require.NoError(err)
 
-		diffs, err := diff.ParseMultiFileDiff(out)
-		require.NoError(err)
+			diffs, err := diff.ParseMultiFileDiff(out)
+			require.NoError(err)
 
-		lintEnabled := LintEnabled{}
-		lintEnabled.Init(testRepoPath)
+			lintEnabled := LintEnabled{}
+			lintEnabled.Init(testRepoPath)
 
-		comments, problems, err := GenerateComments(testRepoPath, diffs, &lintEnabled, log)
-		require.NoError(err)
-		require.Equal(len(v.CheckComments), problems)
-		for i, check := range v.CheckComments {
-			assert.Equal(check.Position, comments[i].Position)
-			assert.Equal(check.Path, comments[i].Path)
-			for _, regexMessage := range check.Messages {
-				assert.Regexp(regexMessage, comments[i].Body)
+			comments, problems, err := GenerateComments(testRepoPath, diffs, &lintEnabled, log)
+			require.NoError(err)
+			require.Equal(len(v.CheckComments), problems)
+			for i, check := range v.CheckComments {
+				assert.Equal(check.Position, comments[i].Position)
+				assert.Equal(check.Path, comments[i].Path)
+				for _, regexMessage := range check.Messages {
+					assert.Regexp(regexMessage, comments[i].Body)
+				}
 			}
-		}
-		log.Close()
-		os.Remove(logFilePath)
+			log.Close()
+			os.Remove(logFilePath)
+		})
 	}
 }
