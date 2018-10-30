@@ -457,7 +457,7 @@ func MDLint(rps []remarkReport) (lints []LintMessage, err error) {
 		if i == 0 {
 			for _, m := range r.Messages {
 				lints = append(lints, LintMessage{
-					RuleID:  m.RuleId,
+					RuleID:  m.RuleID,
 					Line:    m.Line,
 					Message: m.Reason,
 				})
@@ -474,7 +474,7 @@ type remarkReport struct {
 type remarkMessage struct {
 	Line   int
 	Reason string
-	RuleId string
+	RuleID string
 }
 
 func remark(fileName string, repoPath string) (reports []remarkReport, out []byte, err error) {
