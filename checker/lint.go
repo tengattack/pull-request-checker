@@ -506,12 +506,12 @@ func remark(fileName string, repoPath string) (reports []remarkReport, out []byt
 	}
 
 	stdoutStr, err := ioutil.ReadAll(stdout)
-	LogAccess.Debugf("RemarkLint Stdout:\n%s", string(stdoutStr))
+	LogAccess.Debugf("RemarkLint Stdout:\n%s", stdoutStr)
 	if err != nil {
 		return nil, nil, err
 	}
 	stderrStr, err := ioutil.ReadAll(stderr)
-	LogAccess.Debugf("RemarkLint Stderr:\n%s", string(stderrStr))
+	LogAccess.Debugf("RemarkLint Stderr:\n%s", stderrStr)
 	if err != nil {
 		return nil, stdoutStr, err
 	}
