@@ -7,10 +7,9 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/tengattack/unified-ci/config"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tengattack/unified-ci/config"
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
@@ -25,100 +24,76 @@ type CheckComment struct {
 	// The position in the diff continues to increase through lines of whitespace and additional hunks until the
 	// beginning of a new file.
 	// See more information: https://developer.github.com/v3/pulls/comments/
-	Position int
+	Position int // offset in the unified diff
 }
 
-func TestGenerateCommentsGo(t *testing.T) {
-	assert := assert.New(t)
-	assert.NotNil(assert)
-	require := require.New(t)
-	require.NotNil(require)
+// TestsData contains the meta-data for a sub-test.
+type TestsData struct {
+	Language      string
+	TestRepoPath  string
+	FileName      string
+	CheckComments []CheckComment
+}
 
-	_, filename, _, ok := runtime.Caller(0)
-	require.True(ok)
-
-	checkComments := []CheckComment{
+var dataSet = []TestsData{
+	{"CPP", "../tests", "sillycode.cpp", []CheckComment{
+		CheckComment{[]string{`two`}, "sillycode.cpp", 7},
+		CheckComment{[]string{`explicit`}, "sillycode.cpp", 16},
+	}},
+	{"Go", "../tests", "test1.go", []CheckComment{
 		CheckComment{[]string{`\n\+\s*"bytes"`}, "test1.go", 2},
 		CheckComment{[]string{`\n\-\s*"bytes"`}, "test1.go", 5},
-	}
-
-	testRepoPath := path.Join(path.Dir(filename), "../tests")
-	goDiffPath := path.Join(testRepoPath, "test1.go.diff")
-	out, err := ioutil.ReadFile(goDiffPath)
-	require.NoError(err)
-
-	// log file
-	logFilePath := path.Join(testRepoPath, "test1.go.log")
-	log, err := os.Create(logFilePath)
-	require.NoError(err)
-	defer os.Remove(logFilePath)
-	defer log.Close()
-
-	diffs, err := diff.ParseMultiFileDiff(out)
-	require.NoError(err)
-
-	lintEnabled := LintEnabled{}
-	lintEnabled.Init(testRepoPath)
-
-	comments, problems, err := GenerateComments(testRepoPath, diffs, &lintEnabled, log)
-	require.NoError(err)
-	require.Equal(len(checkComments), problems)
-	for i, check := range checkComments {
-		assert.Equal(check.Position, comments[i].Position)
-		assert.Equal(check.Path, comments[i].Path)
-		for _, regexMessage := range check.Messages {
-			assert.Regexp(regexMessage, comments[i].Body)
-		}
-	}
+	}},
+	{"Markdown", "../tests/markdown", "example.md", []CheckComment{
+		{[]string{"Hello 你好"}, "example.md", 2},
+		{[]string{"undefined"}, "example.md", 5},
+	}},
 }
 
-func TestGenerateCommentsCPP(t *testing.T) {
-	assert := assert.New(t)
-	assert.NotNil(assert)
-	require := require.New(t)
-	require.NotNil(require)
-
-	conf, err := config.LoadConfig("../config.yaml")
-	require.Nil(err)
+func TestGenerateComments(t *testing.T) {
+	conf, err := config.LoadConfig("../config.yml")
+	require.Nil(t, err)
 	Conf = conf
 
 	err = InitLog()
-	require.Nil(err)
+	require.Nil(t, err)
 
 	_, filename, _, ok := runtime.Caller(0)
-	require.True(ok)
+	require.True(t, ok)
+	currentDir := path.Dir(filename)
 
-	checkComments := []CheckComment{
-		CheckComment{[]string{`two`}, "sillycode.cpp", 7},
-		CheckComment{[]string{`explicit`}, "sillycode.cpp", 16},
-	}
+	for _, v := range dataSet {
+		t.Run(v.Language, func(t *testing.T) {
+			assert := assert.New(t)
+			assert.NotNil(assert)
+			require := require.New(t)
+			require.NotNil(require)
 
-	testRepoPath := path.Join(path.Dir(filename), "../tests")
-	CPPDiffPath := path.Join(testRepoPath, "sillycode.cpp.diff")
-	out, err := ioutil.ReadFile(CPPDiffPath)
-	require.NoError(err)
+			testRepoPath := path.Join(currentDir, v.TestRepoPath)
+			out, err := ioutil.ReadFile(path.Join(testRepoPath, v.FileName+".diff"))
+			require.NoError(err)
+			logFilePath := path.Join(testRepoPath, v.FileName+".log")
+			log, err := os.Create(logFilePath)
+			require.NoError(err)
 
-	// log file
-	logFilePath := path.Join(testRepoPath, "sillycode.cpp.log")
-	log, err := os.Create(logFilePath)
-	require.NoError(err)
-	defer os.Remove(logFilePath)
-	defer log.Close()
+			diffs, err := diff.ParseMultiFileDiff(out)
+			require.NoError(err)
 
-	diffs, err := diff.ParseMultiFileDiff(out)
-	require.NoError(err)
+			lintEnabled := LintEnabled{}
+			lintEnabled.Init(testRepoPath)
 
-	lintEnabled := LintEnabled{}
-	lintEnabled.Init(testRepoPath)
-
-	comments, problems, err := GenerateComments(testRepoPath, diffs, &lintEnabled, log)
-	require.NoError(err)
-	require.Equal(len(checkComments), problems)
-	for i, check := range checkComments {
-		assert.Equal(check.Position, comments[i].Position)
-		assert.Equal(check.Path, comments[i].Path)
-		for _, regexMessage := range check.Messages {
-			assert.Regexp(regexMessage, comments[i].Body)
-		}
+			comments, problems, err := GenerateComments(testRepoPath, diffs, &lintEnabled, log)
+			require.NoError(err)
+			require.Equal(len(v.CheckComments), problems)
+			for i, check := range v.CheckComments {
+				assert.Equal(check.Position, comments[i].Position)
+				assert.Equal(check.Path, comments[i].Path)
+				for _, regexMessage := range check.Messages {
+					assert.Regexp(regexMessage, comments[i].Body)
+				}
+			}
+			log.Close()
+			os.Remove(logFilePath)
+		})
 	}
 }

@@ -20,6 +20,30 @@ func isCPP(fileName string) bool {
 	return false
 }
 
+func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, comments []GithubRefComment, problems int, log *os.File, fileName string) ([]GithubRefComment, int) {
+	for _, lint := range lintsDiff {
+		for _, hunk := range d.Hunks {
+			intersection := lint.Column > 0 && hunk.NewLines > 0
+			intersection = intersection && (lint.Line+lint.Column-1 >= int(hunk.NewStartLine))
+			intersection = intersection && (int(hunk.NewStartLine+hunk.NewLines-1) >= lint.Line)
+			if intersection {
+				log.WriteString(fmt.Sprintf("%d:%d %s %s\n",
+					lint.Line, 0, lint.Message, lint.RuleID))
+				comment := fmt.Sprintf("`%s` %d:%d %s",
+					lint.RuleID, lint.Line, 0, lint.Message)
+				comments = append(comments, GithubRefComment{
+					Path:     fileName,
+					Position: int(hunk.StartPosition) + getOffsetToUnifiedDiff(lint.Line, hunk),
+					Body:     comment,
+				})
+				problems++
+				break
+			}
+		}
+	}
+	return comments, problems
+}
+
 // GenerateComments generate github comments from github diffs and lint option
 func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *LintEnabled, log *os.File) ([]GithubRefComment, int, error) {
 	comments := []GithubRefComment{}
@@ -30,7 +54,19 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 			fileName := d.NewName[2:]
 			log.WriteString(fmt.Sprintf("Checking '%s'\n", fileName))
 			var lints []LintMessage
-			if lintEnabled.CPP && isCPP(fileName) {
+			if lintEnabled.MD && strings.HasSuffix(fileName, ".md") {
+				log.WriteString(fmt.Sprintf("Markdown '%s'\n", fileName))
+				rps, out, err := remark(fileName, repoPath)
+				if err != nil {
+					return nil, 0, err
+				}
+				lintsFormatted, err := MDFormattedLint(filepath.Join(repoPath, fileName), out)
+				if err != nil {
+					return nil, 0, err
+				}
+				comments, problems = pickDiffLintMessages(lintsFormatted, d, comments, problems, log, fileName)
+				lints, err = MDLint(rps)
+			} else if lintEnabled.CPP && isCPP(fileName) {
 				log.WriteString(fmt.Sprintf("CPPLint '%s'\n", fileName))
 				lints, err = CPPLint(fileName, repoPath)
 			} else if lintEnabled.Go && strings.HasSuffix(fileName, ".go") {
@@ -39,26 +75,7 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 				if err != nil {
 					return nil, 0, err
 				}
-				for _, lint := range lintsGoreturns {
-					for _, hunk := range d.Hunks {
-						intersection := lint.Column > 0 && hunk.NewLines > 0
-						intersection = intersection && (lint.Line+lint.Column-1 >= int(hunk.NewStartLine))
-						intersection = intersection && (int(hunk.NewStartLine+hunk.NewLines-1) >= lint.Line)
-						if intersection {
-							log.WriteString(fmt.Sprintf("%d:%d %s %s\n",
-								lint.Line, 0, lint.Message, lint.RuleID))
-							comment := fmt.Sprintf("`%s` %d:%d %s",
-								lint.RuleID, lint.Line, 0, lint.Message)
-							comments = append(comments, GithubRefComment{
-								Path:     fileName,
-								Position: int(hunk.StartPosition) + getOffsetToUnifiedDiff(lint.Line, hunk),
-								Body:     comment,
-							})
-							problems++
-							break
-						}
-					}
-				}
+				comments, problems = pickDiffLintMessages(lintsGoreturns, d, comments, problems, log, fileName)
 				log.WriteString(fmt.Sprintf("Golint '%s'\n", fileName))
 				lints, err = Golint(filepath.Join(repoPath, fileName), repoPath)
 			} else if lintEnabled.PHP && strings.HasSuffix(fileName, ".php") {
