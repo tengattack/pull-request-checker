@@ -23,5 +23,5 @@ config.yml
 /tmp
 /logs
 
-tests/markdown/node_modules/
-tests/markdown/package-lock.json
+node_modules
+package-lock.json
