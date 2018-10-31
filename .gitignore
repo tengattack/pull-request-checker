@@ -22,3 +22,6 @@ config.yml
 /main
 /tmp
 /logs
+
+tests/markdown/node_modules/
+tests/markdown/package-lock.json

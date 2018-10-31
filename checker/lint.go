@@ -155,7 +155,9 @@ func CPPLint(filePath string, repoPath string) (lints []LintMessage, err error) 
 		LogError.Error("CPPLint: " + err.Error())
 		return nil, err
 	}
-	lines := strings.Split(output.String(), "\n")
+	outputStr := output.String()
+	LogAccess.Debugf("CPPLint Output:\n%s", outputStr)
+	lines := strings.Split(outputStr, "\n")
 
 	// Sample output: "code.cpp:138:  Missing spaces around =  [whitespace/operators] [4]"
 	re := regexp.MustCompile(`:(\d+):(.+)\[(.+?)\] \[\d\]$`)
@@ -207,7 +209,7 @@ func PHPLint(fileName, cwd string) ([]LintMessage, error) {
 		return nil, err
 	}
 
-	LogAccess.Debugf("PHPLint Result:\n%s", out)
+	LogAccess.Debugf("PHPLint Output:\n%s", out)
 
 	var results []LintResult
 	err = json.Unmarshal(out, &results)
@@ -242,7 +244,7 @@ func ESLint(fileName, cwd, eslintrc string) ([]LintMessage, error) {
 		}
 	}
 
-	LogAccess.Debugf("ESLint Result:\n%s", out)
+	LogAccess.Debugf("ESLint Output:\n%s", out)
 
 	var results []LintResult
 	err = json.Unmarshal(out, &results)
@@ -273,7 +275,7 @@ func TSLint(fileName, cwd string) ([]LintMessage, error) {
 		}
 	}
 
-	LogAccess.Debugf("TSLint Result:\n%s", out)
+	LogAccess.Debugf("TSLint Output:\n%s", out)
 
 	var results []TSLintResult
 	err = json.Unmarshal(out, &results)
@@ -321,7 +323,7 @@ func SCSSLint(fileName, cwd string) ([]LintMessage, error) {
 		}
 	}
 
-	LogAccess.Debugf("SCSSLint Result:\n%s", out)
+	LogAccess.Debugf("SCSSLint Output:\n%s", out)
 
 	var results map[string][]SCSSLintResult
 	err = json.Unmarshal(out, &results)
@@ -503,15 +505,21 @@ func remark(fileName string, repoPath string) (reports []remarkReport, out []byt
 		return nil, nil, err
 	}
 
-	out, err = ioutil.ReadAll(stdout)
+	stdoutStr, err := ioutil.ReadAll(stdout)
+	LogAccess.Debugf("RemarkLint Stdout:\n%s", string(stdoutStr))
 	if err != nil {
 		return nil, nil, err
 	}
-	err = json.NewDecoder(stderr).Decode(&reports)
+	stderrStr, err := ioutil.ReadAll(stderr)
+	LogAccess.Debugf("RemarkLint Stderr:\n%s", string(stderrStr))
 	if err != nil {
-		return nil, out, err
+		return nil, stdoutStr, err
 	}
-	return reports, out, cmd.Wait()
+	err = json.Unmarshal(stderrStr, &reports)
+	if err != nil {
+		return nil, stdoutStr, err
+	}
+	return reports, stdoutStr, cmd.Wait()
 }
 
 func markdownFormatted(filePath string, result []byte) (*diff.FileDiff, error) {
