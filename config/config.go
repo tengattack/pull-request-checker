@@ -23,7 +23,7 @@ type SectionCore struct {
 	WorkDir       string `yaml:"work_dir"`
 	LogsDir       string `yaml:"logs_dir"`
 	CheckLogURI   string `yaml:"check_log_uri"`
-	Markdownlint  string `yaml:"markdownlint"`
+	RemarkLint    string `yaml:"markdownlint"`
 	CPPLint       string `yaml:"cpplint"`
 	PHPLint       string `yaml:"phplint"`
 	ESLint        string `yaml:"eslint"`
@@ -71,7 +71,7 @@ func BuildDefaultConf() Config {
 	conf.Core.WorkDir = "tmp"
 	conf.Core.LogsDir = "logs"
 	conf.Core.CheckLogURI = ""
-	conf.Core.Markdownlint = "markdownlint"
+	conf.Core.RemarkLint = "remark"
 	conf.Core.CPPLint = "cpplint"
 	conf.Core.PHPLint = "phplint"
 	conf.Core.ESLint = ""

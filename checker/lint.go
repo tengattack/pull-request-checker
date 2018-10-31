@@ -478,9 +478,9 @@ type remarkMessage struct {
 }
 
 func remark(fileName string, repoPath string) (reports []remarkReport, out []byte, err error) {
-	words, err := shellwords.Parse(Conf.Core.Markdownlint)
+	words, err := shellwords.Parse(Conf.Core.RemarkLint)
 	if err != nil {
-		LogError.Error("Markdownlint: " + err.Error())
+		LogError.Error("RemarkLint: " + err.Error())
 		return nil, nil, err
 	}
 	words = append(words, "--quiet", "--report", "json", fileName)
