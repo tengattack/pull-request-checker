@@ -51,24 +51,24 @@ var dataSet = []TestsData{
 }
 
 func TestGenerateComments(t *testing.T) {
-	assert := assert.New(t)
-	assert.NotNil(assert)
-	require := require.New(t)
-	require.NotNil(require)
-
 	conf, err := config.LoadConfig("../config.yml")
-	require.Nil(err)
+	require.Nil(t, err)
 	Conf = conf
 
 	err = InitLog()
-	require.Nil(err)
+	require.Nil(t, err)
 
 	_, filename, _, ok := runtime.Caller(0)
-	require.True(ok)
+	require.True(t, ok)
 	currentDir := path.Dir(filename)
 
 	for _, v := range dataSet {
 		t.Run(v.Language, func(t *testing.T) {
+			assert := assert.New(t)
+			assert.NotNil(assert)
+			require := require.New(t)
+			require.NotNil(require)
+
 			testRepoPath := path.Join(currentDir, v.TestRepoPath)
 			out, err := ioutil.ReadFile(path.Join(testRepoPath, v.FileName+".diff"))
 			require.NoError(err)

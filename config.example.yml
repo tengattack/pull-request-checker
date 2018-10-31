@@ -6,6 +6,7 @@ core:
   work_dir: 'tmp'
   logs_dir: 'logs'
   check_log_uri: 'http://example.com/checker/logs/'
+  markdownlint: 'remark'
   cpplint: 'cpplint'
   phplint: 'phplint'
   eslint: './node_modules/.bin/eslint'

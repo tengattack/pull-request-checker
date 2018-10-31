@@ -478,7 +478,13 @@ type remarkMessage struct {
 }
 
 func remark(fileName string, repoPath string) (reports []remarkReport, out []byte, err error) {
-	cmd := exec.Command("remark", "--quiet", "--report", "json", fileName)
+	words, err := shellwords.Parse(Conf.Core.Markdownlint)
+	if err != nil {
+		LogError.Error("Markdownlint: " + err.Error())
+		return nil, nil, err
+	}
+	words = append(words, "--quiet", "--report", "json", fileName)
+	cmd := exec.Command(words[0], words[1:]...)
 	cmd.Dir = repoPath
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
