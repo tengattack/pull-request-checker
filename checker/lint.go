@@ -111,8 +111,11 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 	lintEnabled.SCSS = false
 	lintEnabled.JS = ""
 	lintEnabled.ES = ""
-	lintEnabled.MD = true
+	lintEnabled.MD = false
 
+	if _, err := os.Stat(filepath.Join(cwd, ".remarkrc")); err == nil {
+		lintEnabled.MD = true
+	}
 	if _, err := os.Stat(filepath.Join(cwd, "tslint.json")); err == nil {
 		lintEnabled.TypeScript = true
 	}
