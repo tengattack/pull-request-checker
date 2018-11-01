@@ -1,7 +1,7 @@
-diff --git a/example.md b/example.md
+diff --git "a/hello \342\230\272.md" "b/hello \342\230\272.md"
 index eb0c801..e2385e5 100644
---- a/example.md
-+++ b/example.md
+--- "a/hello \342\230\272.md"
++++ "b/hello \342\230\272.md"
 @@ -1 +1 @@
 --   你好Hello
 +-   Hello你好

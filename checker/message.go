@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"sourcegraph.com/sourcegraph/go-diff/diff"
@@ -47,11 +48,15 @@ func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, comments []
 // GenerateComments generate github comments from github diffs and lint option
 func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *LintEnabled, log *os.File) ([]GithubRefComment, int, error) {
 	comments := []GithubRefComment{}
-	var err error
 	problems := 0
+	var lintErr error
 	for _, d := range diffs {
-		if strings.HasPrefix(d.NewName, "b/") {
-			fileName := d.NewName[2:]
+		newName, err := strconv.Unquote(d.NewName)
+		if err != nil {
+			newName = d.NewName
+		}
+		if strings.HasPrefix(newName, "b/") {
+			fileName := newName[2:]
 			log.WriteString(fmt.Sprintf("Checking '%s'\n", fileName))
 			var lints []LintMessage
 			if lintEnabled.MD && strings.HasSuffix(fileName, ".md") {
@@ -65,10 +70,10 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 					return nil, 0, err
 				}
 				comments, problems = pickDiffLintMessages(lintsFormatted, d, comments, problems, log, fileName)
-				lints, err = MDLint(rps)
+				lints, lintErr = MDLint(rps)
 			} else if lintEnabled.CPP && isCPP(fileName) {
 				log.WriteString(fmt.Sprintf("CPPLint '%s'\n", fileName))
-				lints, err = CPPLint(fileName, repoPath)
+				lints, lintErr = CPPLint(fileName, repoPath)
 			} else if lintEnabled.Go && strings.HasSuffix(fileName, ".go") {
 				log.WriteString(fmt.Sprintf("Goreturns '%s'\n", fileName))
 				lintsGoreturns, err := Goreturns(filepath.Join(repoPath, fileName), repoPath)
@@ -77,28 +82,28 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 				}
 				comments, problems = pickDiffLintMessages(lintsGoreturns, d, comments, problems, log, fileName)
 				log.WriteString(fmt.Sprintf("Golint '%s'\n", fileName))
-				lints, err = Golint(filepath.Join(repoPath, fileName), repoPath)
+				lints, lintErr = Golint(filepath.Join(repoPath, fileName), repoPath)
 			} else if lintEnabled.PHP && strings.HasSuffix(fileName, ".php") {
 				log.WriteString(fmt.Sprintf("PHPLint '%s'\n", fileName))
-				lints, err = PHPLint(filepath.Join(repoPath, fileName), repoPath)
+				lints, lintErr = PHPLint(filepath.Join(repoPath, fileName), repoPath)
 			} else if lintEnabled.TypeScript && (strings.HasSuffix(fileName, ".ts") ||
 				strings.HasSuffix(fileName, ".tsx")) {
 				log.WriteString(fmt.Sprintf("TSLint '%s'\n", fileName))
-				lints, err = TSLint(filepath.Join(repoPath, fileName), repoPath)
+				lints, lintErr = TSLint(filepath.Join(repoPath, fileName), repoPath)
 			} else if lintEnabled.SCSS && (strings.HasSuffix(fileName, ".scss") ||
 				strings.HasSuffix(fileName, ".css")) {
 				log.WriteString(fmt.Sprintf("SCSSLint '%s'\n", fileName))
-				lints, err = SCSSLint(filepath.Join(repoPath, fileName), repoPath)
+				lints, lintErr = SCSSLint(filepath.Join(repoPath, fileName), repoPath)
 			} else if lintEnabled.JS != "" && strings.HasSuffix(fileName, ".js") {
 				log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
-				lints, err = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
+				lints, lintErr = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
 			} else if lintEnabled.ES != "" && (strings.HasSuffix(fileName, ".es") ||
 				strings.HasSuffix(fileName, ".esx") || strings.HasSuffix(fileName, ".jsx")) {
 				log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
-				lints, err = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.ES)
+				lints, lintErr = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.ES)
 			}
-			if err != nil {
-				return nil, 0, err
+			if lintErr != nil {
+				return nil, 0, lintErr
 			}
 			if lintEnabled.JS != "" && (strings.HasSuffix(fileName, ".html") ||
 				strings.HasSuffix(fileName, ".php")) {
