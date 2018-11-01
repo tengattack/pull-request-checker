@@ -44,9 +44,9 @@ var dataSet = []TestsData{
 		CheckComment{[]string{`\n\+\s*"bytes"`}, "test1.go", 2},
 		CheckComment{[]string{`\n\-\s*"bytes"`}, "test1.go", 5},
 	}},
-	{"Markdown", "../tests/markdown", "example.md", []CheckComment{
-		{[]string{"Hello 你好"}, "example.md", 2},
-		{[]string{"undefined"}, "example.md", 5},
+	{"Markdown", "../tests/markdown", "hello ☺.md", []CheckComment{
+		{[]string{"Hello 你好"}, "hello ☺.md", 2},
+		{[]string{"undefined"}, "hello ☺.md", 5},
 	}},
 }
 

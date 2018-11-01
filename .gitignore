@@ -18,6 +18,7 @@
 
 .DS_Store
 .vscode/
+.idea/
 config.yml
 /main
 /tmp
