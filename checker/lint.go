@@ -104,7 +104,7 @@ func init() {
 func (lintEnabled *LintEnabled) Init(cwd string) {
 
 	// reset to defaults
-	lintEnabled.CPP = true
+	lintEnabled.CPP = false
 	lintEnabled.Go = true
 	lintEnabled.PHP = true
 	lintEnabled.TypeScript = false
@@ -113,6 +113,9 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 	lintEnabled.ES = ""
 	lintEnabled.MD = false
 
+	if _, err := os.Stat(filepath.Join(cwd, "CPPLINT.cfg")); err == nil {
+		lintEnabled.CPP = true
+	}
 	if _, err := os.Stat(filepath.Join(cwd, ".remarkrc")); err == nil {
 		lintEnabled.MD = true
 	}
