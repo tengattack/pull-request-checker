@@ -75,6 +75,8 @@ func TestGenerateComments(t *testing.T) {
 			logFilePath := path.Join(testRepoPath, v.FileName+".log")
 			log, err := os.Create(logFilePath)
 			require.NoError(err)
+			defer os.Remove(logFilePath)
+			defer log.Close()
 
 			diffs, err := diff.ParseMultiFileDiff(out)
 			require.NoError(err)
@@ -92,8 +94,6 @@ func TestGenerateComments(t *testing.T) {
 					assert.Regexp(regexMessage, comments[i].Body)
 				}
 			}
-			log.Close()
-			os.Remove(logFilePath)
 		})
 	}
 }
