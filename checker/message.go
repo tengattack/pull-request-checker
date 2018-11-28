@@ -401,15 +401,17 @@ func HandleMessage(message string) error {
 		err = ref.CreateReview(pull, "REQUEST_CHANGES", comment, comments)
 		if err != nil {
 			log.WriteString("error: " + err.Error() + "\n")
+			LogError.Errorf("create review failed: %v", err)
 		}
 		conclusion = "failure"
 		outputSummary = fmt.Sprintf("The lint check failed! %d problem(s) found.", problems)
 		err = ref.UpdateState("lint", "error", targetURL, outputSummary)
 	} else {
-		// err = ref.CreateReview(pull, "APPROVE", "**lint**: no problems found.", nil)
-		// if err != nil {
-		// 	log.WriteString("error: " + err.Error() + "\n")
-		// }
+		err = ref.CreateReview(pull, "APPROVE", "**lint**: no problems found.", nil)
+		if err != nil {
+			log.WriteString("error: " + err.Error() + "\n")
+			LogError.Errorf("create review failed: %v", err)
+		}
 		conclusion = "success"
 		outputSummary = "The lint check succeed!"
 		err = ref.UpdateState("lint", "success", targetURL, outputSummary)
