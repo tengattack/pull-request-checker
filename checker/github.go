@@ -2,15 +2,19 @@ package checker
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strings"
 	"time"
 
+	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/gin-gonic/gin"
+	"github.com/google/go-github/github"
 	githubhook "gopkg.in/rjz/githubhook.v0"
 )
 
@@ -388,6 +392,53 @@ func webhookHandler(c *gin.Context) {
 	}
 }
 
+// HasLinterChecks check specified commit whether contain the linter checks
+func HasLinterChecks(ref *GithubRef) (bool, error) {
+	// Wrap the shared transport for use with the integration ID authenticating with installation ID.
+	// TODO: add installation ID to db
+	tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
+		Conf.GitHub.AppID, 479595, Conf.GitHub.PrivateKey)
+	if err != nil {
+		LogError.Errorf("load private key failed: %v", err)
+		return false, err
+	}
+
+	// TODO: refine code
+	ctx := context.Background()
+	client := github.NewClient(&http.Client{Transport: tr})
+
+	parts := strings.Split(ref.RepoName, "/")
+	checkRuns, _, err := client.Checks.ListCheckRunsForRef(ctx, parts[0], parts[1], ref.Sha, nil)
+	if err != nil {
+		LogError.Errorf("github list check runs failed: %v", err)
+		return false, err
+	}
+
+	for _, checkRun := range checkRuns.CheckRuns {
+		if checkRun.GetName() == "linter" {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+// HasLintStatuses check specified commit whether contain the lint context
+func HasLintStatuses(ref *GithubRef) (bool, error) {
+	statuses, err := ref.GetStatuses()
+	if err != nil {
+		LogError.Errorf("github get statuses failed: %v", err)
+		return false, err
+	}
+	lint := 0
+	for _, s := range statuses {
+		if s.Context == "lint" {
+			lint++
+		}
+	}
+	return lint > 0, nil
+}
+
 func WatchLocalRepo() error {
 	var err error
 	for {
@@ -414,17 +465,17 @@ func WatchLocalRepo() error {
 								RepoName: repository,
 								Sha:      pull.Head.Sha,
 							}
-							statuses, err := ref.GetStatuses()
+							exists, err := HasLintStatuses(&ref)
 							if err != nil {
 								continue
 							}
-							lint := 0
-							for _, s := range statuses {
-								if s.Context == "lint" {
-									lint++
+							if !exists {
+								exists, err = HasLinterChecks(&ref)
+								if err != nil {
+									continue
 								}
 							}
-							if lint <= 0 {
+							if !exists {
 								// no statuses, need check
 								message := fmt.Sprintf("%s/pull/%d/commits/%s", ref.RepoName, pull.Number, ref.Sha)
 								LogAccess.WithField("entry", "local").Info("Push message: " + message)

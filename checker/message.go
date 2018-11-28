@@ -248,6 +248,7 @@ func HandleMessage(message string) error {
 		return err
 	}
 
+	// TODO: refine code
 	ctx := context.Background()
 	client := github.NewClient(&http.Client{Transport: tr})
 
