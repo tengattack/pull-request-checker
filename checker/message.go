@@ -389,6 +389,11 @@ func HandleMessage(message string) error {
 	}
 
 	checkRunStatus = "completed"
+	if len(annotations) > 50 {
+		// TODO: push all
+		annotations = annotations[:50]
+		LogAccess.Warn("Too many annotations to push them all at once. Only 50 annotations will be pushed right now.")
+	}
 	_, _, err = client.Checks.UpdateCheckRun(ctx, gpull.Base.Repo.Owner.Login, gpull.Base.Repo.Name, checkRunID, github.UpdateCheckRunOptions{
 		Name:        "linter",
 		Status:      &checkRunStatus,
