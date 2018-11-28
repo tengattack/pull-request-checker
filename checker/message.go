@@ -239,6 +239,35 @@ func HandleMessage(message string) error {
 		return nil
 	}
 
+	// Wrap the shared transport for use with the integration ID authenticating with installation ID.
+	// TODO: add installation ID to db
+	tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
+		Conf.GitHub.AppID, 479595, Conf.GitHub.PrivateKey)
+	if err != nil {
+		LogError.Errorf("load private key failed: %v", err)
+		return err
+	}
+
+	ctx := context.Background()
+	client := github.NewClient(&http.Client{Transport: tr})
+
+	var checkRunID int64
+
+	t := github.Timestamp{Time: time.Now()}
+	outputTitle := "linter"
+	checkRunStatus := "in_progress"
+	checkRun, _, err := client.Checks.CreateCheckRun(ctx, gpull.Base.Repo.Owner.Login, gpull.Base.Repo.Name, github.CreateCheckRunOptions{
+		Name:       "linter",
+		HeadBranch: gpull.Base.Ref,
+		HeadSHA:    ref.Sha,
+		Status:     &checkRunStatus,
+	})
+	if err != nil {
+		LogError.Errorf("github create check run failed: %v", err)
+		return err
+	}
+	checkRunID = checkRun.GetID()
+
 	err = ref.UpdateState("lint", "pending", targetURL,
 		"checking")
 	if err != nil {
@@ -358,34 +387,10 @@ func HandleMessage(message string) error {
 		log.WriteString("done.")
 	}
 
-	// Wrap the shared transport for use with the integration ID authenticating with installation ID.
-	// TODO: add installation ID to db
-	tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
-		Conf.GitHub.AppID, 479595, Conf.GitHub.PrivateKey)
-	if err != nil {
-		LogError.Errorf("load private key failed: %v", err)
-		return err
-	}
-
-	ctx := context.Background()
-	client := github.NewClient(&http.Client{Transport: tr})
-
-	status := "completed"
-	t := github.Timestamp{Time: time.Now()}
-	outputTitle := "linter"
-	checkRun, _, err := client.Checks.CreateCheckRun(ctx, gpull.Base.Repo.Owner.Login, gpull.Base.Repo.Name, github.CreateCheckRunOptions{
-		Name:       "linter",
-		HeadBranch: gpull.Base.Ref,
-		HeadSHA:    ref.Sha,
-	})
-	if err != nil {
-		LogError.Errorf("github create check run failed: %v", err)
-		return err
-	}
-
-	_, _, err = client.Checks.UpdateCheckRun(ctx, gpull.Base.Repo.Owner.Login, gpull.Base.Repo.Name, checkRun.GetID(), github.UpdateCheckRunOptions{
+	checkRunStatus = "completed"
+	_, _, err = client.Checks.UpdateCheckRun(ctx, gpull.Base.Repo.Owner.Login, gpull.Base.Repo.Name, checkRunID, github.UpdateCheckRunOptions{
 		Name:        "linter",
-		Status:      &status,
+		Status:      &checkRunStatus,
 		Conclusion:  &conclusion,
 		CompletedAt: &t,
 		Output: &github.CheckRunOutput{
