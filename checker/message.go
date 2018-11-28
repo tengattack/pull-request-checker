@@ -220,24 +220,9 @@ func HandleMessage(message string) error {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err != nil {
-			log.WriteString("error: " + err.Error() + "\n")
-		}
-		log.Close()
-	}()
 
-	log.WriteString("Pull Request Checker/" + GetVersion() + "\n\n")
-	log.WriteString(fmt.Sprintf("Start fetching %s/pull/%s\n", repository, pull))
-
-	gpull, err := GetGithubPull(repository, pull)
-	if err != nil {
-		return err
-	}
-	if gpull.State != "open" {
-		log.WriteString("PR " + gpull.State + ".")
-		return nil
-	}
+	var checkRunID int64
+	var gpull *GithubPull
 
 	// Wrap the shared transport for use with the integration ID authenticating with installation ID.
 	// TODO: add installation ID to db
@@ -245,6 +230,9 @@ func HandleMessage(message string) error {
 		Conf.GitHub.AppID, 479595, Conf.GitHub.PrivateKey)
 	if err != nil {
 		LogError.Errorf("load private key failed: %v", err)
+		// close log manually
+		log.WriteString("error: " + err.Error() + "\n")
+		log.Close()
 		return err
 	}
 
@@ -252,7 +240,45 @@ func HandleMessage(message string) error {
 	ctx := context.Background()
 	client := github.NewClient(&http.Client{Transport: tr})
 
-	var checkRunID int64
+	defer func() {
+		if err != nil {
+			LogError.Errorf("handle message failed: %v", err)
+			log.WriteString("error: " + err.Error() + "\n")
+		}
+		if checkRunID != 0 && gpull != nil {
+			conclusion := "action_required"
+			checkRunStatus := "completed"
+			t := github.Timestamp{Time: time.Now()}
+			outputTitle := "linter"
+			outputSummary := fmt.Sprintf("error: %v", err)
+			_, _, err := client.Checks.UpdateCheckRun(ctx, gpull.Base.Repo.Owner.Login, gpull.Base.Repo.Name, checkRunID, github.UpdateCheckRunOptions{
+				Name:        "linter",
+				Status:      &checkRunStatus,
+				Conclusion:  &conclusion,
+				CompletedAt: &t,
+				Output: &github.CheckRunOutput{
+					Title:   &outputTitle,
+					Summary: &outputSummary,
+				},
+			})
+			if err != nil {
+				LogError.Errorf("github update check run failed: %v", err)
+			}
+		}
+		log.Close()
+	}()
+
+	log.WriteString("Pull Request Checker/" + GetVersion() + "\n\n")
+	log.WriteString(fmt.Sprintf("Start fetching %s/pull/%s\n", repository, pull))
+
+	gpull, err = GetGithubPull(repository, pull)
+	if err != nil {
+		return err
+	}
+	if gpull.State != "open" {
+		log.WriteString("PR " + gpull.State + ".")
+		return nil
+	}
 
 	t := github.Timestamp{Time: time.Now()}
 	outputTitle := "linter"
@@ -273,6 +299,7 @@ func HandleMessage(message string) error {
 		"checking")
 	if err != nil {
 		LogAccess.Error("Update pull request status error: " + err.Error())
+		return err
 	}
 
 	repoPath := filepath.Join(Conf.Core.WorkDir, repository)
