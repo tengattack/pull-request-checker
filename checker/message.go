@@ -244,8 +244,11 @@ func HandleMessage(message string) error {
 		if err != nil {
 			LogError.Errorf("handle message failed: %v", err)
 			log.WriteString("error: " + err.Error() + "\n")
+		} else {
+			LogAccess.Infof("Finish message: %s", message)
 		}
-		if checkRunID != 0 && gpull != nil {
+		if err != nil && checkRunID != 0 && gpull != nil {
+			// update check run result with error message
 			conclusion := "action_required"
 			checkRunStatus := "completed"
 			t := github.Timestamp{Time: time.Now()}
