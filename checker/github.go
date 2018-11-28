@@ -37,8 +37,10 @@ type GithubPull struct {
 type GithubRef struct {
 	RepoName string `json:"-"`
 	Repo     struct {
-		HTMLURL string `json:"html_url"`
-		SSHURL  string `json:"ssh_url"`
+		Name    string     `json:"name"`
+		Owner   githubUser `json:"owner"`
+		HTMLURL string     `json:"html_url"`
+		SSHURL  string     `json:"ssh_url"`
 	} `json:"repo"`
 	Label string     `json:"label"`
 	Ref   string     `json:"ref"`

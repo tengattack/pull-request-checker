@@ -42,8 +42,10 @@ type SectionAPI struct {
 
 // SectionGitHub is sub section of config.
 type SectionGitHub struct {
+	AppID       int    `yaml:"app_id"`
 	Secret      string `yaml:"secret"`
 	AccessToken string `yaml:"access_token"`
+	PrivateKey  string `yaml:"private_key"`
 }
 
 // SectionLog is sub section of config.
@@ -86,8 +88,10 @@ func BuildDefaultConf() Config {
 	conf.API.WebHookURI = "/api/webhook"
 
 	// GitHub
+	conf.GitHub.AppID = 0
 	conf.GitHub.Secret = ""
 	conf.GitHub.AccessToken = ""
+	conf.GitHub.PrivateKey = ""
 
 	// Log
 	conf.Log.Format = "string"

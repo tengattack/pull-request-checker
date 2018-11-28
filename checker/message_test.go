@@ -84,7 +84,7 @@ func TestGenerateComments(t *testing.T) {
 			lintEnabled := LintEnabled{}
 			lintEnabled.Init(testRepoPath)
 
-			comments, problems, err := GenerateComments(testRepoPath, diffs, &lintEnabled, log)
+			comments, _, problems, err := GenerateComments(testRepoPath, diffs, &lintEnabled, log)
 			require.NoError(err)
 			require.Equal(len(v.CheckComments), problems)
 			for i, check := range v.CheckComments {

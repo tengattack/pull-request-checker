@@ -1,13 +1,18 @@
 package checker
 
 import (
+	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
+	"github.com/bradleyfalzon/ghinstallation"
+	"github.com/google/go-github/github"
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
@@ -46,8 +51,10 @@ func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, comments []
 }
 
 // GenerateComments generate github comments from github diffs and lint option
-func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *LintEnabled, log *os.File) ([]GithubRefComment, int, error) {
+func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *LintEnabled, log *os.File) ([]GithubRefComment, []*github.CheckRunAnnotation, int, error) {
 	comments := []GithubRefComment{}
+	annotations := []*github.CheckRunAnnotation{}
+	annotationLevel := "warning" // TODO: from lint.Severity
 	problems := 0
 	var lintErr error
 	for _, d := range diffs {
@@ -63,11 +70,11 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 				log.WriteString(fmt.Sprintf("Markdown '%s'\n", fileName))
 				rps, out, err := remark(fileName, repoPath)
 				if err != nil {
-					return nil, 0, err
+					return nil, nil, 0, err
 				}
 				lintsFormatted, err := MDFormattedLint(filepath.Join(repoPath, fileName), out)
 				if err != nil {
-					return nil, 0, err
+					return nil, nil, 0, err
 				}
 				comments, problems = pickDiffLintMessages(lintsFormatted, d, comments, problems, log, fileName)
 				lints, lintErr = MDLint(rps)
@@ -78,7 +85,7 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 				log.WriteString(fmt.Sprintf("Goreturns '%s'\n", fileName))
 				lintsGoreturns, err := Goreturns(filepath.Join(repoPath, fileName), repoPath)
 				if err != nil {
-					return nil, 0, err
+					return nil, nil, 0, err
 				}
 				comments, problems = pickDiffLintMessages(lintsGoreturns, d, comments, problems, log, fileName)
 				log.WriteString(fmt.Sprintf("Golint '%s'\n", fileName))
@@ -103,7 +110,7 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 				lints, lintErr = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.ES)
 			}
 			if lintErr != nil {
-				return nil, 0, lintErr
+				return nil, nil, 0, lintErr
 			}
 			if lintEnabled.JS != "" && (strings.HasSuffix(fileName, ".html") ||
 				strings.HasSuffix(fileName, ".php")) {
@@ -111,7 +118,7 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 				log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
 				lints2, err := ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
 				if err != nil {
-					return nil, 0, err
+					return nil, nil, 0, err
 				}
 				if lints2 != nil {
 					if lints != nil {
@@ -159,6 +166,13 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 										lint.Line, lint.Column, lint.Message, lint.RuleID))
 									comment := fmt.Sprintf("`%s` %d:%d %s",
 										lint.RuleID, lint.Line, lint.Column, lint.Message)
+									annotations = append(annotations, &github.CheckRunAnnotation{
+										Path:            &fileName,
+										Message:         &comment,
+										StartLine:       &lint.Line,
+										EndLine:         &lint.Line,
+										AnnotationLevel: &annotationLevel,
+									})
 									comments = append(comments, GithubRefComment{
 										Path:     fileName,
 										Position: int(hunk.StartPosition) + i,
@@ -176,7 +190,7 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 			log.WriteString("\n")
 		}
 	}
-	return comments, problems, nil
+	return comments, annotations, problems, nil
 }
 
 // HandleMessage handles message
@@ -187,22 +201,22 @@ func HandleMessage(message string) error {
 		return nil
 	}
 
-	repository, pull, commits := s[0]+"/"+s[1], s[3], s[5]
+	repository, pull, commitSha := s[0]+"/"+s[1], s[3], s[5]
 	LogAccess.Infof("Start fetching %s/pull/%s", repository, pull)
 
 	ref := GithubRef{
 		RepoName: repository,
-		Sha:      commits,
+		Sha:      commitSha,
 	}
 	targetURL := ""
 	if len(Conf.Core.CheckLogURI) > 0 {
-		targetURL = Conf.Core.CheckLogURI + repository + "/" + commits + ".log"
+		targetURL = Conf.Core.CheckLogURI + repository + "/" + ref.Sha + ".log"
 	}
 
 	repoLogsPath := filepath.Join(Conf.Core.LogsDir, repository)
 	os.MkdirAll(repoLogsPath, os.ModePerm)
 
-	log, err := os.Create(filepath.Join(repoLogsPath, fmt.Sprintf("%s.log", commits)))
+	log, err := os.Create(filepath.Join(repoLogsPath, fmt.Sprintf("%s.log", ref.Sha)))
 	if err != nil {
 		return err
 	}
@@ -266,8 +280,8 @@ func HandleMessage(message string) error {
 	}
 
 	// git checkout -f <commits>/<branch>
-	log.WriteString("$ git checkout -f " + commits + "\n")
-	cmd = exec.Command("git", "checkout", "-f", commits)
+	log.WriteString("$ git checkout -f " + ref.Sha + "\n")
+	cmd = exec.Command("git", "checkout", "-f", ref.Sha)
 	cmd.Dir = repoPath
 	cmd.Stdout = log
 	cmd.Stderr = log
@@ -301,7 +315,7 @@ func HandleMessage(message string) error {
 	lintEnabled := LintEnabled{}
 	lintEnabled.Init(repoPath)
 
-	comments, problems, err := GenerateComments(repoPath, diffs, &lintEnabled, log)
+	comments, annotations, problems, err := GenerateComments(repoPath, diffs, &lintEnabled, log)
 	if err != nil {
 		return err
 	}
@@ -314,6 +328,8 @@ func HandleMessage(message string) error {
 		mark, problems))
 	log.WriteString("Updating status...\n")
 
+	var conclusion string
+	var outputSummary string
 	if problems > 0 {
 		comment := fmt.Sprintf("**lint**: %d problem(s) found.", problems)
 		// The API doc didn't quite say this but too many comments will cause CreateReview to fail
@@ -326,19 +342,61 @@ func HandleMessage(message string) error {
 		if err != nil {
 			log.WriteString("error: " + err.Error() + "\n")
 		}
-		err = ref.UpdateState("lint", "error", targetURL,
-			fmt.Sprintf("The lint check failed! %d problem(s) found.", problems))
+		conclusion = "failure"
+		outputSummary = fmt.Sprintf("The lint check failed! %d problem(s) found.", problems)
+		err = ref.UpdateState("lint", "error", targetURL, outputSummary)
 	} else {
 		// err = ref.CreateReview(pull, "APPROVE", "**lint**: no problems found.", nil)
 		// if err != nil {
 		// 	log.WriteString("error: " + err.Error() + "\n")
 		// }
-		err = ref.UpdateState("lint", "success", targetURL,
-			"The lint check succeed!")
+		conclusion = "success"
+		outputSummary = "The lint check succeed!"
+		err = ref.UpdateState("lint", "success", targetURL, outputSummary)
 	}
 	if err == nil {
 		log.WriteString("done.")
 	}
 
+	// Wrap the shared transport for use with the integration ID authenticating with installation ID.
+	// TODO: add installation ID to db
+	tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
+		Conf.GitHub.AppID, 479595, Conf.GitHub.PrivateKey)
+	if err != nil {
+		LogError.Errorf("load private key failed: %v", err)
+		return err
+	}
+
+	ctx := context.Background()
+	client := github.NewClient(&http.Client{Transport: tr})
+
+	status := "completed"
+	t := github.Timestamp{Time: time.Now()}
+	outputTitle := "linter"
+	checkRun, _, err := client.Checks.CreateCheckRun(ctx, gpull.Base.Repo.Owner.Login, gpull.Base.Repo.Name, github.CreateCheckRunOptions{
+		Name:       "linter",
+		HeadBranch: gpull.Base.Ref,
+		HeadSHA:    ref.Sha,
+	})
+	if err != nil {
+		LogError.Errorf("github create check run failed: %v", err)
+		return err
+	}
+
+	_, _, err = client.Checks.UpdateCheckRun(ctx, gpull.Base.Repo.Owner.Login, gpull.Base.Repo.Name, checkRun.GetID(), github.UpdateCheckRunOptions{
+		Name:        "linter",
+		Status:      &status,
+		Conclusion:  &conclusion,
+		CompletedAt: &t,
+		Output: &github.CheckRunOutput{
+			Title:       &outputTitle,
+			Summary:     &outputSummary,
+			Annotations: annotations,
+		},
+	})
+	if err != nil {
+		LogError.Errorf("github update check run failed: %v", err)
+		return err
+	}
 	return err
 }
