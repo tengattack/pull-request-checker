@@ -290,6 +290,7 @@ func HandleMessage(message string) error {
 		Name:       "linter",
 		HeadBranch: gpull.Base.Ref,
 		HeadSHA:    ref.Sha,
+		DetailsURL: &targetURL,
 		Status:     &checkRunStatus,
 	})
 	if err != nil {
@@ -298,8 +299,7 @@ func HandleMessage(message string) error {
 	}
 	checkRunID = checkRun.GetID()
 
-	err = ref.UpdateState("lint", "pending", targetURL,
-		"checking")
+	err = ref.UpdateState("lint", "pending", targetURL, "checking")
 	if err != nil {
 		LogAccess.Error("Update pull request status error: " + err.Error())
 		return err
@@ -394,11 +394,12 @@ func HandleMessage(message string) error {
 		comment := fmt.Sprintf("**lint**: %d problem(s) found.", problems)
 		// The API doc didn't quite say this but too many comments will cause CreateReview to fail
 		// with "HTTP 422 Unprocessable Entity: submitted too quickly"
+		// TODO: remove comments for review
 		if len(comments) > 30 {
 			comments = comments[:30]
 			LogAccess.Warn("Too many comments to push them all at once. Only 30 comments will be pushed right now.")
 		}
-		err = ref.CreateReview(pull, "REQUEST_CHANGES", comment, comments)
+		err = ref.CreateReview(pull, "REQUEST_CHANGES", comment, nil)
 		if err != nil {
 			log.WriteString("error: " + err.Error() + "\n")
 			LogError.Errorf("create review failed: %v", err)
