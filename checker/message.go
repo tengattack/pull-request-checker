@@ -26,7 +26,8 @@ func isCPP(fileName string) bool {
 	return false
 }
 
-func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, comments []GithubRefComment, problems int, log *os.File, fileName string) ([]GithubRefComment, int) {
+func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, comments []GithubRefComment, annotations []*github.CheckRunAnnotation, problems int, log *os.File, fileName string) ([]GithubRefComment, []*github.CheckRunAnnotation, int) {
+	annotationLevel := "warning" // TODO: from lint.Severity
 	for _, lint := range lintsDiff {
 		for _, hunk := range d.Hunks {
 			intersection := lint.Column > 0 && hunk.NewLines > 0
@@ -42,12 +43,20 @@ func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, comments []
 					Position: int(hunk.StartPosition) + getOffsetToUnifiedDiff(lint.Line, hunk),
 					Body:     comment,
 				})
+				startLine := lint.Line
+				annotations = append(annotations, &github.CheckRunAnnotation{
+					Path:            &fileName,
+					Message:         &comment,
+					StartLine:       &startLine,
+					EndLine:         &startLine,
+					AnnotationLevel: &annotationLevel,
+				})
 				problems++
 				break
 			}
 		}
 	}
-	return comments, problems
+	return comments, annotations, problems
 }
 
 // GenerateComments generate github comments from github diffs and lint option
@@ -76,7 +85,7 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 				if err != nil {
 					return nil, nil, 0, err
 				}
-				comments, problems = pickDiffLintMessages(lintsFormatted, d, comments, problems, log, fileName)
+				comments, annotations, problems = pickDiffLintMessages(lintsFormatted, d, comments, annotations, problems, log, fileName)
 				lints, lintErr = MDLint(rps)
 			} else if lintEnabled.CPP && isCPP(fileName) {
 				log.WriteString(fmt.Sprintf("CPPLint '%s'\n", fileName))
@@ -87,7 +96,7 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 				if err != nil {
 					return nil, nil, 0, err
 				}
-				comments, problems = pickDiffLintMessages(lintsGoreturns, d, comments, problems, log, fileName)
+				comments, annotations, problems = pickDiffLintMessages(lintsGoreturns, d, comments, annotations, problems, log, fileName)
 				log.WriteString(fmt.Sprintf("Golint '%s'\n", fileName))
 				lints, lintErr = Golint(filepath.Join(repoPath, fileName), repoPath)
 			} else if lintEnabled.PHP && strings.HasSuffix(fileName, ".php") {
@@ -166,11 +175,12 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 										lint.Line, lint.Column, lint.Message, lint.RuleID))
 									comment := fmt.Sprintf("`%s` %d:%d %s",
 										lint.RuleID, lint.Line, lint.Column, lint.Message)
+									startLine := lint.Line
 									annotations = append(annotations, &github.CheckRunAnnotation{
 										Path:            &fileName,
 										Message:         &comment,
-										StartLine:       &lint.Line,
-										EndLine:         &lint.Line,
+										StartLine:       &startLine,
+										EndLine:         &startLine,
 										AnnotationLevel: &annotationLevel,
 									})
 									comments = append(comments, GithubRefComment{
