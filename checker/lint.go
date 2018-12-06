@@ -440,6 +440,10 @@ func goreturns(filePath string) (*diff.FileDiff, error) {
 		if err != nil {
 			return nil, fmt.Errorf("computing diff: %s", err)
 		}
+		if data == "" {
+			// TODO: final EOL
+			return nil, nil
+		}
 		return diff.ParseFileDiff([]byte(data))
 	}
 	return nil, nil
@@ -549,6 +553,10 @@ func markdownFormatted(filePath string, result []byte) (*diff.FileDiff, error) {
 		data, err := difflib.GetUnifiedDiffString(udf)
 		if err != nil {
 			return nil, fmt.Errorf("computing diff: %s", err)
+		}
+		if data == "" {
+			// TODO: final EOL
+			return nil, nil
 		}
 		return diff.ParseFileDiff([]byte(data))
 	}
