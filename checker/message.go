@@ -257,27 +257,7 @@ func HandleMessage(message string) error {
 		} else {
 			LogAccess.Infof("Finish message: %s", message)
 		}
-		if err != nil && checkRunID != 0 && gpull != nil {
-			// update check run result with error message
-			conclusion := "action_required"
-			checkRunStatus := "completed"
-			t := github.Timestamp{Time: time.Now()}
-			outputTitle := "linter"
-			outputSummary := fmt.Sprintf("error: %v", err)
-			_, _, err := client.Checks.UpdateCheckRun(ctx, gpull.Base.Repo.Owner.Login, gpull.Base.Repo.Name, checkRunID, github.UpdateCheckRunOptions{
-				Name:        "linter",
-				Status:      &checkRunStatus,
-				Conclusion:  &conclusion,
-				CompletedAt: &t,
-				Output: &github.CheckRunOutput{
-					Title:   &outputTitle,
-					Summary: &outputSummary,
-				},
-			})
-			if err != nil {
-				LogError.Errorf("github update check run failed: %v", err)
-			}
-		}
+		UpdateCheckRunWithError(ctx, err, client, gpull, checkRunID)
 		log.Close()
 	}()
 
@@ -295,14 +275,7 @@ func HandleMessage(message string) error {
 
 	t := github.Timestamp{Time: time.Now()}
 	outputTitle := "linter"
-	checkRunStatus := "in_progress"
-	checkRun, _, err := client.Checks.CreateCheckRun(ctx, gpull.Base.Repo.Owner.Login, gpull.Base.Repo.Name, github.CreateCheckRunOptions{
-		Name:       "linter",
-		HeadBranch: gpull.Base.Ref,
-		HeadSHA:    ref.Sha,
-		DetailsURL: &targetURL,
-		Status:     &checkRunStatus,
-	})
+	checkRun, err := CreateCheckRun(ctx, client, outputTitle, gpull, ref, targetURL)
 	if err != nil {
 		LogError.Errorf("github create check run failed: %v", err)
 		return err
@@ -360,6 +333,10 @@ func HandleMessage(message string) error {
 		return err
 	}
 
+	err = ReportGotest(repoPath, client, gpull, ref, targetURL)
+	if err != nil {
+		return err
+	}
 	// this works not accurately
 	// git diff -U3 <base_commits>
 	// log.WriteString("$ git diff -U3 " + p.Base.Sha + "\n")
@@ -431,26 +408,11 @@ func HandleMessage(message string) error {
 		log.WriteString("done.")
 	}
 
-	checkRunStatus = "completed"
 	if len(annotations) > 50 {
 		// TODO: push all
 		annotations = annotations[:50]
 		LogAccess.Warn("Too many annotations to push them all at once. Only 50 annotations will be pushed right now.")
 	}
-	_, _, err = client.Checks.UpdateCheckRun(ctx, gpull.Base.Repo.Owner.Login, gpull.Base.Repo.Name, checkRunID, github.UpdateCheckRunOptions{
-		Name:        "linter",
-		Status:      &checkRunStatus,
-		Conclusion:  &conclusion,
-		CompletedAt: &t,
-		Output: &github.CheckRunOutput{
-			Title:       &outputTitle,
-			Summary:     &outputSummary,
-			Annotations: annotations,
-		},
-	})
-	if err != nil {
-		LogError.Errorf("github update check run failed: %v", err)
-		return err
-	}
+	err = UpdateCheckRun(ctx, client, gpull, checkRunID, conclusion, t, outputTitle, outputSummary, annotations)
 	return err
 }

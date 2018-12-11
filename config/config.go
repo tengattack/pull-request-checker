@@ -29,6 +29,7 @@ type SectionCore struct {
 	ESLint        string `yaml:"eslint"`
 	TSLint        string `yaml:"tslint"`
 	SCSSLint      string `yaml:"scsslint"`
+	Gotest        string `yaml:"gotest"`
 }
 
 // SectionAPI is sub section of config.
