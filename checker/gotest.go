@@ -26,6 +26,7 @@ func Gotest(ctx context.Context, repo string) (string, error) {
 	return string(out), err
 }
 
+// ReportGotest reports the go test result to github
 func ReportGotest(repo string, client *github.Client, gpull *GithubPull, ref GithubRef, targetURL string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
 	defer cancel()
@@ -55,7 +56,6 @@ func ReportGotest(repo string, client *github.Client, gpull *GithubPull, ref Git
 	outputSummary, err := Gotest(ctx, repo)
 	if err != nil {
 		return UpdateCheckRun(ctx, client, gpull, checkRunID, "failure", t, outputTitle, outputSummary, nil)
-	} else {
-		return UpdateCheckRun(ctx, client, gpull, checkRunID, "success", t, outputTitle, outputSummary, nil)
 	}
+	return UpdateCheckRun(ctx, client, gpull, checkRunID, "success", t, outputTitle, outputSummary, nil)
 }
