@@ -80,6 +80,7 @@ func BuildDefaultConf() Config {
 	conf.Core.ESLint = ""
 	conf.Core.TSLint = ""
 	conf.Core.SCSSLint = ""
+	conf.Core.Gotest = "go test"
 
 	// API
 	conf.API.Enabled = true

@@ -257,7 +257,9 @@ func HandleMessage(message string) error {
 		} else {
 			LogAccess.Infof("Finish message: %s", message)
 		}
-		UpdateCheckRunWithError(ctx, err, client, gpull, checkRunID)
+		if err != nil {
+			UpdateCheckRunWithError(ctx, client, checkRunID, "linter", "linter", err, gpull)
+		}
 		log.Close()
 	}()
 
@@ -333,10 +335,6 @@ func HandleMessage(message string) error {
 		return err
 	}
 
-	err = ReportGotest(repoPath, client, gpull, ref, targetURL)
-	if err != nil {
-		return err
-	}
 	// this works not accurately
 	// git diff -U3 <base_commits>
 	// log.WriteString("$ git diff -U3 " + p.Base.Sha + "\n")
@@ -361,6 +359,8 @@ func HandleMessage(message string) error {
 
 	lintEnabled := LintEnabled{}
 	lintEnabled.Init(repoPath)
+
+	ReportGotest(repoPath, diffs, client, gpull, ref, targetURL)
 
 	comments, annotations, problems, err := GenerateComments(repoPath, diffs, &lintEnabled, log)
 	if err != nil {
@@ -413,6 +413,6 @@ func HandleMessage(message string) error {
 		annotations = annotations[:50]
 		LogAccess.Warn("Too many annotations to push them all at once. Only 50 annotations will be pushed right now.")
 	}
-	err = UpdateCheckRun(ctx, client, gpull, checkRunID, conclusion, t, outputTitle, outputSummary, annotations)
+	err = UpdateCheckRun(ctx, client, checkRunID, outputTitle, gpull, conclusion, t, outputTitle, outputSummary, annotations)
 	return err
 }

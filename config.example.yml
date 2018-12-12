@@ -13,7 +13,7 @@ core:
   tslint: './node_modules/.bin/tslint'
   scsslint: 'scss-lint'
 
-  gotest: '' # go test flags: https://golang.org/cmd/go/#hdr-Test_packages
+  gotest: 'go test' # go test flags: https://golang.org/cmd/go/#hdr-Test_packages
 
 api:
   enabled: true

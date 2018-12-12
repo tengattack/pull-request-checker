@@ -55,15 +55,14 @@ func DoHTTPRequest(req *http.Request, isJSONResponse bool, v interface{}) error 
 }
 
 // UpdateCheckRunWithError updates the check run result with error message
-func UpdateCheckRunWithError(ctx context.Context, err error, client *github.Client, gpull *GithubPull, checkRunID int64) {
-	if err != nil && checkRunID != 0 && gpull != nil {
+func UpdateCheckRunWithError(ctx context.Context, client *github.Client, checkRunID int64, checkName, outputTitle string, err error, gpull *GithubPull) {
+	if checkRunID != 0 && gpull != nil {
 		conclusion := "action_required"
 		checkRunStatus := "completed"
 		t := github.Timestamp{Time: time.Now()}
-		outputTitle := "linter"
 		outputSummary := fmt.Sprintf("error: %v", err)
 		_, _, eror := client.Checks.UpdateCheckRun(ctx, gpull.Base.Repo.Owner.Login, gpull.Base.Repo.Name, checkRunID, github.UpdateCheckRunOptions{
-			Name:        "linter",
+			Name:        checkName,
 			Status:      &checkRunStatus,
 			Conclusion:  &conclusion,
 			CompletedAt: &t,
@@ -79,10 +78,10 @@ func UpdateCheckRunWithError(ctx context.Context, err error, client *github.Clie
 }
 
 // UpdateCheckRun updates the check run result with output message
-func UpdateCheckRun(ctx context.Context, client *github.Client, gpull *GithubPull, checkRunID int64, conclusion string, t github.Timestamp, outputTitle string, outputSummary string, annotations []*github.CheckRunAnnotation) error {
+func UpdateCheckRun(ctx context.Context, client *github.Client, checkRunID int64, checkName string, gpull *GithubPull, conclusion string, t github.Timestamp, outputTitle string, outputSummary string, annotations []*github.CheckRunAnnotation) error {
 	checkRunStatus := "completed"
 	_, _, err := client.Checks.UpdateCheckRun(ctx, gpull.Base.Repo.Owner.Login, gpull.Base.Repo.Name, checkRunID, github.UpdateCheckRunOptions{
-		Name:        "linter",
+		Name:        checkName,
 		Status:      &checkRunStatus,
 		Conclusion:  &conclusion,
 		CompletedAt: &t,
