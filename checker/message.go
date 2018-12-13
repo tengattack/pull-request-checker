@@ -257,7 +257,7 @@ func HandleMessage(message string) error {
 		} else {
 			LogAccess.Infof("Finish message: %s", message)
 		}
-		if err != nil {
+		if err != nil && checkRunID != 0 {
 			UpdateCheckRunWithError(ctx, client, checkRunID, "linter", "linter", err, gpull)
 		}
 		log.Close()
@@ -280,9 +280,10 @@ func HandleMessage(message string) error {
 	checkRun, err := CreateCheckRun(ctx, client, outputTitle, gpull, ref, targetURL)
 	if err != nil {
 		LogError.Errorf("github create check run failed: %v", err)
-		return err
+		// PASS
+	} else {
+		checkRunID = checkRun.GetID()
 	}
-	checkRunID = checkRun.GetID()
 
 	err = ref.UpdateState("lint", "pending", targetURL, "checking")
 	if err != nil {
@@ -408,11 +409,13 @@ func HandleMessage(message string) error {
 		log.WriteString("done.")
 	}
 
-	if len(annotations) > 50 {
-		// TODO: push all
-		annotations = annotations[:50]
-		LogAccess.Warn("Too many annotations to push them all at once. Only 50 annotations will be pushed right now.")
+	if checkRunID != 0 {
+		if len(annotations) > 50 {
+			// TODO: push all
+			annotations = annotations[:50]
+			LogAccess.Warn("Too many annotations to push them all at once. Only 50 annotations will be pushed right now.")
+		}
+		err = UpdateCheckRun(ctx, client, checkRunID, outputTitle, gpull, conclusion, t, outputTitle, outputSummary, annotations)
 	}
-	err = UpdateCheckRun(ctx, client, checkRunID, outputTitle, gpull, conclusion, t, outputTitle, outputSummary, annotations)
 	return err
 }

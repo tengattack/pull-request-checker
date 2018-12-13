@@ -56,7 +56,7 @@ func DoHTTPRequest(req *http.Request, isJSONResponse bool, v interface{}) error 
 
 // UpdateCheckRunWithError updates the check run result with error message
 func UpdateCheckRunWithError(ctx context.Context, client *github.Client, checkRunID int64, checkName, outputTitle string, err error, gpull *GithubPull) {
-	if checkRunID != 0 && gpull != nil {
+	if gpull != nil {
 		conclusion := "action_required"
 		checkRunStatus := "completed"
 		t := github.Timestamp{Time: time.Now()}
