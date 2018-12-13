@@ -27,6 +27,8 @@ github:
   secret: 'xxx'
   access_token: 'xxx'
   private_key: '/path/to/private-key.pem'
+  installations:
+    tengattack: 479572
 
 log:
   format: "string" # string or json

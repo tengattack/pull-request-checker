@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -394,10 +395,15 @@ func webhookHandler(c *gin.Context) {
 
 // HasLinterChecks check specified commit whether contain the linter checks
 func HasLinterChecks(ref *GithubRef) (bool, error) {
+	parts := strings.Split(ref.RepoName, "/")
 	// Wrap the shared transport for use with the integration ID authenticating with installation ID.
 	// TODO: add installation ID to db
+	installationID, ok := Conf.GitHub.Installations[parts[0]]
+	if !ok {
+		return false, errors.New("no such installation")
+	}
 	tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
-		Conf.GitHub.AppID, 479595, Conf.GitHub.PrivateKey)
+		Conf.GitHub.AppID, installationID, Conf.GitHub.PrivateKey)
 	if err != nil {
 		LogError.Errorf("load private key failed: %v", err)
 		return false, err
@@ -407,7 +413,6 @@ func HasLinterChecks(ref *GithubRef) (bool, error) {
 	ctx := context.Background()
 	client := github.NewClient(&http.Client{Transport: tr})
 
-	parts := strings.Split(ref.RepoName, "/")
 	checkRuns, _, err := client.Checks.ListCheckRunsForRef(ctx, parts[0], parts[1], ref.Sha, nil)
 	if err != nil {
 		LogError.Errorf("github list check runs failed: %v", err)

@@ -43,10 +43,11 @@ type SectionAPI struct {
 
 // SectionGitHub is sub section of config.
 type SectionGitHub struct {
-	AppID       int    `yaml:"app_id"`
-	Secret      string `yaml:"secret"`
-	AccessToken string `yaml:"access_token"`
-	PrivateKey  string `yaml:"private_key"`
+	AppID         int            `yaml:"app_id"`
+	Secret        string         `yaml:"secret"`
+	AccessToken   string         `yaml:"access_token"`
+	PrivateKey    string         `yaml:"private_key"`
+	Installations map[string]int `yaml:"installations"`
 }
 
 // SectionLog is sub section of config.
@@ -94,6 +95,7 @@ func BuildDefaultConf() Config {
 	conf.GitHub.Secret = ""
 	conf.GitHub.AccessToken = ""
 	conf.GitHub.PrivateKey = ""
+	conf.GitHub.Installations = make(map[string]int)
 
 	// Log
 	conf.Log.Format = "string"

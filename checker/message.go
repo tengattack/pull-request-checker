@@ -211,6 +211,7 @@ func HandleMessage(message string) error {
 		return nil
 	}
 
+	owner := s[0]
 	repository, pull, commitSha := s[0]+"/"+s[1], s[3], s[5]
 	LogAccess.Infof("Start fetching %s/pull/%s", repository, pull)
 
@@ -232,23 +233,26 @@ func HandleMessage(message string) error {
 	}
 
 	var checkRunID int64
+	var client *github.Client
 	var gpull *GithubPull
 
 	// Wrap the shared transport for use with the integration ID authenticating with installation ID.
 	// TODO: add installation ID to db
-	tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
-		Conf.GitHub.AppID, 479595, Conf.GitHub.PrivateKey)
-	if err != nil {
-		LogError.Errorf("load private key failed: %v", err)
-		// close log manually
-		log.WriteString("error: " + err.Error() + "\n")
-		log.Close()
-		return err
-	}
+	installationID, ok := Conf.GitHub.Installations[owner]
+	if ok {
+		tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
+			Conf.GitHub.AppID, installationID, Conf.GitHub.PrivateKey)
+		if err != nil {
+			LogError.Errorf("load private key failed: %v", err)
+			// close log manually
+			log.WriteString("error: " + err.Error() + "\n")
+			log.Close()
+			return err
+		}
 
-	// TODO: refine code
-	ctx := context.Background()
-	client := github.NewClient(&http.Client{Transport: tr})
+		// TODO: refine code
+		client = github.NewClient(&http.Client{Transport: tr})
+	}
 
 	defer func() {
 		if err != nil {
@@ -258,6 +262,7 @@ func HandleMessage(message string) error {
 			LogAccess.Infof("Finish message: %s", message)
 		}
 		if err != nil && checkRunID != 0 {
+			ctx := context.Background()
 			UpdateCheckRunWithError(ctx, client, checkRunID, "linter", "linter", err, gpull)
 		}
 		log.Close()
@@ -276,6 +281,7 @@ func HandleMessage(message string) error {
 	}
 
 	t := github.Timestamp{Time: time.Now()}
+	ctx := context.Background()
 	outputTitle := "linter"
 	checkRun, err := CreateCheckRun(ctx, client, outputTitle, gpull, ref, targetURL)
 	if err != nil {
