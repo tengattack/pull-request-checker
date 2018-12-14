@@ -30,6 +30,7 @@ type SectionCore struct {
 	TSLint        string `yaml:"tslint"`
 	SCSSLint      string `yaml:"scsslint"`
 	Gotest        string `yaml:"gotest"`
+	PHPUnit       string `yaml:"phpunit"`
 }
 
 // SectionAPI is sub section of config.
