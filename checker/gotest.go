@@ -18,8 +18,8 @@ func carry(ctx context.Context, repo, cmd, opt string) (string, error) {
 	if opt != "" {
 		words = append(words, opt)
 	}
-	if len(words) < 2 {
-		return "", errors.New("Command(opt) should consist of at least 2 words")
+	if len(words) < 1 {
+		return "", errors.New("cmd + opt should consist of at least 1 word")
 	}
 
 	cmds := exec.CommandContext(ctx, words[0], words[1:]...)
@@ -37,7 +37,7 @@ func ReportTestResults(repo, cmd, opt string, client *github.Client, gpull *Gith
 
 	checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
 	if err != nil {
-		LogError.WithField("error", err.Error()).Error(outputTitle)
+		LogError.Errorf("github create "+outputTitle+" failed: %v", err)
 		return
 	}
 	checkRunID := checkRun.GetID()

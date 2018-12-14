@@ -75,12 +75,13 @@ func UpdateCheckRunWithError(ctx context.Context, client *github.Client, gpull *
 			},
 		})
 		if eror != nil {
-			LogError.WithField("error", eror.Error()).Error("UpdateCheckRunWithError")
+			LogError.Errorf("github update check run with error failed: %v", eror)
 		}
 	}
 }
 
 // UpdateCheckRun updates the check run result with output message
+// outputTitle, outputSummary can contain markdown.
 func UpdateCheckRun(ctx context.Context, client *github.Client, gpull *GithubPull, checkRunID int64, checkName string, conclusion string, t github.Timestamp, outputTitle string, outputSummary string, annotations []*github.CheckRunAnnotation) error {
 	checkRunStatus := "completed"
 	_, _, err := client.Checks.UpdateCheckRun(ctx, gpull.Base.Repo.Owner.Login, gpull.Base.Repo.Name, checkRunID, github.UpdateCheckRunOptions{
