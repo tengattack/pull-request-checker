@@ -51,6 +51,6 @@ func ReportTestResults(repo, cmd, opt string, client *github.Client, gpull *Gith
 	}
 	err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, outputTitle, outputSummary, nil)
 	if err != nil {
-		LogError.Errorf("report test results to github failed: %s", err.Error())
+		LogError.Errorf("report test results to github failed: %v", err)
 	}
 }
