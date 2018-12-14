@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/go-github/github"
+	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
 // InitHTTPRequest helps to set necessary headers
@@ -55,7 +58,7 @@ func DoHTTPRequest(req *http.Request, isJSONResponse bool, v interface{}) error 
 }
 
 // UpdateCheckRunWithError updates the check run result with error message
-func UpdateCheckRunWithError(ctx context.Context, client *github.Client, checkRunID int64, checkName, outputTitle string, err error, gpull *GithubPull) {
+func UpdateCheckRunWithError(ctx context.Context, client *github.Client, gpull *GithubPull, checkRunID int64, checkName, outputTitle string, err error) {
 	if gpull != nil {
 		conclusion := "action_required"
 		checkRunStatus := "completed"
@@ -72,13 +75,14 @@ func UpdateCheckRunWithError(ctx context.Context, client *github.Client, checkRu
 			},
 		})
 		if eror != nil {
-			LogError.Errorf("github update check run failed: %v", eror)
+			LogError.Errorf("github update check run with error failed: %v", eror)
 		}
 	}
 }
 
 // UpdateCheckRun updates the check run result with output message
-func UpdateCheckRun(ctx context.Context, client *github.Client, checkRunID int64, checkName string, gpull *GithubPull, conclusion string, t github.Timestamp, outputTitle string, outputSummary string, annotations []*github.CheckRunAnnotation) error {
+// outputTitle, outputSummary can contain markdown.
+func UpdateCheckRun(ctx context.Context, client *github.Client, gpull *GithubPull, checkRunID int64, checkName string, conclusion string, t github.Timestamp, outputTitle string, outputSummary string, annotations []*github.CheckRunAnnotation) error {
 	checkRunStatus := "completed"
 	_, _, err := client.Checks.UpdateCheckRun(ctx, gpull.Base.Repo.Owner.Login, gpull.Base.Repo.Name, checkRunID, github.UpdateCheckRunOptions{
 		Name:        checkName,
@@ -98,7 +102,7 @@ func UpdateCheckRun(ctx context.Context, client *github.Client, checkRunID int64
 }
 
 // CreateCheckRun creates a new check run
-func CreateCheckRun(ctx context.Context, client *github.Client, checkName string, gpull *GithubPull, ref GithubRef, targetURL string) (*github.CheckRun, error) {
+func CreateCheckRun(ctx context.Context, client *github.Client, gpull *GithubPull, checkName string, ref GithubRef, targetURL string) (*github.CheckRun, error) {
 	checkRunStatus := "in_progress"
 	checkRun, _, err := client.Checks.CreateCheckRun(ctx, gpull.Base.Repo.Owner.Login, gpull.Base.Repo.Name, github.CreateCheckRunOptions{
 		Name:       checkName,
@@ -108,4 +112,23 @@ func CreateCheckRun(ctx context.Context, client *github.Client, checkName string
 		Status:     &checkRunStatus,
 	})
 	return checkRun, err
+}
+
+func getTests(diffs []*diff.FileDiff) map[string]bool {
+	result := make(map[string]bool)
+	for _, d := range diffs {
+		newName, err := strconv.Unquote(d.NewName)
+		if err != nil {
+			newName = d.NewName
+		}
+		if strings.HasPrefix(newName, "b/") {
+			fileName := newName[2:]
+			if strings.HasSuffix(fileName, ".go") {
+				result["go"] = true
+			} else if strings.HasSuffix(fileName, ".php") {
+				result["php"] = true
+			}
+		}
+	}
+	return result
 }

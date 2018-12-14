@@ -263,7 +263,7 @@ func HandleMessage(message string) error {
 		}
 		if err != nil && checkRunID != 0 {
 			ctx := context.Background()
-			UpdateCheckRunWithError(ctx, client, checkRunID, "linter", "linter", err, gpull)
+			UpdateCheckRunWithError(ctx, client, gpull, checkRunID, "linter", "linter", err)
 		}
 		log.Close()
 	}()
@@ -283,7 +283,7 @@ func HandleMessage(message string) error {
 	t := github.Timestamp{Time: time.Now()}
 	ctx := context.Background()
 	outputTitle := "linter"
-	checkRun, err := CreateCheckRun(ctx, client, outputTitle, gpull, ref, targetURL)
+	checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
 	if err != nil {
 		LogError.Errorf("github create check run failed: %v", err)
 		// PASS
@@ -367,7 +367,19 @@ func HandleMessage(message string) error {
 	lintEnabled := LintEnabled{}
 	lintEnabled.Init(repoPath)
 
-	ReportGotest(repoPath, diffs, client, gpull, ref, targetURL)
+	tests := getTests(diffs)
+	for k := range tests {
+		switch k {
+		case "go":
+			if Conf.Core.Gotest != "" {
+				ReportTestResults(repoPath, Conf.Core.Gotest, "./...", client, gpull, "gotest", ref, targetURL)
+			}
+		case "php":
+			if Conf.Core.PHPUnit != "" {
+				ReportTestResults(repoPath, Conf.Core.PHPUnit, "", client, gpull, "phptest", ref, targetURL)
+			}
+		}
+	}
 
 	comments, annotations, problems, err := GenerateComments(repoPath, diffs, &lintEnabled, log)
 	if err != nil {
@@ -421,7 +433,7 @@ func HandleMessage(message string) error {
 			annotations = annotations[:50]
 			LogAccess.Warn("Too many annotations to push them all at once. Only 50 annotations will be pushed right now.")
 		}
-		err = UpdateCheckRun(ctx, client, checkRunID, outputTitle, gpull, conclusion, t, outputTitle, outputSummary, annotations)
+		err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, outputTitle, outputSummary, annotations)
 	}
 	return err
 }
