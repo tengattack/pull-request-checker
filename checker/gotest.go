@@ -37,7 +37,7 @@ func ReportTestResults(repo, cmd, opt string, client *github.Client, gpull *Gith
 
 	checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
 	if err != nil {
-		LogError.Errorf("github create "+outputTitle+" failed: %v", err)
+		LogError.Errorf("github create %s failed: %v", outputTitle, err)
 		return
 	}
 	checkRunID := checkRun.GetID()
