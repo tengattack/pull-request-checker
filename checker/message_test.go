@@ -51,11 +51,9 @@ var dataSet = []TestsData{
 }
 
 func TestGenerateComments(t *testing.T) {
-	conf, err := config.LoadConfig("../config.yml")
-	require.Nil(t, err)
-	Conf = conf
+	Conf = config.BuildDefaultConf()
 
-	err = InitLog()
+	err := InitLog()
 	require.Nil(t, err)
 
 	_, filename, _, ok := runtime.Caller(0)
