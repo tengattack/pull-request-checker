@@ -215,7 +215,7 @@ func (ref *GithubRef) UpdateState(context, state, targetURL, description string)
 	return DoHTTPRequest(req, true, &s)
 }
 
-func (ref *GithubRef) CreateComment(pull, path string, position int, body string) error {
+/* func (ref *GithubRef) CreateComment(pull, path string, position int, body string) error {
 	data := GithubRefComment{
 		CommentID: ref.Sha,
 		Body:      body,
@@ -245,7 +245,7 @@ func (ref *GithubRef) CreateComment(pull, path string, position int, body string
 
 	var s GithubRefComment
 	return DoHTTPRequest(req, true, &s)
-}
+} */
 
 func (ref *GithubRef) CreateReview(pull, event, body string, comments []GithubRefComment) error {
 	data := GithubRefReview{
