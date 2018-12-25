@@ -37,16 +37,16 @@ type TestsData struct {
 
 var dataSet = []TestsData{
 	{"CPP", "../testdata", "sillycode.cpp", []CheckComment{
-		CheckComment{[]string{`two`}, "sillycode.cpp", 7},
-		CheckComment{[]string{`explicit`}, "sillycode.cpp", 16},
+		CheckComment{[]string{`two`}, "sillycode.cpp", 5},
+		CheckComment{[]string{`explicit`}, "sillycode.cpp", 80},
 	}},
 	{"Go", "../testdata", "test1.go", []CheckComment{
-		CheckComment{[]string{`\n\+\s*"bytes"`}, "test1.go", 2},
-		CheckComment{[]string{`\n\-\s*"bytes"`}, "test1.go", 5},
+		CheckComment{[]string{`\n\+\s*"bytes"`}, "test1.go", 3},
+		CheckComment{[]string{`\n\-\s*"bytes"`}, "test1.go", 6},
 	}},
 	{"Markdown", "../testdata/markdown", "hello ☺.md", []CheckComment{
-		{[]string{"Hello 你好"}, "hello ☺.md", 2},
-		{[]string{"undefined"}, "hello ☺.md", 5},
+		{[]string{"Hello 你好"}, "hello ☺.md", 1},
+		{[]string{"undefined"}, "hello ☺.md", 3},
 	}},
 }
 
@@ -82,14 +82,14 @@ func TestGenerateComments(t *testing.T) {
 			lintEnabled := LintEnabled{}
 			lintEnabled.Init(testRepoPath)
 
-			comments, _, problems, err := GenerateComments(testRepoPath, diffs, &lintEnabled, log)
+			annotations, problems, err := GenerateComments(testRepoPath, diffs, &lintEnabled, log)
 			require.NoError(err)
 			require.Equal(len(v.CheckComments), problems)
 			for i, check := range v.CheckComments {
-				assert.Equal(check.Position, comments[i].Position)
-				assert.Equal(check.Path, comments[i].Path)
+				assert.Equal(check.Position, *annotations[i].StartLine)
+				assert.Equal(check.Path, *annotations[i].Path)
 				for _, regexMessage := range check.Messages {
-					assert.Regexp(regexMessage, comments[i].Body)
+					assert.Regexp(regexMessage, *annotations[i].Message)
 				}
 			}
 		})
