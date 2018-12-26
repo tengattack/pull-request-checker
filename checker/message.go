@@ -26,7 +26,7 @@ func isCPP(fileName string) bool {
 	return false
 }
 
-func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff /* comments []GithubRefComment,  */, annotations []*github.CheckRunAnnotation, problems int, log *os.File, fileName string) ( /* []GithubRefComment,  */ []*github.CheckRunAnnotation, int) {
+func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, annotations []*github.CheckRunAnnotation, problems int, log *os.File, fileName string) ([]*github.CheckRunAnnotation, int) {
 	annotationLevel := "warning" // TODO: from lint.Severity
 	for _, lint := range lintsDiff {
 		for _, hunk := range d.Hunks {
@@ -38,11 +38,6 @@ func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff /* comments 
 					lint.Line, 0, lint.Message, lint.RuleID))
 				comment := fmt.Sprintf("`%s` %d:%d %s",
 					lint.RuleID, lint.Line, 0, lint.Message)
-				/* comments = append(comments, GithubRefComment{
-					Path:     fileName,
-					Position: int(hunk.StartPosition) + getOffsetToUnifiedDiff(lint.Line, hunk),
-					Body:     comment,
-				}) */
 				startLine := lint.Line
 				annotations = append(annotations, &github.CheckRunAnnotation{
 					Path:            &fileName,
@@ -56,11 +51,11 @@ func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff /* comments 
 			}
 		}
 	}
-	return /* comments,  */ annotations, problems
+	return annotations, problems
 }
 
 // GenerateComments generate github comments from github diffs and lint option
-func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *LintEnabled, log *os.File) ( /* []GithubRefComment,  */ []*github.CheckRunAnnotation, int, error) {
+func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *LintEnabled, log *os.File) ([]*github.CheckRunAnnotation, int, error) {
 	// comments := []GithubRefComment{}
 	annotations := []*github.CheckRunAnnotation{}
 	annotationLevel := "warning" // TODO: from lint.Severity

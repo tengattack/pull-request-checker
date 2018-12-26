@@ -13,8 +13,8 @@ import (
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
-// CheckComment contains path & position for github comment
-type CheckComment struct {
+// CheckAnnotation contains path & position for github comment
+type CheckAnnotation struct {
 	Messages []string // regexp format for comment message
 	Path     string
 	// The position in the diff where you want to add a review comment.
@@ -29,22 +29,22 @@ type CheckComment struct {
 
 // TestsData contains the meta-data for a sub-test.
 type TestsData struct {
-	Language      string
-	TestRepoPath  string
-	FileName      string
-	CheckComments []CheckComment
+	Language     string
+	TestRepoPath string
+	FileName     string
+	Annotations  []CheckAnnotation
 }
 
 var dataSet = []TestsData{
-	{"CPP", "../testdata", "sillycode.cpp", []CheckComment{
-		CheckComment{[]string{`two`}, "sillycode.cpp", 5},
-		CheckComment{[]string{`explicit`}, "sillycode.cpp", 80},
+	{"CPP", "../testdata", "sillycode.cpp", []CheckAnnotation{
+		CheckAnnotation{[]string{`two`}, "sillycode.cpp", 5},
+		CheckAnnotation{[]string{`explicit`}, "sillycode.cpp", 80},
 	}},
-	{"Go", "../testdata", "test1.go", []CheckComment{
-		CheckComment{[]string{`\n\+\s*"bytes"`}, "test1.go", 3},
-		CheckComment{[]string{`\n\-\s*"bytes"`}, "test1.go", 6},
+	{"Go", "../testdata", "test1.go", []CheckAnnotation{
+		CheckAnnotation{[]string{`\n\+\s*"bytes"`}, "test1.go", 3},
+		CheckAnnotation{[]string{`\n\-\s*"bytes"`}, "test1.go", 6},
 	}},
-	{"Markdown", "../testdata/markdown", "hello ☺.md", []CheckComment{
+	{"Markdown", "../testdata/markdown", "hello ☺.md", []CheckAnnotation{
 		{[]string{"Hello 你好"}, "hello ☺.md", 1},
 		{[]string{"undefined"}, "hello ☺.md", 3},
 	}},
@@ -84,8 +84,8 @@ func TestGenerateComments(t *testing.T) {
 
 			annotations, problems, err := GenerateComments(testRepoPath, diffs, &lintEnabled, log)
 			require.NoError(err)
-			require.Equal(len(v.CheckComments), problems)
-			for i, check := range v.CheckComments {
+			require.Equal(len(v.Annotations), problems)
+			for i, check := range v.Annotations {
 				assert.Equal(check.Position, *annotations[i].StartLine)
 				assert.Equal(check.Path, *annotations[i].Path)
 				for _, regexMessage := range check.Messages {
