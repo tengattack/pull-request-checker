@@ -15,16 +15,9 @@ import (
 
 // CheckAnnotation contains path & position for github comment
 type CheckAnnotation struct {
-	Messages []string // regexp format for comment message
-	Path     string
-	// The position in the diff where you want to add a review comment.
-	// Note this value is not the same as the line number in the file.
-	// The position value equals the number of lines down from the first "@@" hunk header in the file you want to
-	// add a comment. The line just below the "@@" line is position 1, the next line is position 2, and so on.
-	// The position in the diff continues to increase through lines of whitespace and additional hunks until the
-	// beginning of a new file.
-	// See more information: https://developer.github.com/v3/pulls/comments/
-	Position int // offset in the unified diff
+	Messages  []string // regexp format for comment message
+	Path      string
+	StartLine int
 }
 
 // TestsData contains the meta-data for a sub-test.
@@ -86,7 +79,7 @@ func TestGenerateComments(t *testing.T) {
 			require.NoError(err)
 			require.Equal(len(v.Annotations), problems)
 			for i, check := range v.Annotations {
-				assert.Equal(check.Position, *annotations[i].StartLine)
+				assert.Equal(check.StartLine, *annotations[i].StartLine)
 				assert.Equal(check.Path, *annotations[i].Path)
 				for _, regexMessage := range check.Messages {
 					assert.Regexp(regexMessage, *annotations[i].Message)
