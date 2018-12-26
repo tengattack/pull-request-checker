@@ -80,7 +80,7 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 				if err != nil {
 					return nil, 0, err
 				}
-				/* comments,  */ annotations, problems = pickDiffLintMessages(lintsFormatted, d /* comments,  */, annotations, problems, log, fileName)
+				annotations, problems = pickDiffLintMessages(lintsFormatted, d, annotations, problems, log, fileName)
 				lints, lintErr = MDLint(rps)
 			} else if lintEnabled.CPP && isCPP(fileName) {
 				log.WriteString(fmt.Sprintf("CPPLint '%s'\n", fileName))
@@ -91,7 +91,7 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 				if err != nil {
 					return nil, 0, err
 				}
-				/* comments,  */ annotations, problems = pickDiffLintMessages(lintsGoreturns, d /* comments,  */, annotations, problems, log, fileName)
+				annotations, problems = pickDiffLintMessages(lintsGoreturns, d, annotations, problems, log, fileName)
 				log.WriteString(fmt.Sprintf("Golint '%s'\n", fileName))
 				lints, lintErr = Golint(filepath.Join(repoPath, fileName), repoPath)
 			} else if lintEnabled.PHP && strings.HasSuffix(fileName, ".php") {
@@ -178,11 +178,6 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 										EndLine:         &startLine,
 										AnnotationLevel: &annotationLevel,
 									})
-									/* comments = append(comments, GithubRefComment{
-										Path:     fileName,
-										Position: int(hunk.StartPosition) + i,
-										Body:     comment,
-									}) */
 									// ref.CreateComment(repository, pull, fileName,
 									// 	int(hunk.StartPosition)+i, comment)
 									problems++
@@ -376,7 +371,6 @@ func HandleMessage(message string) error {
 		}
 	}
 
-	/* comments,  */
 	annotations, problems, err := GenerateComments(repoPath, diffs, &lintEnabled, log)
 	if err != nil {
 		return err
@@ -394,13 +388,6 @@ func HandleMessage(message string) error {
 	var outputSummary string
 	if problems > 0 {
 		comment := fmt.Sprintf("**lint**: %d problem(s) found.", problems)
-		// The API doc didn't quite say this but too many comments will cause CreateReview to fail
-		// with "HTTP 422 Unprocessable Entity: submitted too quickly"
-		// TODO: remove comments for review
-		/* if len(comments) > 30 {
-			comments = comments[:30]
-			LogAccess.Warn("Too many comments to push them all at once. Only 30 comments will be pushed right now.")
-		} */
 		err = ref.CreateReview(pull, "REQUEST_CHANGES", comment, nil)
 		if err != nil {
 			log.WriteString("error: " + err.Error() + "\n")
