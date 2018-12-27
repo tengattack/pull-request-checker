@@ -13,40 +13,33 @@ import (
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
-// CheckComment contains path & position for github comment
-type CheckComment struct {
-	Messages []string // regexp format for comment message
-	Path     string
-	// The position in the diff where you want to add a review comment.
-	// Note this value is not the same as the line number in the file.
-	// The position value equals the number of lines down from the first "@@" hunk header in the file you want to
-	// add a comment. The line just below the "@@" line is position 1, the next line is position 2, and so on.
-	// The position in the diff continues to increase through lines of whitespace and additional hunks until the
-	// beginning of a new file.
-	// See more information: https://developer.github.com/v3/pulls/comments/
-	Position int // offset in the unified diff
+// CheckAnnotation contains path & position for github comment
+type CheckAnnotation struct {
+	Messages  []string // regexp format for comment message
+	Path      string
+	StartLine int
 }
 
 // TestsData contains the meta-data for a sub-test.
 type TestsData struct {
-	Language      string
-	TestRepoPath  string
-	FileName      string
-	CheckComments []CheckComment
+	Language     string
+	TestRepoPath string
+	FileName     string
+	Annotations  []CheckAnnotation
 }
 
 var dataSet = []TestsData{
-	{"CPP", "../testdata", "sillycode.cpp", []CheckComment{
-		CheckComment{[]string{`two`}, "sillycode.cpp", 7},
-		CheckComment{[]string{`explicit`}, "sillycode.cpp", 16},
+	{"CPP", "../testdata", "sillycode.cpp", []CheckAnnotation{
+		CheckAnnotation{[]string{`two`}, "sillycode.cpp", 5},
+		CheckAnnotation{[]string{`explicit`}, "sillycode.cpp", 80},
 	}},
-	{"Go", "../testdata", "test1.go", []CheckComment{
-		CheckComment{[]string{`\n\+\s*"bytes"`}, "test1.go", 2},
-		CheckComment{[]string{`\n\-\s*"bytes"`}, "test1.go", 5},
+	{"Go", "../testdata", "test1.go", []CheckAnnotation{
+		CheckAnnotation{[]string{`\n\+\s*"bytes"`}, "test1.go", 3},
+		CheckAnnotation{[]string{`\n\-\s*"bytes"`}, "test1.go", 6},
 	}},
-	{"Markdown", "../testdata/markdown", "hello ☺.md", []CheckComment{
-		{[]string{"Hello 你好"}, "hello ☺.md", 2},
-		{[]string{"undefined"}, "hello ☺.md", 5},
+	{"Markdown", "../testdata/markdown", "hello ☺.md", []CheckAnnotation{
+		{[]string{"Hello 你好"}, "hello ☺.md", 1},
+		{[]string{"undefined"}, "hello ☺.md", 3},
 	}},
 }
 
@@ -82,14 +75,14 @@ func TestGenerateComments(t *testing.T) {
 			lintEnabled := LintEnabled{}
 			lintEnabled.Init(testRepoPath)
 
-			comments, _, problems, err := GenerateComments(testRepoPath, diffs, &lintEnabled, log)
+			annotations, problems, err := GenerateComments(testRepoPath, diffs, &lintEnabled, log)
 			require.NoError(err)
-			require.Equal(len(v.CheckComments), problems)
-			for i, check := range v.CheckComments {
-				assert.Equal(check.Position, comments[i].Position)
-				assert.Equal(check.Path, comments[i].Path)
+			require.Equal(len(v.Annotations), problems)
+			for i, check := range v.Annotations {
+				assert.Equal(check.StartLine, *annotations[i].StartLine)
+				assert.Equal(check.Path, *annotations[i].Path)
 				for _, regexMessage := range check.Messages {
-					assert.Regexp(regexMessage, comments[i].Body)
+					assert.Regexp(regexMessage, *annotations[i].Message)
 				}
 			}
 		})

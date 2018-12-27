@@ -215,38 +215,6 @@ func (ref *GithubRef) UpdateState(context, state, targetURL, description string)
 	return DoHTTPRequest(req, true, &s)
 }
 
-func (ref *GithubRef) CreateComment(pull, path string, position int, body string) error {
-	data := GithubRefComment{
-		CommentID: ref.Sha,
-		Body:      body,
-		Path:      path,
-		Position:  position,
-	}
-
-	// /repos/:owner/:repo/pulls/:number/comments
-	apiURI := fmt.Sprintf("/repos/%s/pulls/%s/comments", ref.RepoName, pull)
-
-	query := url.Values{}
-	query.Set("access_token", Conf.GitHub.AccessToken)
-	content, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-
-	LogAccess.Debugf("POST %s?%s\n%s", apiURI, query.Encode(), content)
-
-	req, err := http.NewRequest(http.MethodPost,
-		fmt.Sprintf("%s%s?%s", GITHUB_API_URL, apiURI, query.Encode()),
-		bytes.NewReader(content))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	var s GithubRefComment
-	return DoHTTPRequest(req, true, &s)
-}
-
 func (ref *GithubRef) CreateReview(pull, event, body string, comments []GithubRefComment) error {
 	data := GithubRefReview{
 		CommentID: ref.Sha,

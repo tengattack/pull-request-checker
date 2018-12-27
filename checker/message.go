@@ -26,7 +26,7 @@ func isCPP(fileName string) bool {
 	return false
 }
 
-func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, comments []GithubRefComment, annotations []*github.CheckRunAnnotation, problems int, log *os.File, fileName string) ([]GithubRefComment, []*github.CheckRunAnnotation, int) {
+func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, annotations []*github.CheckRunAnnotation, problems int, log *os.File, fileName string) ([]*github.CheckRunAnnotation, int) {
 	annotationLevel := "warning" // TODO: from lint.Severity
 	for _, lint := range lintsDiff {
 		for _, hunk := range d.Hunks {
@@ -38,11 +38,6 @@ func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, comments []
 					lint.Line, 0, lint.Message, lint.RuleID))
 				comment := fmt.Sprintf("`%s` %d:%d %s",
 					lint.RuleID, lint.Line, 0, lint.Message)
-				comments = append(comments, GithubRefComment{
-					Path:     fileName,
-					Position: int(hunk.StartPosition) + getOffsetToUnifiedDiff(lint.Line, hunk),
-					Body:     comment,
-				})
 				startLine := lint.Line
 				annotations = append(annotations, &github.CheckRunAnnotation{
 					Path:            &fileName,
@@ -56,12 +51,11 @@ func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, comments []
 			}
 		}
 	}
-	return comments, annotations, problems
+	return annotations, problems
 }
 
 // GenerateComments generate github comments from github diffs and lint option
-func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *LintEnabled, log *os.File) ([]GithubRefComment, []*github.CheckRunAnnotation, int, error) {
-	comments := []GithubRefComment{}
+func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *LintEnabled, log *os.File) ([]*github.CheckRunAnnotation, int, error) {
 	annotations := []*github.CheckRunAnnotation{}
 	annotationLevel := "warning" // TODO: from lint.Severity
 	problems := 0
@@ -79,13 +73,13 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 				log.WriteString(fmt.Sprintf("Markdown '%s'\n", fileName))
 				rps, out, err := remark(fileName, repoPath)
 				if err != nil {
-					return nil, nil, 0, err
+					return nil, 0, err
 				}
 				lintsFormatted, err := MDFormattedLint(filepath.Join(repoPath, fileName), out)
 				if err != nil {
-					return nil, nil, 0, err
+					return nil, 0, err
 				}
-				comments, annotations, problems = pickDiffLintMessages(lintsFormatted, d, comments, annotations, problems, log, fileName)
+				annotations, problems = pickDiffLintMessages(lintsFormatted, d, annotations, problems, log, fileName)
 				lints, lintErr = MDLint(rps)
 			} else if lintEnabled.CPP && isCPP(fileName) {
 				log.WriteString(fmt.Sprintf("CPPLint '%s'\n", fileName))
@@ -94,9 +88,9 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 				log.WriteString(fmt.Sprintf("Goreturns '%s'\n", fileName))
 				lintsGoreturns, err := Goreturns(filepath.Join(repoPath, fileName), repoPath)
 				if err != nil {
-					return nil, nil, 0, err
+					return nil, 0, err
 				}
-				comments, annotations, problems = pickDiffLintMessages(lintsGoreturns, d, comments, annotations, problems, log, fileName)
+				annotations, problems = pickDiffLintMessages(lintsGoreturns, d, annotations, problems, log, fileName)
 				log.WriteString(fmt.Sprintf("Golint '%s'\n", fileName))
 				lints, lintErr = Golint(filepath.Join(repoPath, fileName), repoPath)
 			} else if lintEnabled.PHP && strings.HasSuffix(fileName, ".php") {
@@ -119,7 +113,7 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 				lints, lintErr = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.ES)
 			}
 			if lintErr != nil {
-				return nil, nil, 0, lintErr
+				return nil, 0, lintErr
 			}
 			if lintEnabled.JS != "" && (strings.HasSuffix(fileName, ".html") ||
 				strings.HasSuffix(fileName, ".php")) {
@@ -127,7 +121,7 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 				log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
 				lints2, err := ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
 				if err != nil {
-					return nil, nil, 0, err
+					return nil, 0, err
 				}
 				if lints2 != nil {
 					if lints != nil {
@@ -183,11 +177,6 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 										EndLine:         &startLine,
 										AnnotationLevel: &annotationLevel,
 									})
-									comments = append(comments, GithubRefComment{
-										Path:     fileName,
-										Position: int(hunk.StartPosition) + i,
-										Body:     comment,
-									})
 									// ref.CreateComment(repository, pull, fileName,
 									// 	int(hunk.StartPosition)+i, comment)
 									problems++
@@ -200,7 +189,7 @@ func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *Lint
 			log.WriteString("\n")
 		}
 	}
-	return comments, annotations, problems, nil
+	return annotations, problems, nil
 }
 
 // HandleMessage handles message
@@ -381,7 +370,7 @@ func HandleMessage(message string) error {
 		}
 	}
 
-	comments, annotations, problems, err := GenerateComments(repoPath, diffs, &lintEnabled, log)
+	annotations, problems, err := GenerateComments(repoPath, diffs, &lintEnabled, log)
 	if err != nil {
 		return err
 	}
@@ -398,13 +387,6 @@ func HandleMessage(message string) error {
 	var outputSummary string
 	if problems > 0 {
 		comment := fmt.Sprintf("**lint**: %d problem(s) found.", problems)
-		// The API doc didn't quite say this but too many comments will cause CreateReview to fail
-		// with "HTTP 422 Unprocessable Entity: submitted too quickly"
-		// TODO: remove comments for review
-		if len(comments) > 30 {
-			comments = comments[:30]
-			LogAccess.Warn("Too many comments to push them all at once. Only 30 comments will be pushed right now.")
-		}
 		err = ref.CreateReview(pull, "REQUEST_CHANGES", comment, nil)
 		if err != nil {
 			log.WriteString("error: " + err.Error() + "\n")
