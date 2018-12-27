@@ -54,8 +54,8 @@ func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, annotations
 	return annotations, problems
 }
 
-// GenerateComments generate github comments from github diffs and lint option
-func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *LintEnabled, log *os.File) ([]*github.CheckRunAnnotation, int, error) {
+// GenerateAnnotations generate github annotations from github diffs and lint option
+func GenerateAnnotations(repoPath string, diffs []*diff.FileDiff, lintEnabled *LintEnabled, log *os.File) ([]*github.CheckRunAnnotation, int, error) {
 	annotations := []*github.CheckRunAnnotation{}
 	annotationLevel := "warning" // TODO: from lint.Severity
 	problems := 0
@@ -370,7 +370,7 @@ func HandleMessage(message string) error {
 		}
 	}
 
-	annotations, problems, err := GenerateComments(repoPath, diffs, &lintEnabled, log)
+	annotations, problems, err := GenerateAnnotations(repoPath, diffs, &lintEnabled, log)
 	if err != nil {
 		return err
 	}
