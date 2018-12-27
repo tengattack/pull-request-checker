@@ -56,7 +56,6 @@ func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, annotations
 
 // GenerateComments generate github comments from github diffs and lint option
 func GenerateComments(repoPath string, diffs []*diff.FileDiff, lintEnabled *LintEnabled, log *os.File) ([]*github.CheckRunAnnotation, int, error) {
-	// comments := []GithubRefComment{}
 	annotations := []*github.CheckRunAnnotation{}
 	annotationLevel := "warning" // TODO: from lint.Severity
 	problems := 0
@@ -357,16 +356,19 @@ func HandleMessage(message string) error {
 	lintEnabled := LintEnabled{}
 	lintEnabled.Init(repoPath)
 
+	var futures []chan error
 	tests := getTests(diffs)
 	for k := range tests {
 		switch k {
 		case "go":
 			if Conf.Core.Gotest != "" {
-				ReportTestResults(repoPath, Conf.Core.Gotest, "./...", client, gpull, "gotest", ref, targetURL)
+				future := ReportTestResults(repoPath, Conf.Core.Gotest, "./...", client, gpull, "gotest", ref, targetURL)
+				futures = append(futures, future)
 			}
 		case "php":
 			if Conf.Core.PHPUnit != "" {
-				ReportTestResults(repoPath, Conf.Core.PHPUnit, "", client, gpull, "phptest", ref, targetURL)
+				future := ReportTestResults(repoPath, Conf.Core.PHPUnit, "", client, gpull, "phptest", ref, targetURL)
+				futures = append(futures, future)
 			}
 		}
 	}
@@ -376,6 +378,16 @@ func HandleMessage(message string) error {
 		return err
 	}
 
+	for _, v := range futures {
+		errReport, exist := <-v
+		if exist {
+			if _, ok := errReport.(*testResultProblemFound); ok {
+				problems++
+			} else {
+				log.WriteString(fmt.Sprintf("Trouble in ReportTestResults: %v\n", errReport))
+			}
+		}
+	}
 	mark := '✔'
 	if problems > 0 {
 		mark = '✖'
