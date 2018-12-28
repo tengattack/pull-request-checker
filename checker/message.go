@@ -196,13 +196,13 @@ func GenerateAnnotations(repoPath string, diffs []*diff.FileDiff, lintEnabled *L
 func HandleMessage(message string) error {
 	s := strings.Split(message, "/")
 	if len(s) != 6 || s[2] != "pull" || s[4] != "commits" {
-		LogAccess.Warnf("malfromed message: %s", message)
+		LogAccess.Warnf("malformed message: %s", message)
 		return nil
 	}
 
 	owner := s[0]
 	repository, pull, commitSha := s[0]+"/"+s[1], s[3], s[5]
-	LogAccess.Infof("Start fetching %s/pull/%s", repository, pull)
+	LogAccess.Infof("Start handling %s/pull/%s", repository, pull)
 
 	ref := GithubRef{
 		RepoName: repository,
@@ -378,44 +378,43 @@ func HandleMessage(message string) error {
 		return err
 	}
 
+	testProbs := 0
 	for _, v := range futures {
 		errReport, exist := <-v
 		if exist {
 			if _, ok := errReport.(*testResultProblemFound); ok {
-				problems++
+				testProbs++
 			} else {
 				log.WriteString(fmt.Sprintf("Trouble in ReportTestResults: %v\n", errReport))
+				LogError.Errorf("Trouble in ReportTestResults: %v\n", errReport)
 			}
 		}
 	}
 	mark := '✔'
-	if problems > 0 {
+	if problems+testProbs > 0 {
 		mark = '✖'
 	}
 	log.WriteString(fmt.Sprintf("%c %d problem(s) found.\n\n",
-		mark, problems))
+		mark, problems+testProbs))
 	log.WriteString("Updating status...\n")
 
-	var conclusion string
 	var outputSummary string
-	if problems > 0 {
-		comment := fmt.Sprintf("**lint**: %d problem(s) found.", problems)
+	if problems+testProbs > 0 {
+		comment := fmt.Sprintf("**check**: %d problem(s) found.", problems+testProbs)
 		err = ref.CreateReview(pull, "REQUEST_CHANGES", comment, nil)
 		if err != nil {
 			log.WriteString("error: " + err.Error() + "\n")
 			LogError.Errorf("create review failed: %v", err)
 		}
-		conclusion = "failure"
-		outputSummary = fmt.Sprintf("The lint check failed! %d problem(s) found.", problems)
+		outputSummary = fmt.Sprintf("The check failed! %d problem(s) found.", problems+testProbs)
 		err = ref.UpdateState("lint", "error", targetURL, outputSummary)
 	} else {
-		err = ref.CreateReview(pull, "APPROVE", "**lint**: no problems found.", nil)
+		err = ref.CreateReview(pull, "APPROVE", "**check**: no problems found.", nil)
 		if err != nil {
 			log.WriteString("error: " + err.Error() + "\n")
 			LogError.Errorf("create review failed: %v", err)
 		}
-		conclusion = "success"
-		outputSummary = "The lint check succeed!"
+		outputSummary = "The check succeed!"
 		err = ref.UpdateState("lint", "success", targetURL, outputSummary)
 	}
 	if err == nil {
@@ -427,6 +426,14 @@ func HandleMessage(message string) error {
 			// TODO: push all
 			annotations = annotations[:50]
 			LogAccess.Warn("Too many annotations to push them all at once. Only 50 annotations will be pushed right now.")
+		}
+		var conclusion string
+		if problems > 0 {
+			conclusion = "failure"
+			outputSummary = fmt.Sprintf("The lint check failed! %d problem(s) found.", problems)
+		} else {
+			conclusion = "success"
+			outputSummary = "The lint check succeed!"
 		}
 		err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, outputTitle, outputSummary, annotations)
 	}
