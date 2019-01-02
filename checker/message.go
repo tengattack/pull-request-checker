@@ -391,22 +391,23 @@ func HandleMessage(message string) error {
 		}
 	}
 	mark := '✔'
-	if problems+testProbs > 0 {
+	sumCount := problems + testProbs
+	if sumCount > 0 {
 		mark = '✖'
 	}
 	log.WriteString(fmt.Sprintf("%c %d problem(s) found.\n\n",
-		mark, problems+testProbs))
+		mark, sumCount))
 	log.WriteString("Updating status...\n")
 
 	var outputSummary string
-	if problems+testProbs > 0 {
-		comment := fmt.Sprintf("**check**: %d problem(s) found.", problems+testProbs)
+	if sumCount > 0 {
+		comment := fmt.Sprintf("**check**: %d problem(s) found.", sumCount)
 		err = ref.CreateReview(pull, "REQUEST_CHANGES", comment, nil)
 		if err != nil {
 			log.WriteString("error: " + err.Error() + "\n")
 			LogError.Errorf("create review failed: %v", err)
 		}
-		outputSummary = fmt.Sprintf("The check failed! %d problem(s) found.", problems+testProbs)
+		outputSummary = fmt.Sprintf("The check failed! %d problem(s) found.", sumCount)
 		err = ref.UpdateState("lint", "error", targetURL, outputSummary)
 	} else {
 		err = ref.CreateReview(pull, "APPROVE", "**check**: no problems found.", nil)
