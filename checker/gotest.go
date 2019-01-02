@@ -40,9 +40,12 @@ func carry(ctx context.Context, repo, cmd, opt string) (string, error) {
 func ReportTestResults(repo, cmd, opt string, client *github.Client, gpull *GithubPull, outputTitle string, ref GithubRef, targetURL string) chan error {
 	future := make(chan error, 1)
 	go func() {
+		var err error
 		defer func() {
 			if info := recover(); info != nil {
 				future <- fmt.Errorf("Panic: %v", info)
+			} else if err != nil {
+				future <- err
 			}
 			close(future)
 		}()
@@ -54,7 +57,6 @@ func ReportTestResults(repo, cmd, opt string, client *github.Client, gpull *Gith
 		checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
 		if err != nil {
 			LogError.Errorf("github create %s failed: %v", outputTitle, err)
-			future <- err
 			return
 		}
 		checkRunID := checkRun.GetID()
@@ -69,11 +71,10 @@ func ReportTestResults(repo, cmd, opt string, client *github.Client, gpull *Gith
 		err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, outputTitle, "```\n"+outputSummary+"\n```", nil)
 		if err != nil {
 			LogError.Errorf("report test results to github failed: %v", err)
-			future <- err
 			return
 		}
 		if conclusion == "failure" {
-			future <- &testResultProblemFound{}
+			err = &testResultProblemFound{}
 			return
 		}
 	}()
