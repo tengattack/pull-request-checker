@@ -1,6 +1,7 @@
 package checker
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"net/http"
@@ -9,10 +10,12 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/github"
+	"golang.org/x/sync/errgroup"
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
@@ -26,7 +29,7 @@ func isCPP(fileName string) bool {
 	return false
 }
 
-func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, annotations []*github.CheckRunAnnotation, problems int, log *os.File, fileName string) ([]*github.CheckRunAnnotation, int) {
+func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, annotations *[]*github.CheckRunAnnotation, problems *int, log *bytes.Buffer, fileName string) {
 	annotationLevel := "warning" // TODO: from lint.Severity
 	for _, lint := range lintsDiff {
 		for _, hunk := range d.Hunks {
@@ -39,157 +42,194 @@ func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, annotations
 				comment := fmt.Sprintf("`%s` %d:%d %s",
 					lint.RuleID, lint.Line, 0, lint.Message)
 				startLine := lint.Line
-				annotations = append(annotations, &github.CheckRunAnnotation{
+				*annotations = append(*annotations, &github.CheckRunAnnotation{
 					Path:            &fileName,
 					Message:         &comment,
 					StartLine:       &startLine,
 					EndLine:         &startLine,
 					AnnotationLevel: &annotationLevel,
 				})
-				problems++
+				*problems++
 				break
 			}
 		}
 	}
-	return annotations, problems
 }
 
 // GenerateAnnotations generate github annotations from github diffs and lint option
-func GenerateAnnotations(repoPath string, diffs []*diff.FileDiff, lintEnabled *LintEnabled, log *os.File) ([]*github.CheckRunAnnotation, int, error) {
-	annotations := []*github.CheckRunAnnotation{}
+func GenerateAnnotations(repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled, log *os.File) ([]*github.CheckRunAnnotation, int, error) {
 	annotationLevel := "warning" // TODO: from lint.Severity
-	problems := 0
-	var lintErr error
-	for _, d := range diffs {
-		newName, err := strconv.Unquote(d.NewName)
-		if err != nil {
-			newName = d.NewName
-		}
-		if strings.HasPrefix(newName, "b/") {
-			fileName := newName[2:]
-			log.WriteString(fmt.Sprintf("Checking '%s'\n", fileName))
-			var lints []LintMessage
-			if lintEnabled.MD && strings.HasSuffix(fileName, ".md") {
-				log.WriteString(fmt.Sprintf("Markdown '%s'\n", fileName))
-				rps, out, err := remark(fileName, repoPath)
-				if err != nil {
-					return nil, 0, err
-				}
-				lintsFormatted, err := MDFormattedLint(filepath.Join(repoPath, fileName), out)
-				if err != nil {
-					return nil, 0, err
-				}
-				annotations, problems = pickDiffLintMessages(lintsFormatted, d, annotations, problems, log, fileName)
-				lints, lintErr = MDLint(rps)
-			} else if lintEnabled.CPP && isCPP(fileName) {
-				log.WriteString(fmt.Sprintf("CPPLint '%s'\n", fileName))
-				lints, lintErr = CPPLint(fileName, repoPath)
-			} else if lintEnabled.Go && strings.HasSuffix(fileName, ".go") {
-				log.WriteString(fmt.Sprintf("Goreturns '%s'\n", fileName))
-				lintsGoreturns, err := Goreturns(filepath.Join(repoPath, fileName), repoPath)
-				if err != nil {
-					return nil, 0, err
-				}
-				annotations, problems = pickDiffLintMessages(lintsGoreturns, d, annotations, problems, log, fileName)
-				log.WriteString(fmt.Sprintf("Golint '%s'\n", fileName))
-				lints, lintErr = Golint(filepath.Join(repoPath, fileName), repoPath)
-			} else if lintEnabled.PHP && strings.HasSuffix(fileName, ".php") {
-				log.WriteString(fmt.Sprintf("PHPLint '%s'\n", fileName))
-				lints, lintErr = PHPLint(filepath.Join(repoPath, fileName), repoPath)
-			} else if lintEnabled.TypeScript && (strings.HasSuffix(fileName, ".ts") ||
-				strings.HasSuffix(fileName, ".tsx")) {
-				log.WriteString(fmt.Sprintf("TSLint '%s'\n", fileName))
-				lints, lintErr = TSLint(filepath.Join(repoPath, fileName), repoPath)
-			} else if lintEnabled.SCSS && (strings.HasSuffix(fileName, ".scss") ||
-				strings.HasSuffix(fileName, ".css")) {
-				log.WriteString(fmt.Sprintf("SCSSLint '%s'\n", fileName))
-				lints, lintErr = SCSSLint(filepath.Join(repoPath, fileName), repoPath)
-			} else if lintEnabled.JS != "" && strings.HasSuffix(fileName, ".js") {
-				log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
-				lints, lintErr = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
-			} else if lintEnabled.ES != "" && (strings.HasSuffix(fileName, ".es") ||
-				strings.HasSuffix(fileName, ".esx") || strings.HasSuffix(fileName, ".jsx")) {
-				log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
-				lints, lintErr = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.ES)
-			}
-			if lintErr != nil {
-				return nil, 0, lintErr
-			}
-			if lintEnabled.JS != "" && (strings.HasSuffix(fileName, ".html") ||
-				strings.HasSuffix(fileName, ".php")) {
-				// ESLint for HTML & PHP files (ES5)
-				log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
-				lints2, err := ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
-				if err != nil {
-					return nil, 0, err
-				}
-				if lints2 != nil {
-					if lints != nil {
-						lints = append(lints, lints2...)
-					} else {
-						lints = lints2
-					}
-				}
-			}
+	maxPending := Conf.Concurrency.Lint
+	if maxPending < 1 {
+		maxPending = 1
+	}
+	pending := make(chan int, maxPending)
+	var (
+		eg  errgroup.Group
+		mtx sync.Mutex
 
+		Annotations []*github.CheckRunAnnotation
+		Problems    int
+	)
+	for _, d := range diffs {
+		pending <- 0
+		eg.Go(func() error {
+			defer func() { <-pending }()
+			d := d
+			var (
+				buf         bytes.Buffer
+				annotations []*github.CheckRunAnnotation
+				problems    int
+			)
+
+			err := handleSingleFile(repoPath, d, lintEnabled, annotationLevel, &buf, &annotations, &problems)
+
+			mtx.Lock()
+			defer mtx.Unlock()
+			log.Write(buf.Bytes())
+			Annotations = append(Annotations, annotations...)
+			Problems += problems
+
+			return err
+		})
+	}
+	err := eg.Wait()
+	return Annotations, Problems, err
+}
+
+func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled, annotationLevel string, log *bytes.Buffer, annotations *[]*github.CheckRunAnnotation, problems *int) error {
+	newName, err := strconv.Unquote(d.NewName)
+	if err != nil {
+		newName = d.NewName
+	}
+	if !strings.HasPrefix(newName, "b/") {
+		log.WriteString("No need to process " + newName)
+		return nil
+	}
+	fileName := newName[2:]
+	log.WriteString(fmt.Sprintf("Checking '%s'\n", fileName))
+
+	var lints []LintMessage
+	var lintErr error
+	if lintEnabled.MD && strings.HasSuffix(fileName, ".md") {
+		log.WriteString(fmt.Sprintf("Markdown '%s'\n", fileName))
+		rps, out, err := remark(fileName, repoPath)
+		if err != nil {
+			return err
+		}
+		lintsFormatted, err := MDFormattedLint(filepath.Join(repoPath, fileName), out)
+		if err != nil {
+			return err
+		}
+		pickDiffLintMessages(lintsFormatted, d, annotations, problems, log, fileName)
+		lints, lintErr = MDLint(rps)
+	} else if lintEnabled.CPP && isCPP(fileName) {
+		log.WriteString(fmt.Sprintf("CPPLint '%s'\n", fileName))
+		lints, lintErr = CPPLint(fileName, repoPath)
+	} else if lintEnabled.Go && strings.HasSuffix(fileName, ".go") {
+		log.WriteString(fmt.Sprintf("Goreturns '%s'\n", fileName))
+		lintsGoreturns, err := Goreturns(filepath.Join(repoPath, fileName), repoPath)
+		if err != nil {
+			return err
+		}
+		pickDiffLintMessages(lintsGoreturns, d, annotations, problems, log, fileName)
+		log.WriteString(fmt.Sprintf("Golint '%s'\n", fileName))
+		lints, lintErr = Golint(filepath.Join(repoPath, fileName), repoPath)
+	} else if lintEnabled.PHP && strings.HasSuffix(fileName, ".php") {
+		log.WriteString(fmt.Sprintf("PHPLint '%s'\n", fileName))
+		lints, lintErr = PHPLint(filepath.Join(repoPath, fileName), repoPath)
+	} else if lintEnabled.TypeScript && (strings.HasSuffix(fileName, ".ts") ||
+		strings.HasSuffix(fileName, ".tsx")) {
+		log.WriteString(fmt.Sprintf("TSLint '%s'\n", fileName))
+		lints, lintErr = TSLint(filepath.Join(repoPath, fileName), repoPath)
+	} else if lintEnabled.SCSS && (strings.HasSuffix(fileName, ".scss") ||
+		strings.HasSuffix(fileName, ".css")) {
+		log.WriteString(fmt.Sprintf("SCSSLint '%s'\n", fileName))
+		lints, lintErr = SCSSLint(filepath.Join(repoPath, fileName), repoPath)
+	} else if lintEnabled.JS != "" && strings.HasSuffix(fileName, ".js") {
+		log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
+		lints, lintErr = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
+	} else if lintEnabled.ES != "" && (strings.HasSuffix(fileName, ".es") ||
+		strings.HasSuffix(fileName, ".esx") || strings.HasSuffix(fileName, ".jsx")) {
+		log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
+		lints, lintErr = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.ES)
+	}
+	if lintErr != nil {
+		return lintErr
+	}
+	if lintEnabled.JS != "" && (strings.HasSuffix(fileName, ".html") ||
+		strings.HasSuffix(fileName, ".php")) {
+		// ESLint for HTML & PHP files (ES5)
+		log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
+		lints2, err := ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
+		if err != nil {
+			return err
+		}
+		if lints2 != nil {
 			if lints != nil {
-				for _, hunk := range d.Hunks {
-					if hunk.NewLines > 0 {
-						lines := strings.Split(string(hunk.Body), "\n")
-						for _, lint := range lints {
-							if lint.Line >= int(hunk.NewStartLine) &&
-								lint.Line < int(hunk.NewStartLine+hunk.NewLines) {
-								lineNum := 0
-								i := 0
-								lastLineFromOrig := true
-								for ; i < len(lines); i++ {
-									lineExists := len(lines[i]) > 0
-									if !lineExists || lines[i][0] != '-' {
-										if lineExists && lines[i][0] == '\\' && lastLineFromOrig {
-											// `\ No newline at end of file` from original source file
-											continue
-										}
-										if lineNum <= 0 {
-											lineNum = int(hunk.NewStartLine)
-										} else {
-											lineNum++
-										}
-									}
-									if lineNum >= lint.Line {
-										break
-									}
-									if lineExists {
-										lastLineFromOrig = lines[i][0] == '-'
-									}
-								}
-								if i < len(lines) && len(lines[i]) > 0 && lines[i][0] == '+' {
-									// ensure this line is a definitely new line
-									log.WriteString(lines[i] + "\n")
-									log.WriteString(fmt.Sprintf("%d:%d %s %s\n",
-										lint.Line, lint.Column, lint.Message, lint.RuleID))
-									comment := fmt.Sprintf("`%s` %d:%d %s",
-										lint.RuleID, lint.Line, lint.Column, lint.Message)
-									startLine := lint.Line
-									annotations = append(annotations, &github.CheckRunAnnotation{
-										Path:            &fileName,
-										Message:         &comment,
-										StartLine:       &startLine,
-										EndLine:         &startLine,
-										AnnotationLevel: &annotationLevel,
-									})
-									// ref.CreateComment(repository, pull, fileName,
-									// 	int(hunk.StartPosition)+i, comment)
-									problems++
-								}
-							}
-						}
-					}
-				} // end for
+				lints = append(lints, lints2...)
+			} else {
+				lints = lints2
 			}
-			log.WriteString("\n")
 		}
 	}
-	return annotations, problems, nil
+
+	if lints != nil {
+		for _, hunk := range d.Hunks {
+			if hunk.NewLines > 0 {
+				lines := strings.Split(string(hunk.Body), "\n")
+				for _, lint := range lints {
+					if lint.Line >= int(hunk.NewStartLine) &&
+						lint.Line < int(hunk.NewStartLine+hunk.NewLines) {
+						lineNum := 0
+						i := 0
+						lastLineFromOrig := true
+						for ; i < len(lines); i++ {
+							lineExists := len(lines[i]) > 0
+							if !lineExists || lines[i][0] != '-' {
+								if lineExists && lines[i][0] == '\\' && lastLineFromOrig {
+									// `\ No newline at end of file` from original source file
+									continue
+								}
+								if lineNum <= 0 {
+									lineNum = int(hunk.NewStartLine)
+								} else {
+									lineNum++
+								}
+							}
+							if lineNum >= lint.Line {
+								break
+							}
+							if lineExists {
+								lastLineFromOrig = lines[i][0] == '-'
+							}
+						}
+						if i < len(lines) && len(lines[i]) > 0 && lines[i][0] == '+' {
+							// ensure this line is a definitely new line
+							log.WriteString(lines[i] + "\n")
+							log.WriteString(fmt.Sprintf("%d:%d %s %s\n",
+								lint.Line, lint.Column, lint.Message, lint.RuleID))
+							comment := fmt.Sprintf("`%s` %d:%d %s",
+								lint.RuleID, lint.Line, lint.Column, lint.Message)
+							startLine := lint.Line
+							*annotations = append(*annotations, &github.CheckRunAnnotation{
+								Path:            &fileName,
+								Message:         &comment,
+								StartLine:       &startLine,
+								EndLine:         &startLine,
+								AnnotationLevel: &annotationLevel,
+							})
+							// ref.CreateComment(repository, pull, fileName,
+							// 	int(hunk.StartPosition)+i, comment)
+							*problems++
+						}
+					}
+				}
+			}
+		} // end for
+	}
+	log.WriteString("\n")
+	return nil
 }
 
 // HandleMessage handles message
@@ -355,43 +395,15 @@ func HandleMessage(message string) error {
 
 	lintEnabled := LintEnabled{}
 	lintEnabled.Init(repoPath)
-
-	var futures []chan error
-	tests := getTests(diffs)
-	for k := range tests {
-		switch k {
-		case "go":
-			if Conf.Core.Gotest != "" {
-				future := ReportTestResults(repoPath, Conf.Core.Gotest, "./...", client, gpull, "gotest", ref, targetURL)
-				futures = append(futures, future)
-			}
-		case "php":
-			if Conf.Core.PHPUnit != "" {
-				future := ReportTestResults(repoPath, Conf.Core.PHPUnit, "", client, gpull, "phptest", ref, targetURL)
-				futures = append(futures, future)
-			}
-		}
-	}
-
-	annotations, problems, err := GenerateAnnotations(repoPath, diffs, &lintEnabled, log)
+	annotations, problems, err := GenerateAnnotations(repoPath, diffs, lintEnabled, log)
 	if err != nil {
 		return err
 	}
 
-	testProbs := 0
-	for _, v := range futures {
-		errReport, exist := <-v
-		if exist {
-			if _, ok := errReport.(*testResultProblemFound); ok {
-				testProbs++
-			} else {
-				log.WriteString(fmt.Sprintf("Trouble in ReportTestResults: %v\n", errReport))
-				LogError.Errorf("Trouble in ReportTestResults: %v\n", errReport)
-			}
-		}
-	}
+	failedTests := runningTest(repoPath, diffs, client, gpull, ref, targetURL, log)
+
 	mark := '✔'
-	sumCount := problems + testProbs
+	sumCount := problems + failedTests
 	if sumCount > 0 {
 		mark = '✖'
 	}
@@ -439,4 +451,47 @@ func HandleMessage(message string) error {
 		err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, outputTitle, outputSummary, annotations)
 	}
 	return err
+}
+
+func runningTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpull *GithubPull, ref GithubRef, targetURL string, log *os.File) (failedTests int) {
+	maxPendingTests := Conf.Concurrency.Test
+	if maxPendingTests < 1 {
+		maxPendingTests = 1
+	}
+	futures := make(chan chan error, maxPendingTests)
+	var waitTest sync.WaitGroup
+	waitTest.Add(1)
+	go func() {
+		defer waitTest.Done()
+		for v := range futures {
+			errReport, exist := <-v
+			if exist {
+				if _, ok := errReport.(*testResultProblemFound); ok {
+					failedTests++
+				} else {
+					log.WriteString(fmt.Sprintf("Trouble in ReportTestResults: %v\n", errReport))
+					LogError.Errorf("Trouble in ReportTestResults: %v\n", errReport)
+				}
+			}
+		}
+	}()
+
+	tests := getTests(diffs)
+	for k := range tests {
+		switch k {
+		case "go":
+			if Conf.Core.Gotest != "" {
+				future := ReportTestResults(repoPath, Conf.Core.Gotest, "./...", client, gpull, "gotest", ref, targetURL)
+				futures <- future
+			}
+		case "php":
+			if Conf.Core.PHPUnit != "" {
+				future := ReportTestResults(repoPath, Conf.Core.PHPUnit, "", client, gpull, "phptest", ref, targetURL)
+				futures <- future
+			}
+		}
+	}
+	defer waitTest.Wait()
+	defer close(futures)
+	return
 }
