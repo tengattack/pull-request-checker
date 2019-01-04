@@ -42,11 +42,12 @@ func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, annotations
 				comment := fmt.Sprintf("`%s` %d:%d %s",
 					lint.RuleID, lint.Line, 0, lint.Message)
 				startLine := lint.Line
+				endline := startLine + lint.Column - 1
 				*annotations = append(*annotations, &github.CheckRunAnnotation{
 					Path:            &fileName,
 					Message:         &comment,
 					StartLine:       &startLine,
-					EndLine:         &startLine,
+					EndLine:         &endline,
 					AnnotationLevel: &annotationLevel,
 				})
 				*problems++
@@ -73,9 +74,9 @@ func GenerateAnnotations(repoPath string, diffs []*diff.FileDiff, lintEnabled Li
 	)
 	for _, d := range diffs {
 		pending <- 0
+		d := d
 		eg.Go(func() error {
 			defer func() { <-pending }()
-			d := d
 			var (
 				buf         bytes.Buffer
 				annotations []*github.CheckRunAnnotation
