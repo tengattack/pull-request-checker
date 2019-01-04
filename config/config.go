@@ -120,7 +120,7 @@ func BuildDefaultConf() Config {
 	conf.MessageQueue.Redis.PoolSize = 10
 
 	// Concurrency
-	conf.Concurrency.Lint = 1
+	conf.Concurrency.Lint = 4
 	conf.Concurrency.Test = 1
 	return conf
 }
