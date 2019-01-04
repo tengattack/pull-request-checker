@@ -462,6 +462,20 @@ func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpu
 	}
 	pendingTests := make(chan int, maxPendingTests)
 	errReports := make(chan error, maxPendingTests)
+
+	go func() {
+		for errReport := range errReports {
+			if errReport != nil {
+				if _, ok := errReport.(*testResultProblemFound); ok {
+					failedTests++
+				} else {
+					log.WriteString(fmt.Sprintf("Trouble in ReportTestResults: %v\n", errReport))
+					LogError.Errorf("Trouble in ReportTestResults: %v\n", errReport)
+				}
+			}
+		}
+	}()
+
 	var wg sync.WaitGroup
 	tests := getTests(diffs)
 	for k := range tests {
@@ -499,18 +513,6 @@ func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpu
 		}
 	}
 	wg.Wait()
-	defer func() {
-		for errReport := range errReports {
-			if errReport != nil {
-				if _, ok := errReport.(*testResultProblemFound); ok {
-					failedTests++
-				} else {
-					log.WriteString(fmt.Sprintf("Trouble in ReportTestResults: %v\n", errReport))
-					LogError.Errorf("Trouble in ReportTestResults: %v\n", errReport)
-				}
-			}
-		}
-	}()
 	defer close(errReports)
 	return
 }
