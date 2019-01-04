@@ -3,7 +3,6 @@ package checker
 import (
 	"context"
 	"errors"
-	"fmt"
 	"os/exec"
 	"time"
 
@@ -37,46 +36,34 @@ func carry(ctx context.Context, repo, cmd, opt string) (string, error) {
 }
 
 // ReportTestResults reports the test results to github
-func ReportTestResults(repo, cmd, opt string, client *github.Client, gpull *GithubPull, outputTitle string, ref GithubRef, targetURL string) chan error {
-	future := make(chan error, 1)
-	go func() {
-		var err error
-		defer func() {
-			if info := recover(); info != nil {
-				future <- fmt.Errorf("Panic: %v", info)
-			} else if err != nil {
-				future <- err
-			}
-			close(future)
-		}()
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-		defer cancel()
+func ReportTestResults(repo, cmd, opt string, client *github.Client, gpull *GithubPull, outputTitle string, ref GithubRef, targetURL string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel()
 
-		t := github.Timestamp{Time: time.Now()}
+	t := github.Timestamp{Time: time.Now()}
 
-		checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
-		if err != nil {
-			LogError.Errorf("github create %s failed: %v", outputTitle, err)
-			return
-		}
-		checkRunID := checkRun.GetID()
+	checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
+	if err != nil {
+		LogError.Errorf("github create %s failed: %v", outputTitle, err)
+		return err
+	}
+	checkRunID := checkRun.GetID()
 
-		outputSummary, err := carry(ctx, repo, cmd, opt)
-		var conclusion string
-		if err != nil {
-			conclusion = "failure"
-		} else {
-			conclusion = "success"
-		}
-		err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, outputTitle, "```\n"+outputSummary+"\n```", nil)
-		if err != nil {
-			LogError.Errorf("report test results to github failed: %v", err)
-			return
-		}
-		if conclusion == "failure" {
-			err = &testResultProblemFound{}
-			return
-		}
-	}()
-	return future
+	outputSummary, err := carry(ctx, repo, cmd, opt)
+	var conclusion string
+	if err != nil {
+		conclusion = "failure"
+	} else {
+		conclusion = "success"
+	}
+	err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, outputTitle, "```\n"+outputSummary+"\n```", nil)
+	if err != nil {
+		LogError.Errorf("report test results to github failed: %v", err)
+		return err
+	}
+	if conclusion == "failure" {
+		err = &testResultProblemFound{}
+		return err
+	}
+	return nil
 }

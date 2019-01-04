@@ -69,8 +69,8 @@ func GenerateAnnotations(repoPath string, diffs []*diff.FileDiff, lintEnabled Li
 		eg  errgroup.Group
 		mtx sync.Mutex
 
-		Annotations []*github.CheckRunAnnotation
-		Problems    int
+		annotations []*github.CheckRunAnnotation
+		problems    int
 	)
 	for _, d := range diffs {
 		pending <- 0
@@ -78,24 +78,25 @@ func GenerateAnnotations(repoPath string, diffs []*diff.FileDiff, lintEnabled Li
 		eg.Go(func() error {
 			defer func() { <-pending }()
 			var (
-				buf         bytes.Buffer
-				annotations []*github.CheckRunAnnotation
-				problems    int
+				buf          bytes.Buffer
+				annotations_ []*github.CheckRunAnnotation
+				problems_    int
 			)
 
-			err := handleSingleFile(repoPath, d, lintEnabled, annotationLevel, &buf, &annotations, &problems)
+			err := handleSingleFile(repoPath, d, lintEnabled, annotationLevel, &buf, &annotations_, &problems_)
 
 			mtx.Lock()
 			defer mtx.Unlock()
 			log.Write(buf.Bytes())
-			Annotations = append(Annotations, annotations...)
-			Problems += problems
+			annotations = append(annotations, annotations_...)
+			problems += problems_
 
 			return err
 		})
 	}
 	err := eg.Wait()
-	return Annotations, Problems, err
+	// The check-run status will be set to "action_required" if err != nil
+	return annotations, problems, err
 }
 
 func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled, annotationLevel string, log *bytes.Buffer, annotations *[]*github.CheckRunAnnotation, problems *int) error {
@@ -401,7 +402,7 @@ func HandleMessage(message string) error {
 		return err
 	}
 
-	failedTests := runningTest(repoPath, diffs, client, gpull, ref, targetURL, log)
+	failedTests := runTest(repoPath, diffs, client, gpull, ref, targetURL, log)
 
 	mark := '✔'
 	sumCount := problems + failedTests
@@ -454,19 +455,53 @@ func HandleMessage(message string) error {
 	return err
 }
 
-func runningTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpull *GithubPull, ref GithubRef, targetURL string, log *os.File) (failedTests int) {
+func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpull *GithubPull, ref GithubRef, targetURL string, log *os.File) (failedTests int) {
 	maxPendingTests := Conf.Concurrency.Test
 	if maxPendingTests < 1 {
 		maxPendingTests = 1
 	}
-	futures := make(chan chan error, maxPendingTests)
-	var waitTest sync.WaitGroup
-	waitTest.Add(1)
-	go func() {
-		defer waitTest.Done()
-		for v := range futures {
-			errReport, exist := <-v
-			if exist {
+	pendingTests := make(chan int, maxPendingTests)
+	errReports := make(chan error, maxPendingTests)
+	var wg sync.WaitGroup
+	tests := getTests(diffs)
+	for k := range tests {
+		switch k {
+		case "go":
+			if Conf.Core.Gotest != "" {
+				pendingTests <- 0
+				wg.Add(1)
+				go func() {
+					defer func() {
+						if info := recover(); info != nil {
+							errReports <- &panicError{Info: info}
+						}
+						wg.Done()
+						<-pendingTests
+					}()
+					errReports <- ReportTestResults(repoPath, Conf.Core.Gotest, "./...", client, gpull, "gotest", ref, targetURL)
+				}()
+			}
+		case "php":
+			if Conf.Core.PHPUnit != "" {
+				pendingTests <- 0
+				wg.Add(1)
+				go func() {
+					defer func() {
+						if info := recover(); info != nil {
+							errReports <- &panicError{Info: info}
+						}
+						wg.Done()
+						<-pendingTests
+					}()
+					errReports <- ReportTestResults(repoPath, Conf.Core.PHPUnit, "", client, gpull, "phptest", ref, targetURL)
+				}()
+			}
+		}
+	}
+	wg.Wait()
+	defer func() {
+		for errReport := range errReports {
+			if errReport != nil {
 				if _, ok := errReport.(*testResultProblemFound); ok {
 					failedTests++
 				} else {
@@ -476,23 +511,6 @@ func runningTest(repoPath string, diffs []*diff.FileDiff, client *github.Client,
 			}
 		}
 	}()
-
-	tests := getTests(diffs)
-	for k := range tests {
-		switch k {
-		case "go":
-			if Conf.Core.Gotest != "" {
-				future := ReportTestResults(repoPath, Conf.Core.Gotest, "./...", client, gpull, "gotest", ref, targetURL)
-				futures <- future
-			}
-		case "php":
-			if Conf.Core.PHPUnit != "" {
-				future := ReportTestResults(repoPath, Conf.Core.PHPUnit, "", client, gpull, "phptest", ref, targetURL)
-				futures <- future
-			}
-		}
-	}
-	defer waitTest.Wait()
-	defer close(futures)
+	defer close(errReports)
 	return
 }

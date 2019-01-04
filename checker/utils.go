@@ -15,6 +15,17 @@ import (
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
+type panicError struct {
+	Info interface{}
+}
+
+func (p *panicError) Error() (s string) {
+	if p != nil {
+		s = fmt.Sprintf("Panic: %v", p.Info)
+	}
+	return
+}
+
 // InitHTTPRequest helps to set necessary headers
 func InitHTTPRequest(req *http.Request, isJSONResponse bool) {
 	if isJSONResponse {
