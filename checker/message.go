@@ -468,9 +468,6 @@ func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpu
 			if errReport != nil {
 				if _, ok := errReport.(*testResultProblemFound); ok {
 					failedTests++
-				} else {
-					log.WriteString(fmt.Sprintf("Trouble in ReportTestResults: %v\n", errReport))
-					LogError.Errorf("Trouble in ReportTestResults: %v\n", errReport)
 				}
 			}
 		}
