@@ -54,7 +54,9 @@ func TestGenerateComments(t *testing.T) {
 	currentDir := path.Dir(filename)
 
 	for _, v := range dataSet {
+		v := v
 		t.Run(v.Language, func(t *testing.T) {
+			t.Parallel()
 			assert := assert.New(t)
 			assert.NotNil(assert)
 			require := require.New(t)
@@ -75,7 +77,7 @@ func TestGenerateComments(t *testing.T) {
 			lintEnabled := LintEnabled{}
 			lintEnabled.Init(testRepoPath)
 
-			annotations, problems, err := GenerateAnnotations(testRepoPath, diffs, &lintEnabled, log)
+			annotations, problems, err := GenerateAnnotations(testRepoPath, diffs, lintEnabled, log)
 			require.NoError(err)
 			require.Equal(len(v.Annotations), problems)
 			for i, check := range v.Annotations {

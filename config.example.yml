@@ -44,3 +44,6 @@ mq:
     addr: "localhost:6379"
     password: ""
     db: 0
+concurrency:
+  lint: 4
+  test: 1

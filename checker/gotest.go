@@ -10,6 +10,17 @@ import (
 	"github.com/mattn/go-shellwords"
 )
 
+type testResultProblemFound struct {
+	TestTitle string
+}
+
+func (t *testResultProblemFound) Error() (s string) {
+	if t != nil {
+		return t.TestTitle
+	}
+	return
+}
+
 func carry(ctx context.Context, repo, cmd, opt string) (string, error) {
 	words, err := shellwords.Parse(cmd)
 	if err != nil {
@@ -29,7 +40,7 @@ func carry(ctx context.Context, repo, cmd, opt string) (string, error) {
 }
 
 // ReportTestResults reports the test results to github
-func ReportTestResults(repo, cmd, opt string, client *github.Client, gpull *GithubPull, outputTitle string, ref GithubRef, targetURL string) {
+func ReportTestResults(repo, cmd, opt string, client *github.Client, gpull *GithubPull, outputTitle string, ref GithubRef, targetURL string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
@@ -38,7 +49,7 @@ func ReportTestResults(repo, cmd, opt string, client *github.Client, gpull *Gith
 	checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
 	if err != nil {
 		LogError.Errorf("github create %s failed: %v", outputTitle, err)
-		return
+		return err
 	}
 	checkRunID := checkRun.GetID()
 
@@ -52,5 +63,11 @@ func ReportTestResults(repo, cmd, opt string, client *github.Client, gpull *Gith
 	err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, outputTitle, "```\n"+outputSummary+"\n```", nil)
 	if err != nil {
 		LogError.Errorf("report test results to github failed: %v", err)
+		return err
 	}
+	if conclusion == "failure" {
+		err = &testResultProblemFound{TestTitle: outputTitle}
+		return err
+	}
+	return nil
 }

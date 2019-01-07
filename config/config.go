@@ -14,6 +14,7 @@ type Config struct {
 	GitHub       SectionGitHub       `yaml:"github"`
 	Log          SectionLog          `yaml:"log"`
 	MessageQueue SectionMessageQueue `yaml:"mq"`
+	Concurrency  SectionConcurrency  `yaml:"concurrency"`
 }
 
 // SectionCore is sub section of config.
@@ -66,6 +67,12 @@ type SectionMessageQueue struct {
 	Redis  mqredis.Config `yaml:"redis"`
 }
 
+// SectionConcurrency is sub section of config.
+type SectionConcurrency struct {
+	Lint int `yaml:"lint"`
+	Test int `yaml:"test"`
+}
+
 // BuildDefaultConf is default config setting.
 func BuildDefaultConf() Config {
 	var conf Config
@@ -112,6 +119,9 @@ func BuildDefaultConf() Config {
 	conf.MessageQueue.Redis.DB = 0
 	conf.MessageQueue.Redis.PoolSize = 10
 
+	// Concurrency
+	conf.Concurrency.Lint = 4
+	conf.Concurrency.Test = 1
 	return conf
 }
 
