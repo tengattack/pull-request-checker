@@ -507,7 +507,7 @@ func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpu
 						wg.Done()
 						<-pendingTests
 					}()
-					errReports <- ReportTestResults(repoPath, Conf.Core.PHPUnit, "", client, gpull, "phptest", ref, targetURL)
+					errReports <- ReportTestResults(repoPath, Conf.Core.PHPUnit, "", client, gpull, "phpunit", ref, targetURL)
 				}()
 			}
 		}

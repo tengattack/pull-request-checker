@@ -11,10 +11,14 @@ import (
 )
 
 type testResultProblemFound struct {
+	TestTitle string
 }
 
-func (*testResultProblemFound) Error() string {
-	return "failure"
+func (t *testResultProblemFound) Error() (s string) {
+	if t != nil {
+		return t.TestTitle
+	}
+	return
 }
 
 func carry(ctx context.Context, repo, cmd, opt string) (string, error) {
@@ -62,7 +66,7 @@ func ReportTestResults(repo, cmd, opt string, client *github.Client, gpull *Gith
 		return err
 	}
 	if conclusion == "failure" {
-		err = &testResultProblemFound{}
+		err = &testResultProblemFound{TestTitle: outputTitle}
 		return err
 	}
 	return nil
