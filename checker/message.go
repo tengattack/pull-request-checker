@@ -434,6 +434,8 @@ func HandleMessage(message string) error {
 	}
 	if err == nil {
 		log.WriteString("done.")
+	} else {
+		log.WriteString("Failed to update status: " + err.Error())
 	}
 
 	if checkRunID != 0 {
