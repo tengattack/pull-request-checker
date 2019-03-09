@@ -93,6 +93,12 @@ type GithubWebHookPullRequest struct {
 	Repository  GithubRepo `json:"repository"`
 }
 
+type GithubWebHookCheckRun struct {
+	Action     string          `json:"action"`
+	CheckRun   github.CheckRun `json:"check_run"`
+	Repository GithubRepo      `json:"repository"`
+}
+
 func GetGithubPulls(repo string) ([]GithubPull, error) {
 	apiURI := fmt.Sprintf("/repos/%s/pulls", repo)
 
@@ -344,6 +350,41 @@ func webhookHandler(c *gin.Context) {
 		ref := GithubRef{
 			RepoName: payload.Repository.FullName,
 			Sha:      payload.PullRequest.Head.Sha,
+		}
+		err = MQ.Push(message)
+		if err != nil {
+			LogAccess.Error("Add message to queue error: " + err.Error())
+			abortWithError(c, 500, "add to queue error: "+err.Error())
+		} else {
+			markAsPending(ref)
+			c.JSON(http.StatusOK, gin.H{
+				"code": 0,
+				"info": "add to queue successfully",
+			})
+		}
+	} else if hook.Event == "check_run" {
+		var payload GithubWebHookCheckRun
+		err = hook.Extract(&payload)
+		if err != nil {
+			abortWithError(c, 400, "payload error: "+err.Error())
+			return
+		}
+		if payload.Action != "rerequested" {
+			c.JSON(http.StatusOK, gin.H{
+				"code": 0,
+				"info": "no need to handle the action: " + payload.Action,
+			})
+			return
+		}
+		message := fmt.Sprintf("%s/pull/%d/commits/%s",
+			payload.Repository.FullName,
+			*payload.CheckRun.PullRequests[0].Number,
+			*payload.CheckRun.HeadSHA,
+		)
+		LogAccess.WithField("entry", "webhook").Info("Push message: " + message)
+		ref := GithubRef{
+			RepoName: payload.Repository.FullName,
+			Sha:      *payload.CheckRun.HeadSHA,
 		}
 		err = MQ.Push(message)
 		if err != nil {
