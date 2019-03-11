@@ -143,3 +143,30 @@ func getTests(diffs []*diff.FileDiff) map[string]bool {
 	}
 	return result
 }
+
+func searchGithubPR(repo, sha string) (int64, error) {
+	if sha == "" {
+		return 0, errors.New("SHA is empty")
+	}
+	params := fmt.Sprintf("?q=is:pr+repo:%s+SHA:%s", repo, sha)
+
+	req, err := http.NewRequest(http.MethodGet, GITHUB_API_URL+"/search/issues"+params, nil)
+	if err != nil {
+		return 0, err
+	}
+	var result struct {
+		TotalCount        int64 `json:"total_count"`
+		IncompleteResults bool  `json:"incomplete_results"`
+		Items             []struct {
+			Number int64 `json:"number"`
+		} `json:"items"`
+	}
+	err = DoHTTPRequest(req, true, &result)
+	if err != nil {
+		return 0, err
+	}
+	if len(result.Items) == 0 {
+		return 0, errors.New("PR number not found")
+	}
+	return result.Items[0].Number, nil
+}
