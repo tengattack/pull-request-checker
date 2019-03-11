@@ -93,6 +93,7 @@ type GithubWebHookPullRequest struct {
 	Repository  GithubRepo `json:"repository"`
 }
 
+// GithubWebHookCheckRun is the the request body of https://developer.github.com/v3/activity/events/types/#checkrunevent
 type GithubWebHookCheckRun struct {
 	Action     string          `json:"action"`
 	CheckRun   github.CheckRun `json:"check_run"`
