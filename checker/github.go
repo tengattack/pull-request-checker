@@ -386,7 +386,7 @@ func webhookHandler(c *gin.Context) {
 			tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
 				Conf.GitHub.AppID, installationID, Conf.GitHub.PrivateKey)
 			if err != nil {
-				LogAccess.Error("keyfile not found (maybe)")
+				LogAccess.Errorf("keyfile not found (maybe): %v", err)
 				abortWithError(c, 500, "No keyfile")
 				return
 			}
@@ -394,7 +394,7 @@ func webhookHandler(c *gin.Context) {
 			client = github.NewClient(&http.Client{Transport: tr})
 		} else {
 			LogAccess.Error("installationID not found, owner: " + payload.Repository.Owner.Login)
-			abortWithError(c, 500, "No installationID")
+			abortWithError(c, 403, "No installationID")
 			return
 		}
 
@@ -404,8 +404,8 @@ func webhookHandler(c *gin.Context) {
 		} else {
 			prNum, err = searchGithubPR(context.Background(), client, payload.Repository.FullName, *payload.CheckRun.HeadSHA)
 			if err != nil {
-				LogAccess.Error("searchGithubPR: " + err.Error())
-				abortWithError(c, 404, "Can not get the PR number")
+				LogAccess.Errorf("searchGithubPR: %v", err)
+				abortWithError(c, 404, "Could not get the PR number")
 				return
 			}
 		}
