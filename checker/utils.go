@@ -143,3 +143,19 @@ func getTests(diffs []*diff.FileDiff) map[string]bool {
 	}
 	return result
 }
+
+func searchGithubPR(ctx context.Context, client *github.Client, repo, sha string) (int, error) {
+	if sha == "" {
+		return 0, errors.New("SHA is empty")
+	}
+	q := fmt.Sprintf("is:pr repo:%s SHA:%s", repo, sha)
+	opts := &github.SearchOptions{Sort: "created", Order: "asc"}
+	result, _, err := client.Search.Issues(ctx, q, opts)
+	if err != nil {
+		return 0, err
+	}
+	if result.GetTotal() == 0 {
+		return 0, errors.New("PR number not found")
+	}
+	return result.Issues[0].GetNumber(), nil
+}

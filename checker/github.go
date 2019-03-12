@@ -85,6 +85,9 @@ type GithubRepo struct {
 	ID       int64  `json:"id"`
 	Name     string `json:"name"`
 	FullName string `json:"full_name"`
+	Owner    struct {
+		Login string `json:"login"`
+	} `json:"owner"`
 }
 
 type GithubWebHookPullRequest struct {
@@ -377,9 +380,39 @@ func webhookHandler(c *gin.Context) {
 			})
 			return
 		}
+		var client *github.Client
+		installationID, ok := Conf.GitHub.Installations[payload.Repository.Owner.Login]
+		if ok {
+			tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
+				Conf.GitHub.AppID, installationID, Conf.GitHub.PrivateKey)
+			if err != nil {
+				LogAccess.Errorf("NewKeyFromFile returns error: %v", err)
+				abortWithError(c, 500, "NewKeyFromFile returns error")
+				return
+			}
+
+			client = github.NewClient(&http.Client{Transport: tr})
+		} else {
+			LogAccess.Error("installationID not found, owner: " + payload.Repository.Owner.Login)
+			abortWithError(c, 403, "No installationID")
+			return
+		}
+
+		prNum := 0
+		if len(payload.CheckRun.PullRequests) > 0 {
+			prNum = *payload.CheckRun.PullRequests[0].Number
+		} else {
+			prNum, err = searchGithubPR(context.Background(), client, payload.Repository.FullName, *payload.CheckRun.HeadSHA)
+			if err != nil {
+				LogAccess.Errorf("searchGithubPR error: %v", err)
+				abortWithError(c, 404, "Could not get the PR number")
+				return
+			}
+		}
+
 		message := fmt.Sprintf("%s/pull/%d/commits/%s",
 			payload.Repository.FullName,
-			*payload.CheckRun.PullRequests[0].Number,
+			prNum,
 			*payload.CheckRun.HeadSHA,
 		)
 		LogAccess.WithField("entry", "webhook").Info("Push message: " + message)
