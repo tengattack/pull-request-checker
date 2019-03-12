@@ -386,7 +386,7 @@ func webhookHandler(c *gin.Context) {
 			tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
 				Conf.GitHub.AppID, installationID, Conf.GitHub.PrivateKey)
 			if err != nil {
-				LogAccess.Errorf("keyfile not found (maybe): %v", err)
+				LogAccess.Errorf("NewKeyFromFile returns error: %v", err)
 				abortWithError(c, 500, "No keyfile")
 				return
 			}
@@ -404,7 +404,7 @@ func webhookHandler(c *gin.Context) {
 		} else {
 			prNum, err = searchGithubPR(context.Background(), client, payload.Repository.FullName, *payload.CheckRun.HeadSHA)
 			if err != nil {
-				LogAccess.Errorf("searchGithubPR: %v", err)
+				LogAccess.Errorf("searchGithubPR error: %v", err)
 				abortWithError(c, 404, "Could not get the PR number")
 				return
 			}
