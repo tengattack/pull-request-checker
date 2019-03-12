@@ -387,7 +387,7 @@ func webhookHandler(c *gin.Context) {
 				Conf.GitHub.AppID, installationID, Conf.GitHub.PrivateKey)
 			if err != nil {
 				LogAccess.Errorf("NewKeyFromFile returns error: %v", err)
-				abortWithError(c, 500, "No keyfile")
+				abortWithError(c, 500, "NewKeyFromFile returns error")
 				return
 			}
 
