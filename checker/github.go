@@ -398,12 +398,18 @@ func webhookHandler(c *gin.Context) {
 			return
 		}
 
-		PR, err := searchGithubPR(context.Background(), client, payload.Repository.FullName, *payload.CheckRun.HeadSHA)
-		if err != nil {
-			LogAccess.Error("searchGithubPR: " + err.Error())
-			abortWithError(c, 404, "Can not get the PR number")
-			return
+		PR := 0
+		if len(payload.CheckRun.PullRequests) > 0 {
+			PR = *payload.CheckRun.PullRequests[0].Number
+		} else {
+			PR, err = searchGithubPR(context.Background(), client, payload.Repository.FullName, *payload.CheckRun.HeadSHA)
+			if err != nil {
+				LogAccess.Error("searchGithubPR: " + err.Error())
+				abortWithError(c, 404, "Can not get the PR number")
+				return
+			}
 		}
+
 		message := fmt.Sprintf("%s/pull/%d/commits/%s",
 			payload.Repository.FullName,
 			PR,
