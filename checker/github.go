@@ -85,6 +85,9 @@ type GithubRepo struct {
 	ID       int64  `json:"id"`
 	Name     string `json:"name"`
 	FullName string `json:"full_name"`
+	Owner    struct {
+		Login string `json:"login"`
+	} `json:"owner"`
 }
 
 type GithubWebHookPullRequest struct {
@@ -377,7 +380,25 @@ func webhookHandler(c *gin.Context) {
 			})
 			return
 		}
-		PR, err := searchGithubPR(payload.Repository.FullName, *payload.CheckRun.HeadSHA)
+		var client *github.Client
+		installationID, ok := Conf.GitHub.Installations[payload.Repository.Owner.Login]
+		if ok {
+			tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
+				Conf.GitHub.AppID, installationID, Conf.GitHub.PrivateKey)
+			if err != nil {
+				LogAccess.Error("keyfile not found (maybe)")
+				abortWithError(c, 500, "No keyfile")
+				return
+			}
+
+			client = github.NewClient(&http.Client{Transport: tr})
+		} else {
+			LogAccess.Error("installationID not found, owner: " + payload.Repository.Owner.Login)
+			abortWithError(c, 500, "No installationID")
+			return
+		}
+
+		PR, err := searchGithubPR(context.Background(), client, payload.Repository.FullName, *payload.CheckRun.HeadSHA)
 		if err != nil {
 			LogAccess.Error("searchGithubPR: " + err.Error())
 			abortWithError(c, 404, "Can not get the PR number")
