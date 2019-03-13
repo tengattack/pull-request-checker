@@ -464,6 +464,7 @@ func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpu
 	}
 	pendingTests := make(chan int, maxPendingTests)
 	errReports := make(chan error, maxPendingTests)
+	tests := getTests(diffs)
 
 	go func() {
 		for errReport := range errReports {
@@ -476,11 +477,10 @@ func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpu
 	}()
 
 	var wg sync.WaitGroup
-	tests := getTests(diffs)
 	for k := range tests {
 		switch k {
 		case "go":
-			if Conf.Core.Gotest != "" {
+			if cmds, ok := Conf.Tests[k]; ok {
 				pendingTests <- 0
 				wg.Add(1)
 				go func() {
@@ -491,11 +491,11 @@ func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpu
 						wg.Done()
 						<-pendingTests
 					}()
-					errReports <- ReportTestResults(repoPath, Conf.Core.Gotest, "./...", client, gpull, "gotest", ref, targetURL)
+					errReports <- ReportTestResults(repoPath, cmds, client, gpull, "go test", ref, targetURL)
 				}()
 			}
 		case "php":
-			if Conf.Core.PHPUnit != "" {
+			if cmds, ok := Conf.Tests[k]; ok {
 				pendingTests <- 0
 				wg.Add(1)
 				go func() {
@@ -506,7 +506,7 @@ func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpu
 						wg.Done()
 						<-pendingTests
 					}()
-					errReports <- ReportTestResults(repoPath, Conf.Core.PHPUnit, "", client, gpull, "phpunit", ref, targetURL)
+					errReports <- ReportTestResults(repoPath, cmds, client, gpull, "php test", ref, targetURL)
 				}()
 			}
 		}
