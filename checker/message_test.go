@@ -90,3 +90,14 @@ func TestGenerateComments(t *testing.T) {
 		})
 	}
 }
+
+func TestGetTests(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	_, file, _, ok := runtime.Caller(0)
+	require.True(ok)
+
+	tests := getTests(path.Join(path.Dir(file), "../"))
+	assert.ElementsMatch(tests, []string{"go"})
+}

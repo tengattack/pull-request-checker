@@ -21,16 +21,13 @@ func (t *testResultProblemFound) Error() (s string) {
 	return
 }
 
-func carry(ctx context.Context, repo, cmd, opt string) (string, error) {
+func carry(ctx context.Context, repo, cmd string) (string, error) {
 	words, err := shellwords.Parse(cmd)
 	if err != nil {
 		return "", err
 	}
-	if opt != "" {
-		words = append(words, opt)
-	}
 	if len(words) < 1 {
-		return "", errors.New("cmd + opt should consist of at least 1 word")
+		return "", errors.New("invalid command")
 	}
 
 	cmds := exec.CommandContext(ctx, words[0], words[1:]...)
@@ -40,7 +37,7 @@ func carry(ctx context.Context, repo, cmd, opt string) (string, error) {
 }
 
 // ReportTestResults reports the test results to github
-func ReportTestResults(repo, cmd, opt string, client *github.Client, gpull *github.PullRequest, outputTitle string, ref GithubRef, targetURL string) error {
+func ReportTestResults(repo string, cmds []string, client *github.Client, gpull *github.PullRequest, outputTitle string, ref GithubRef, targetURL string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
@@ -53,12 +50,20 @@ func ReportTestResults(repo, cmd, opt string, client *github.Client, gpull *gith
 	}
 	checkRunID := checkRun.GetID()
 
-	outputSummary, err := carry(ctx, repo, cmd, opt)
-	var conclusion string
-	if err != nil {
-		conclusion = "failure"
-	} else {
-		conclusion = "success"
+	var (
+		conclusion    string
+		outputSummary string
+	)
+	conclusion = "success"
+	for _, cmd := range cmds {
+		if cmd != "" {
+			out, err := carry(ctx, repo, cmd)
+			outputSummary += ("\n" + out)
+			if err != nil {
+				conclusion = "failure"
+				break
+			}
+		}
 	}
 	err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, outputTitle, "```\n"+outputSummary+"\n```", nil)
 	if err != nil {

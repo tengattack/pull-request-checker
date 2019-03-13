@@ -13,9 +13,6 @@ core:
   tslint: './node_modules/.bin/tslint'
   scsslint: 'scss-lint'
 
-  gotest: 'go test' # go test flags: https://golang.org/cmd/go/#hdr-Test_packages
-  phpunit: ''
-
 api:
   enabled: true
   mode: 'release'
@@ -43,6 +40,14 @@ mq:
     addr: "localhost:6379"
     password: ""
     db: 0
+
 concurrency:
   lint: 4
   test: 1
+
+tests:
+  php:
+    - ''
+
+  go:
+    - 'go test ./...' # go test flags: https://golang.org/cmd/go/#hdr-Test_packages

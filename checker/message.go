@@ -512,6 +512,7 @@ func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpu
 	}
 	pendingTests := make(chan int, maxPendingTests)
 	errReports := make(chan error, maxPendingTests)
+	tests := getTests(repoPath)
 
 	go func() {
 		for errReport := range errReports {
@@ -524,39 +525,20 @@ func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpu
 	}()
 
 	var wg sync.WaitGroup
-	tests := getTests(diffs)
-	for k := range tests {
-		switch k {
-		case "go":
-			if Conf.Core.Gotest != "" {
-				pendingTests <- 0
-				wg.Add(1)
-				go func() {
-					defer func() {
-						if info := recover(); info != nil {
-							errReports <- &panicError{Info: info}
-						}
-						wg.Done()
-						<-pendingTests
-					}()
-					errReports <- ReportTestResults(repoPath, Conf.Core.Gotest, "./...", client, gpull, "gotest", ref, targetURL)
+	for _, k := range tests {
+		if cmds, ok := Conf.Tests[k]; ok {
+			pendingTests <- 0
+			wg.Add(1)
+			go func() {
+				defer func() {
+					if info := recover(); info != nil {
+						errReports <- &panicError{Info: info}
+					}
+					wg.Done()
+					<-pendingTests
 				}()
-			}
-		case "php":
-			if Conf.Core.PHPUnit != "" {
-				pendingTests <- 0
-				wg.Add(1)
-				go func() {
-					defer func() {
-						if info := recover(); info != nil {
-							errReports <- &panicError{Info: info}
-						}
-						wg.Done()
-						<-pendingTests
-					}()
-					errReports <- ReportTestResults(repoPath, Conf.Core.PHPUnit, "", client, gpull, "phpunit", ref, targetURL)
-				}()
-			}
+				errReports <- ReportTestResults(repoPath, cmds, client, gpull, k+" test", ref, targetURL)
+			}()
 		}
 	}
 	wg.Wait()

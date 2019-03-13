@@ -7,7 +7,7 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// Config is main config struct.
+// Config is the main config struct.
 type Config struct {
 	Core         SectionCore         `yaml:"core"`
 	API          SectionAPI          `yaml:"api"`
@@ -15,9 +15,10 @@ type Config struct {
 	Log          SectionLog          `yaml:"log"`
 	MessageQueue SectionMessageQueue `yaml:"mq"`
 	Concurrency  SectionConcurrency  `yaml:"concurrency"`
+	Tests        map[string][]string `yaml:"tests"`
 }
 
-// SectionCore is sub section of config.
+// SectionCore is a sub section of config.
 type SectionCore struct {
 	EnableRetries bool   `yaml:"enable_retries"`
 	MaxRetries    int64  `yaml:"max_retries"`
@@ -30,11 +31,9 @@ type SectionCore struct {
 	ESLint        string `yaml:"eslint"`
 	TSLint        string `yaml:"tslint"`
 	SCSSLint      string `yaml:"scsslint"`
-	Gotest        string `yaml:"gotest"`
-	PHPUnit       string `yaml:"phpunit"`
 }
 
-// SectionAPI is sub section of config.
+// SectionAPI is a sub section of config.
 type SectionAPI struct {
 	Enabled    bool   `yaml:"enabled"`
 	Mode       string `yaml:"mode"`
@@ -43,7 +42,7 @@ type SectionAPI struct {
 	WebHookURI string `yaml:"webhook_uri"`
 }
 
-// SectionGitHub is sub section of config.
+// SectionGitHub is a sub section of config.
 type SectionGitHub struct {
 	AppID         int            `yaml:"app_id"`
 	Secret        string         `yaml:"secret"`
@@ -51,7 +50,7 @@ type SectionGitHub struct {
 	Installations map[string]int `yaml:"installations"`
 }
 
-// SectionLog is sub section of config.
+// SectionLog is a sub section of config.
 type SectionLog struct {
 	Format      string `yaml:"format"`
 	AccessLog   string `yaml:"access_log"`
@@ -60,19 +59,19 @@ type SectionLog struct {
 	ErrorLevel  string `yaml:"error_level"`
 }
 
-// SectionMessageQueue is sub section of config.
+// SectionMessageQueue is a sub section of config.
 type SectionMessageQueue struct {
 	Engine string         `yaml:"engine"`
 	Redis  mqredis.Config `yaml:"redis"`
 }
 
-// SectionConcurrency is sub section of config.
+// SectionConcurrency is a sub section of config.
 type SectionConcurrency struct {
 	Lint int `yaml:"lint"`
 	Test int `yaml:"test"`
 }
 
-// BuildDefaultConf is default config setting.
+// BuildDefaultConf is the default config setting.
 func BuildDefaultConf() Config {
 	var conf Config
 
@@ -88,7 +87,6 @@ func BuildDefaultConf() Config {
 	conf.Core.ESLint = ""
 	conf.Core.TSLint = ""
 	conf.Core.SCSSLint = ""
-	conf.Core.Gotest = "go test"
 
 	// API
 	conf.API.Enabled = true
