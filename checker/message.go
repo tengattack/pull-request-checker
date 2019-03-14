@@ -307,10 +307,6 @@ func HandleMessage(message string) error {
 		log.Close()
 	}()
 
-	installationToken, _, err := client.Apps.CreateInstallationToken(context.Background(), int64(installationID))
-	if err != nil {
-		return err
-	}
 	log.WriteString("Unified-CI " + GetVersion() + "\n\n")
 	log.WriteString(fmt.Sprintf("Start fetching %s/pull/%s\n", repository, pull))
 
@@ -361,6 +357,10 @@ func HandleMessage(message string) error {
 	} */
 
 	// git fetch -f https://x-access-token:token@github.com/octocat/Hello-World.git new-topic:pull-XX
+	installationToken, _, err := jwtClient.Apps.CreateInstallationToken(context.Background(), int64(installationID))
+	if err != nil {
+		return err
+	}
 	originURL := gpull.Head.Repo.HTMLURL // e.g. https://github.com/octocat/Hello-World.git
 	fetchURL := originURL[:8] + "x-access-token:" + installationToken.GetToken() + "@" + originURL[8:]
 	branch := fmt.Sprintf("pull-%s", pull)

@@ -382,10 +382,10 @@ func webhookHandler(c *gin.Context) {
 			return
 		}
 
-		client, err := getClient(payload.Repository.Owner.Login, Conf.GitHub.AppID, Conf.GitHub.PrivateKey)
+		client, err := getDefaultAPIClient(payload.Repository.Owner.Login, Conf.GitHub.AppID, Conf.GitHub.PrivateKey)
 		if err != nil {
-			LogAccess.Errorf("getClient returns error: %v", err)
-			abortWithError(c, 500, "getClient returns error")
+			LogAccess.Errorf("getDefaultAPIClient returns error: %v", err)
+			abortWithError(c, 500, "getDefaultAPIClient returns error")
 			return
 		}
 		prNum := 0

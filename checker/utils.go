@@ -3,7 +3,6 @@ package checker
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/github"
+	"github.com/pkg/errors"
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
@@ -161,7 +161,7 @@ func searchGithubPR(ctx context.Context, client *github.Client, repo, sha string
 	return result.Issues[0].GetNumber(), nil
 }
 
-func getClient(owner string, appID int, privateKeyPath string) (*github.Client, error) {
+func getDefaultAPIClient(owner string, appID int, privateKeyPath string) (*github.Client, error) {
 	var client *github.Client
 	installationID, ok := Conf.GitHub.Installations[owner]
 	if ok {
