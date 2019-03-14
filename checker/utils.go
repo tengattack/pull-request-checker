@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/github"
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
@@ -158,4 +159,20 @@ func searchGithubPR(ctx context.Context, client *github.Client, repo, sha string
 		return 0, errors.New("PR number not found")
 	}
 	return result.Issues[0].GetNumber(), nil
+}
+
+func getClient(owner string, appID int, privateKeyPath string) (*github.Client, error) {
+	var client *github.Client
+	installationID, ok := Conf.GitHub.Installations[owner]
+	if ok {
+		tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
+			appID, installationID, privateKeyPath)
+		if err != nil {
+			return nil, err
+		}
+
+		client = github.NewClient(&http.Client{Transport: tr})
+		return client, nil
+	}
+	return nil, errors.New("InstallationID not found, owner: " + owner)
 }

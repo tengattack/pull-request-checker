@@ -42,10 +42,11 @@ type GithubPull struct {
 type GithubRef struct {
 	RepoName string `json:"-"`
 	Repo     struct {
-		Name    string     `json:"name"`
-		Owner   githubUser `json:"owner"`
-		HTMLURL string     `json:"html_url"`
-		SSHURL  string     `json:"ssh_url"`
+		Name     string     `json:"name"`
+		Owner    githubUser `json:"owner"`
+		HTMLURL  string     `json:"html_url"`
+		SSHURL   string     `json:"ssh_url"`
+		HTTPSURL string     `json:"clone_url"`
 	} `json:"repo"`
 	Label string     `json:"label"`
 	Ref   string     `json:"ref"`
@@ -380,24 +381,13 @@ func webhookHandler(c *gin.Context) {
 			})
 			return
 		}
-		var client *github.Client
-		installationID, ok := Conf.GitHub.Installations[payload.Repository.Owner.Login]
-		if ok {
-			tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
-				Conf.GitHub.AppID, installationID, Conf.GitHub.PrivateKey)
-			if err != nil {
-				LogAccess.Errorf("NewKeyFromFile returns error: %v", err)
-				abortWithError(c, 500, "NewKeyFromFile returns error")
-				return
-			}
 
-			client = github.NewClient(&http.Client{Transport: tr})
-		} else {
-			LogAccess.Error("installationID not found, owner: " + payload.Repository.Owner.Login)
-			abortWithError(c, 403, "No installationID")
+		client, err := getClient(payload.Repository.Owner.Login, Conf.GitHub.AppID, Conf.GitHub.PrivateKey)
+		if err != nil {
+			LogAccess.Errorf("getClient returns error: %v", err)
+			abortWithError(c, 500, "getClient returns error")
 			return
 		}
-
 		prNum := 0
 		if len(payload.CheckRun.PullRequests) > 0 {
 			prNum = *payload.CheckRun.PullRequests[0].Number

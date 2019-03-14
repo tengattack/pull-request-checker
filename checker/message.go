@@ -3,6 +3,7 @@ package checker
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -283,6 +284,13 @@ func HandleMessage(message string) error {
 
 		// TODO: refine code
 		client = github.NewClient(&http.Client{Transport: tr})
+	} else {
+		msg := "Installation ID not found, owner: " + owner
+		LogError.Error(msg)
+		// close log manually
+		log.WriteString(msg + "\n")
+		log.Close()
+		return errors.New(msg)
 	}
 
 	defer func() {
@@ -299,7 +307,11 @@ func HandleMessage(message string) error {
 		log.Close()
 	}()
 
-	log.WriteString("Pull Request Checker/" + GetVersion() + "\n\n")
+	installationToken, _, err := client.Apps.CreateInstallationToken(context.Background(), int64(installationID))
+	if err != nil {
+		return err
+	}
+	log.WriteString("Unified-CI " + GetVersion() + "\n\n")
 	log.WriteString(fmt.Sprintf("Start fetching %s/pull/%s\n", repository, pull))
 
 	gpull, err = GetGithubPull(repository, pull)
@@ -339,21 +351,21 @@ func HandleMessage(message string) error {
 		return err
 	}
 
-	log.WriteString("$ git remote add " + gpull.Head.User.Login + " " + gpull.Head.Repo.SSHURL + "\n")
-	cmd = exec.Command("git", "remote", "add", gpull.Head.User.Login, gpull.Head.Repo.SSHURL)
+	/* log.WriteString("$ git remote add " + gpull.Head.User.Login + " " + gpull.Head.Repo.HTTPSURL + "\n")
+	cmd = exec.Command("git", "remote", "add", gpull.Head.User.Login, gpull.Head.Repo.HTTPSURL)
 	cmd.Dir = repoPath
 	err = cmd.Run()
 	if err != nil {
 		LogAccess.Debugf("git remote add %s", err.Error())
 		// return err
-	}
+	} */
 
-	// git fetch -f origin pull/XX/head:pull-XX
+	// git fetch -f https://x-access-token:token@github.com/octocat/Hello-World.git new-topic:pull-XX
+	originURL := gpull.Head.Repo.HTMLURL // e.g. https://github.com/octocat/Hello-World.git
+	fetchURL := originURL[:8] + "x-access-token:" + installationToken.GetToken() + "@" + originURL[8:]
 	branch := fmt.Sprintf("pull-%s", pull)
-	log.WriteString("$ git fetch -f " + gpull.Head.User.Login + " " +
-		fmt.Sprintf("%s:%s\n", gpull.Head.Ref, branch))
-	cmd = exec.Command("git", "fetch", "-f", gpull.Head.User.Login,
-		fmt.Sprintf("%s:%s", gpull.Head.Ref, branch))
+	log.WriteString("$ git fetch -f " + fetchURL + fmt.Sprintf("%s:%s\n", gpull.Head.Ref, branch))
+	cmd = exec.Command("git", "fetch", "-f", fetchURL, fmt.Sprintf("%s:%s", gpull.Head.Ref, branch))
 	cmd.Dir = repoPath
 	cmd.Stdout = log
 	cmd.Stderr = log
