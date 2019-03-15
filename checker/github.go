@@ -104,6 +104,7 @@ type GithubWebHookCheckRun struct {
 	Repository GithubRepo      `json:"repository"`
 }
 
+// GetGithubPulls gets the pull requests of the specified repository.
 func GetGithubPulls(client *github.Client, owner, repo string) ([]*github.PullRequest, error) {
 	opt := &github.PullRequestListOptions{}
 	pulls, _, err := client.PullRequests.List(context.Background(), owner, repo, opt)
@@ -114,6 +115,7 @@ func GetGithubPulls(client *github.Client, owner, repo string) ([]*github.PullRe
 	return pulls, nil
 }
 
+// GetGithubPull gets a single pull request.
 func GetGithubPull(client *github.Client, owner, repo, pull string) (*github.PullRequest, error) {
 	num, err := strconv.Atoi(pull)
 	if err != nil {
@@ -127,6 +129,7 @@ func GetGithubPull(client *github.Client, owner, repo, pull string) (*github.Pul
 	return thePull, nil
 }
 
+// GetGithubPullDiff gets the diff of the pull request.
 func GetGithubPullDiff(client *github.Client, owner, repo, pull string) ([]byte, error) {
 	num, err := strconv.Atoi(pull)
 	if err != nil {
@@ -140,6 +143,7 @@ func GetGithubPullDiff(client *github.Client, owner, repo, pull string) ([]byte,
 	return []byte(got), nil
 }
 
+// GetStatuses lists the statuses of a repository at the specified reference.
 func (ref *GithubRef) GetStatuses(client *github.Client) ([]*github.RepoStatus, error) {
 	parts := strings.Split(ref.RepoName, "/")
 	if len(parts) < 2 {
@@ -153,6 +157,7 @@ func (ref *GithubRef) GetStatuses(client *github.Client) ([]*github.RepoStatus, 
 	return statuses, nil
 }
 
+// UpdateState creates the status
 func (ref *GithubRef) UpdateState(client *github.Client, ctx, state, targetURL, description string) error {
 	parts := strings.Split(ref.RepoName, "/")
 	if len(parts) < 2 {
@@ -173,6 +178,7 @@ func (ref *GithubRef) UpdateState(client *github.Client, ctx, state, targetURL, 
 	return nil
 }
 
+// CreateReview creates a new review on the specified pull request.
 func (ref *GithubRef) CreateReview(client *github.Client, pull, event, body string, comments []*github.DraftReviewComment) error {
 	num, err := strconv.Atoi(pull)
 	if err != nil {
