@@ -48,9 +48,10 @@ func (j *JWTRoundTripper) GetToken() (string, error) {
 	defer j.mu.Unlock()
 
 	if j.jwt == nil || j.exp.Add(-time.Minute).Before(time.Now()) {
+		exp := time.Now().Add(10 * time.Minute)
 		token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
 			"iat": int32(time.Now().Unix()),
-			"exp": int32(time.Now().Add(10 * time.Minute).Unix()),
+			"exp": int32(exp.Unix()),
 			"iss": j.iss,
 		})
 
@@ -64,6 +65,7 @@ func (j *JWTRoundTripper) GetToken() (string, error) {
 			return "", errors.Wrap(err, "failed to sign token")
 		}
 		j.jwt = &tokenString
+		j.exp = exp
 	}
 
 	return *j.jwt, nil
