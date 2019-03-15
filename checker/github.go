@@ -440,6 +440,7 @@ func WatchLocalRepo() error {
 						repository := file.Name() + "/" + subfile.Name()
 						pulls, err := GetGithubPulls(client, file.Name(), subfile.Name())
 						if err != nil {
+							LogError.Errorf("WatchLocalRepo:GetGithubPulls: %v", err)
 							continue
 						}
 						for _, pull := range pulls {
@@ -449,11 +450,13 @@ func WatchLocalRepo() error {
 							}
 							exists, err := HasLintStatuses(client, &ref)
 							if err != nil {
+								LogError.Errorf("WatchLocalRepo:HasLintStatuses: %v", err)
 								continue
 							}
 							if !exists {
 								exists, err = HasLinterChecks(&ref)
 								if err != nil {
+									LogError.Errorf("WatchLocalRepo:HasLinterChecks: %v", err)
 									continue
 								}
 							}
