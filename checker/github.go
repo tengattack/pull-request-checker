@@ -46,7 +46,7 @@ type GithubRef struct {
 		Owner    githubUser `json:"owner"`
 		HTMLURL  string     `json:"html_url"`
 		SSHURL   string     `json:"ssh_url"`
-		CLONEURL string     `json:"clone_url"`
+		CloneURL string     `json:"clone_url"`
 	} `json:"repo"`
 	Label string     `json:"label"`
 	Ref   string     `json:"ref"`
