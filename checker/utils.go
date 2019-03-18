@@ -3,7 +3,6 @@ package checker
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -11,7 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/github"
+	"github.com/pkg/errors"
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
@@ -69,13 +70,16 @@ func DoHTTPRequest(req *http.Request, isJSONResponse bool, v interface{}) error 
 }
 
 // UpdateCheckRunWithError updates the check run result with error message
-func UpdateCheckRunWithError(ctx context.Context, client *github.Client, gpull *GithubPull, checkRunID int64, checkName, outputTitle string, err error) {
+func UpdateCheckRunWithError(ctx context.Context, client *github.Client, gpull *github.PullRequest, checkRunID int64, checkName, outputTitle string, err error) {
 	if gpull != nil {
 		conclusion := "action_required"
 		checkRunStatus := "completed"
 		t := github.Timestamp{Time: time.Now()}
 		outputSummary := fmt.Sprintf("error: %v", err)
-		_, _, eror := client.Checks.UpdateCheckRun(ctx, gpull.Base.Repo.Owner.Login, gpull.Base.Repo.Name, checkRunID, github.UpdateCheckRunOptions{
+
+		owner := gpull.GetBase().GetRepo().GetOwner().GetLogin()
+		repo := gpull.GetBase().GetRepo().GetName()
+		_, _, eror := client.Checks.UpdateCheckRun(ctx, owner, repo, checkRunID, github.UpdateCheckRunOptions{
 			Name:        checkName,
 			Status:      &checkRunStatus,
 			Conclusion:  &conclusion,
@@ -93,9 +97,12 @@ func UpdateCheckRunWithError(ctx context.Context, client *github.Client, gpull *
 
 // UpdateCheckRun updates the check run result with output message
 // outputTitle, outputSummary can contain markdown.
-func UpdateCheckRun(ctx context.Context, client *github.Client, gpull *GithubPull, checkRunID int64, checkName string, conclusion string, t github.Timestamp, outputTitle string, outputSummary string, annotations []*github.CheckRunAnnotation) error {
+func UpdateCheckRun(ctx context.Context, client *github.Client, gpull *github.PullRequest, checkRunID int64, checkName string, conclusion string, t github.Timestamp, outputTitle string, outputSummary string, annotations []*github.CheckRunAnnotation) error {
 	checkRunStatus := "completed"
-	_, _, err := client.Checks.UpdateCheckRun(ctx, gpull.Base.Repo.Owner.Login, gpull.Base.Repo.Name, checkRunID, github.UpdateCheckRunOptions{
+
+	owner := gpull.GetBase().GetRepo().GetOwner().GetLogin()
+	repo := gpull.GetBase().GetRepo().GetName()
+	_, _, err := client.Checks.UpdateCheckRun(ctx, owner, repo, checkRunID, github.UpdateCheckRunOptions{
 		Name:        checkName,
 		Status:      &checkRunStatus,
 		Conclusion:  &conclusion,
@@ -113,11 +120,14 @@ func UpdateCheckRun(ctx context.Context, client *github.Client, gpull *GithubPul
 }
 
 // CreateCheckRun creates a new check run
-func CreateCheckRun(ctx context.Context, client *github.Client, gpull *GithubPull, checkName string, ref GithubRef, targetURL string) (*github.CheckRun, error) {
+func CreateCheckRun(ctx context.Context, client *github.Client, gpull *github.PullRequest, checkName string, ref GithubRef, targetURL string) (*github.CheckRun, error) {
 	checkRunStatus := "in_progress"
-	checkRun, _, err := client.Checks.CreateCheckRun(ctx, gpull.Base.Repo.Owner.Login, gpull.Base.Repo.Name, github.CreateCheckRunOptions{
+
+	owner := gpull.GetBase().GetRepo().GetOwner().GetLogin()
+	repo := gpull.GetBase().GetRepo().GetName()
+	checkRun, _, err := client.Checks.CreateCheckRun(ctx, owner, repo, github.CreateCheckRunOptions{
 		Name:       checkName,
-		HeadBranch: gpull.Base.Ref,
+		HeadBranch: gpull.GetBase().GetRef(),
 		HeadSHA:    ref.Sha,
 		DetailsURL: &targetURL,
 		Status:     &checkRunStatus,
@@ -158,4 +168,20 @@ func searchGithubPR(ctx context.Context, client *github.Client, repo, sha string
 		return 0, errors.New("PR number not found")
 	}
 	return result.Issues[0].GetNumber(), nil
+}
+
+func getDefaultAPIClient(owner string) (*github.Client, error) {
+	var client *github.Client
+	installationID, ok := Conf.GitHub.Installations[owner]
+	if ok {
+		tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
+			Conf.GitHub.AppID, installationID, Conf.GitHub.PrivateKey)
+		if err != nil {
+			return nil, err
+		}
+
+		client = github.NewClient(&http.Client{Transport: tr})
+		return client, nil
+	}
+	return nil, errors.New("InstallationID not found, owner: " + owner)
 }

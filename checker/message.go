@@ -3,8 +3,10 @@ package checker
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -242,11 +244,17 @@ func HandleMessage(message string) error {
 		return nil
 	}
 
-	owner := s[0]
 	repository, pull, commitSha := s[0]+"/"+s[1], s[3], s[5]
+	prNum, err := strconv.Atoi(pull)
+	if err != nil {
+		LogAccess.Warnf("malformed message: %s", message)
+		return err
+	}
 	LogAccess.Infof("Start handling %s/pull/%s", repository, pull)
 
 	ref := GithubRef{
+		owner:    s[0],
+		repo:     s[1],
 		RepoName: repository,
 		Sha:      commitSha,
 	}
@@ -265,11 +273,11 @@ func HandleMessage(message string) error {
 
 	var checkRunID int64
 	var client *github.Client
-	var gpull *GithubPull
+	var gpull *github.PullRequest
 
 	// Wrap the shared transport for use with the integration ID authenticating with installation ID.
 	// TODO: add installation ID to db
-	installationID, ok := Conf.GitHub.Installations[owner]
+	installationID, ok := Conf.GitHub.Installations[ref.owner]
 	if ok {
 		tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
 			Conf.GitHub.AppID, installationID, Conf.GitHub.PrivateKey)
@@ -283,6 +291,13 @@ func HandleMessage(message string) error {
 
 		// TODO: refine code
 		client = github.NewClient(&http.Client{Transport: tr})
+	} else {
+		msg := "Installation ID not found, owner: " + ref.owner
+		LogError.Error(msg)
+		// close log manually
+		log.WriteString(msg + "\n")
+		log.Close()
+		return errors.New(msg)
 	}
 
 	defer func() {
@@ -299,15 +314,15 @@ func HandleMessage(message string) error {
 		log.Close()
 	}()
 
-	log.WriteString("Pull Request Checker/" + GetVersion() + "\n\n")
+	log.WriteString("unified-ci " + GetVersion() + "\n\n")
 	log.WriteString(fmt.Sprintf("Start fetching %s/pull/%s\n", repository, pull))
 
-	gpull, err = GetGithubPull(repository, pull)
+	gpull, err = GetGithubPull(client, ref.owner, ref.repo, prNum)
 	if err != nil {
 		return err
 	}
-	if gpull.State != "open" {
-		log.WriteString("PR " + gpull.State + ".")
+	if gpull.GetState() != "open" {
+		log.WriteString("PR " + gpull.GetState() + ".")
 		return nil
 	}
 
@@ -322,7 +337,7 @@ func HandleMessage(message string) error {
 		checkRunID = checkRun.GetID()
 	}
 
-	err = ref.UpdateState("lint", "pending", targetURL, "checking")
+	err = ref.UpdateState(client, "lint", "pending", targetURL, "checking")
 	if err != nil {
 		LogAccess.Error("Update pull request status error: " + err.Error())
 		return err
@@ -339,21 +354,31 @@ func HandleMessage(message string) error {
 		return err
 	}
 
-	log.WriteString("$ git remote add " + gpull.Head.User.Login + " " + gpull.Head.Repo.SSHURL + "\n")
-	cmd = exec.Command("git", "remote", "add", gpull.Head.User.Login, gpull.Head.Repo.SSHURL)
+	/* log.WriteString("$ git remote add " + gpull.Head.User.Login + " " + gpull.Head.Repo.CLONEURL+ "\n")
+	cmd = exec.Command("git", "remote", "add", gpull.Head.User.Login, gpull.Head.Repo.HTTPSURL)
 	cmd.Dir = repoPath
 	err = cmd.Run()
 	if err != nil {
 		LogAccess.Debugf("git remote add %s", err.Error())
 		// return err
+	} */
+
+	installationToken, _, err := jwtClient.Apps.CreateInstallationToken(context.Background(), int64(installationID))
+	if err != nil {
+		return err
 	}
 
-	// git fetch -f origin pull/XX/head:pull-XX
+	originURL, err := url.Parse(gpull.GetHead().GetRepo().GetCloneURL()) // e.g. https://github.com/octocat/Hello-World.git
+	if err != nil {
+		return err
+	}
+	originURL.User = url.UserPassword("x-access-token", installationToken.GetToken())
+	fetchURL := originURL.String()
+
+	// git fetch -f https://x-access-token:token@github.com/octocat/Hello-World.git new-topic:pull-XX
 	branch := fmt.Sprintf("pull-%s", pull)
-	log.WriteString("$ git fetch -f " + gpull.Head.User.Login + " " +
-		fmt.Sprintf("%s:%s\n", gpull.Head.Ref, branch))
-	cmd = exec.Command("git", "fetch", "-f", gpull.Head.User.Login,
-		fmt.Sprintf("%s:%s", gpull.Head.Ref, branch))
+	log.WriteString("$ git fetch -f " + gpull.GetHead().GetRepo().GetCloneURL() + fmt.Sprintf("%s:%s\n", gpull.GetHead().GetRef(), branch))
+	cmd = exec.Command("git", "fetch", "-f", fetchURL, fmt.Sprintf("%s:%s", gpull.GetHead().GetRef(), branch))
 	cmd.Dir = repoPath
 	cmd.Stdout = log
 	cmd.Stderr = log
@@ -384,7 +409,7 @@ func HandleMessage(message string) error {
 	// }
 
 	// get diff from github
-	out, err := GetGithubPullDiff(repository, pull)
+	out, err := GetGithubPullDiff(client, ref.owner, ref.repo, prNum)
 	if err != nil {
 		return err
 	}
@@ -416,21 +441,21 @@ func HandleMessage(message string) error {
 	var outputSummary string
 	if sumCount > 0 {
 		comment := fmt.Sprintf("**check**: %d problem(s) found.", sumCount)
-		err = ref.CreateReview(pull, "REQUEST_CHANGES", comment, nil)
+		err = ref.CreateReview(client, prNum, "REQUEST_CHANGES", comment, nil)
 		if err != nil {
 			log.WriteString("error: " + err.Error() + "\n")
 			LogError.Errorf("create review failed: %v", err)
 		}
 		outputSummary = fmt.Sprintf("The check failed! %d problem(s) found.", sumCount)
-		err = ref.UpdateState("lint", "error", targetURL, outputSummary)
+		err = ref.UpdateState(client, "lint", "error", targetURL, outputSummary)
 	} else {
-		err = ref.CreateReview(pull, "APPROVE", "**check**: no problems found.", nil)
+		err = ref.CreateReview(client, prNum, "APPROVE", "**check**: no problems found.", nil)
 		if err != nil {
 			log.WriteString("error: " + err.Error() + "\n")
 			LogError.Errorf("create review failed: %v", err)
 		}
 		outputSummary = "The check succeed!"
-		err = ref.UpdateState("lint", "success", targetURL, outputSummary)
+		err = ref.UpdateState(client, "lint", "success", targetURL, outputSummary)
 	}
 	if err == nil {
 		log.WriteString("done.")
@@ -457,7 +482,7 @@ func HandleMessage(message string) error {
 	return err
 }
 
-func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpull *GithubPull, ref GithubRef, targetURL string, log *os.File) (failedTests int) {
+func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string, log *os.File) (failedTests int) {
 	maxPendingTests := Conf.Concurrency.Test
 	if maxPendingTests < 1 {
 		maxPendingTests = 1
