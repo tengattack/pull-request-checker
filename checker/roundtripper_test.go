@@ -20,7 +20,7 @@ func (*customRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 func TestJWT(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
-	privateKey, err := ioutil.ReadFile("../config/test/sample_key")
+	privateKey, err := ioutil.ReadFile("../config/test/sample_key.pem")
 	require.NoError(err)
 	var ts http.RoundTripper = newJWTRoundTripper(0, privateKey, &customRoundTripper{})
 
