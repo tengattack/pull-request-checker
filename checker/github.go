@@ -193,6 +193,9 @@ func webhookHandler(c *gin.Context) {
 		)
 		LogAccess.WithField("entry", "webhook").Info("Push message: " + message)
 		ref := GithubRef{
+			owner: payload.Repository.Owner.Login,
+			repo:  payload.Repository.Name,
+
 			RepoName: payload.Repository.FullName,
 			Sha:      payload.PullRequest.Head.Sha,
 		}
@@ -251,6 +254,9 @@ func webhookHandler(c *gin.Context) {
 		)
 		LogAccess.WithField("entry", "webhook").Info("Push message: " + message)
 		ref := GithubRef{
+			owner: payload.Repository.Owner.Login,
+			repo:  payload.Repository.Name,
+
 			RepoName: payload.Repository.FullName,
 			Sha:      *payload.CheckRun.HeadSHA,
 		}
@@ -338,6 +344,9 @@ func WatchLocalRepo() error {
 						}
 						for _, pull := range pulls {
 							ref := GithubRef{
+								owner: file.Name(),
+								repo:  subfile.Name(),
+
 								RepoName: repository,
 								Sha:      pull.GetHead().GetSHA(),
 							}
