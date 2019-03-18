@@ -368,7 +368,7 @@ func HandleMessage(message string) error {
 		return err
 	}
 
-	originURL, err := url.Parse(gpull.GetHead().GetRepo().GetCloneURL()) // e.g. https://github.com/octocat/Hello-World.git
+	originURL, err := url.Parse(gpull.GetBase().GetRepo().GetCloneURL()) // e.g. https://github.com/octocat/Hello-World.git
 	if err != nil {
 		return err
 	}
@@ -377,8 +377,8 @@ func HandleMessage(message string) error {
 
 	// git fetch -f https://x-access-token:token@github.com/octocat/Hello-World.git new-topic:pull-XX
 	branch := fmt.Sprintf("pull-%s", pull)
-	log.WriteString("$ git fetch -f " + gpull.GetHead().GetRepo().GetCloneURL() + fmt.Sprintf("%s:%s\n", gpull.GetHead().GetRef(), branch))
-	cmd = exec.Command("git", "fetch", "-f", fetchURL, fmt.Sprintf("%s:%s", gpull.GetHead().GetRef(), branch))
+	log.WriteString("$ git fetch -f " + gpull.GetHead().GetRepo().GetCloneURL() + fmt.Sprintf(" %s:%s\n", gpull.GetHead().GetRef(), branch))
+	cmd = exec.Command("git", "fetch", "-f", fetchURL, fmt.Sprintf("pull/%s/head:%s", pull, branch))
 	cmd.Dir = repoPath
 	cmd.Stdout = log
 	cmd.Stderr = log
