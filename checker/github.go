@@ -1,19 +1,13 @@
 package checker
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/gin-gonic/gin"
 	"github.com/google/go-github/github"
 	githubhook "gopkg.in/rjz/githubhook.v0"
@@ -41,37 +35,20 @@ type GithubPull struct {
 
 type GithubRef struct {
 	RepoName string `json:"-"`
-	Repo     struct {
-		Name    string     `json:"name"`
-		Owner   githubUser `json:"owner"`
-		HTMLURL string     `json:"html_url"`
-		SSHURL  string     `json:"ssh_url"`
+	owner    string
+	repo     string
+
+	Repo struct {
+		Name     string     `json:"name"`
+		Owner    githubUser `json:"owner"`
+		HTMLURL  string     `json:"html_url"`
+		SSHURL   string     `json:"ssh_url"`
+		CloneURL string     `json:"clone_url"`
 	} `json:"repo"`
 	Label string     `json:"label"`
 	Ref   string     `json:"ref"`
 	Sha   string     `json:"sha"`
 	User  githubUser `json:"user"`
-}
-
-type GithubRefState struct {
-	Context     string `json:"context"`
-	State       string `json:"state"`
-	TargetURL   string `json:"target_url"`
-	Description string `json:"description"`
-}
-
-type GithubRefComment struct {
-	CommentID string `json:"commit_id,omitempty"`
-	Body      string `json:"body"`
-	Path      string `json:"path"`
-	Position  int    `json:"position"`
-}
-
-type GithubRefReview struct {
-	CommentID string             `json:"commit_id"`
-	Body      string             `json:"body"`
-	Event     string             `json:"event"`
-	Comments  []GithubRefComment `json:"comments,omitempty"`
 }
 
 type GithubRefReviewResponse struct {
@@ -103,214 +80,78 @@ type GithubWebHookCheckRun struct {
 	Repository GithubRepo      `json:"repository"`
 }
 
-func GetGithubPulls(repo string) ([]GithubPull, error) {
-	apiURI := fmt.Sprintf("/repos/%s/pulls", repo)
-
-	query := url.Values{}
-	query.Set("access_token", Conf.GitHub.AccessToken)
-
-	LogAccess.Debugf("GET %s?%s", apiURI, query.Encode())
-
-	req, err := http.NewRequest(http.MethodGet,
-		fmt.Sprintf("%s%s?%s", GITHUB_API_URL, apiURI, query.Encode()), nil)
+// GetGithubPulls gets the pull requests of the specified repository.
+func GetGithubPulls(client *github.Client, owner, repo string) ([]*github.PullRequest, error) {
+	opt := &github.PullRequestListOptions{}
+	pulls, _, err := client.PullRequests.List(context.Background(), owner, repo, opt)
 	if err != nil {
+		LogError.Errorf("PullRequests.List returned error: %v", err)
 		return nil, err
 	}
-
-	var resp []GithubPull
-	err = DoHTTPRequest(req, true, &resp)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, nil
+	return pulls, nil
 }
 
-func GetGithubPull(repo, pull string) (*GithubPull, error) {
-	apiURI := fmt.Sprintf("/repos/%s/pulls/%s", repo, pull)
-
-	query := url.Values{}
-	query.Set("access_token", Conf.GitHub.AccessToken)
-
-	LogAccess.Debugf("GET %s?%s", apiURI, query.Encode())
-
-	req, err := http.NewRequest(http.MethodGet,
-		fmt.Sprintf("%s%s?%s", GITHUB_API_URL, apiURI, query.Encode()), nil)
+// GetGithubPull gets a single pull request.
+func GetGithubPull(client *github.Client, owner, repo string, prNum int) (*github.PullRequest, error) {
+	thePull, _, err := client.PullRequests.Get(context.Background(), owner, repo, prNum)
 	if err != nil {
+		LogError.Errorf("PullRequests.Get returned error: %v", err)
 		return nil, err
 	}
-
-	var resp GithubPull
-	err = DoHTTPRequest(req, true, &resp)
-	if err != nil {
-		return nil, err
-	}
-
-	return &resp, nil
+	return thePull, nil
 }
 
-func GetGithubPullDiff(repo, pull string) ([]byte, error) {
-	apiURI := fmt.Sprintf("/repos/%s/pulls/%s", repo, pull)
-
-	query := url.Values{}
-	query.Set("access_token", Conf.GitHub.AccessToken)
-
-	LogAccess.Debugf("GET %s?%s", apiURI, query.Encode())
-
-	req, err := http.NewRequest(http.MethodGet,
-		fmt.Sprintf("%s%s?%s", GITHUB_API_URL, apiURI, query.Encode()), nil)
+// GetGithubPullDiff gets the diff of the pull request.
+func GetGithubPullDiff(client *github.Client, owner, repo string, prNum int) ([]byte, error) {
+	got, _, err := client.PullRequests.GetRaw(context.Background(), owner, repo, prNum, github.RawOptions{github.Diff})
 	if err != nil {
+		LogError.Errorf("PullRequests.GetRaw returned error: %v", err)
 		return nil, err
 	}
-	req.Header.Set("Accept", "application/vnd.github.v3.diff")
-
-	var resp []byte
-	err = DoHTTPRequest(req, false, &resp)
-	if err != nil {
-		return nil, err
-	}
-
-	return resp, nil
+	return []byte(got), nil
 }
 
-func (ref *GithubRef) GetStatuses() ([]GithubRefState, error) {
-	apiURI := fmt.Sprintf("/repos/%s/commits/%s/statuses", ref.RepoName, ref.Sha)
-	query := url.Values{}
-	query.Set("access_token", Conf.GitHub.AccessToken)
-
-	LogAccess.Debugf("GET %s?%s", apiURI, query.Encode())
-
-	req, err := http.NewRequest(http.MethodGet,
-		fmt.Sprintf("%s%s?%s", GITHUB_API_URL, apiURI, query.Encode()), nil)
+// GetStatuses lists the statuses of a repository at the specified reference.
+func (ref *GithubRef) GetStatuses(client *github.Client) ([]*github.RepoStatus, error) {
+	statuses, _, err := client.Repositories.ListStatuses(context.Background(), ref.owner, ref.repo, ref.Sha, nil)
 	if err != nil {
+		LogError.Errorf("Repositories.ListStatuses returned error: %v", err)
 		return nil, err
 	}
-
-	var s []GithubRefState
-	err = DoHTTPRequest(req, true, &s)
-	if err != nil {
-		return nil, err
-	}
-	return s, nil
+	return statuses, nil
 }
 
-func (ref *GithubRef) UpdateState(context, state, targetURL, description string) error {
-	data := GithubRefState{
-		Context:     context,
-		State:       state,
-		TargetURL:   targetURL,
-		Description: description,
+// UpdateState creates the status
+func (ref *GithubRef) UpdateState(client *github.Client, ctx, state, targetURL, description string) error {
+	input := &github.RepoStatus{
+		Context:     github.String(ctx),
+		State:       github.String(state),
+		TargetURL:   github.String(targetURL),
+		Description: github.String(description),
 	}
-
-	apiURI := fmt.Sprintf("/repos/%s/statuses/%s", ref.RepoName, ref.Sha)
-
-	query := url.Values{}
-	query.Set("access_token", Conf.GitHub.AccessToken)
-	content, err := json.Marshal(data)
+	_, _, err := client.Repositories.CreateStatus(context.Background(), ref.owner, ref.repo, ref.Sha, input)
 	if err != nil {
+		LogError.Errorf("Repositories.CreateStatus returned error: %v", err)
 		return err
 	}
-
-	LogAccess.Debugf("POST %s?%s\n%s", apiURI, query.Encode(), content)
-
-	req, err := http.NewRequest(http.MethodPost,
-		fmt.Sprintf("%s%s?%s", GITHUB_API_URL, apiURI, query.Encode()),
-		bytes.NewReader(content))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	var s GithubRef
-	return DoHTTPRequest(req, true, &s)
+	return nil
 }
 
-func (ref *GithubRef) CreateReview(pull, event, body string, comments []GithubRefComment) error {
-	data := GithubRefReview{
-		CommentID: ref.Sha,
-		Body:      body,
-		Event:     event,
-		Comments:  comments,
+// CreateReview creates a new review on the specified pull request.
+func (ref *GithubRef) CreateReview(client *github.Client, prNum int, event, body string, comments []*github.DraftReviewComment) error {
+	input := &github.PullRequestReviewRequest{
+		CommitID: github.String(ref.Sha),
+		Body:     github.String(body),
+		Event:    github.String(event),
+		Comments: comments,
 	}
 
-	// POST /repos/:owner/:repo/pulls/:number/reviews
-	apiURI := fmt.Sprintf("/repos/%s/pulls/%s/reviews", ref.RepoName, pull)
-
-	query := url.Values{}
-	query.Set("access_token", Conf.GitHub.AccessToken)
-	content, err := json.Marshal(data)
+	_, _, err := client.PullRequests.CreateReview(context.Background(), ref.owner, ref.repo, prNum, input)
 	if err != nil {
+		LogError.Errorf("PullRequests.CreateReview returned error: %v", err)
 		return err
 	}
-
-	LogAccess.Debugf("POST %s?%s\n%s", apiURI, query.Encode(), content)
-
-	req, err := http.NewRequest(http.MethodPost,
-		fmt.Sprintf("%s%s?%s", GITHUB_API_URL, apiURI, query.Encode()),
-		bytes.NewReader(content))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	var s GithubRefReview
-	return DoHTTPRequest(req, true, &s)
-}
-
-func (ref *GithubRef) GetReviews(pull string) ([]GithubRefReviewResponse, error) {
-	// GET /repos/:owner/:repo/pulls/:number/reviews
-	apiURI := fmt.Sprintf("/repos/%s/pulls/%s/reviews", ref.RepoName, pull)
-
-	query := url.Values{}
-	query.Set("access_token", Conf.GitHub.AccessToken)
-
-	LogAccess.Debugf("GET %s?%s", apiURI, query.Encode())
-
-	req, err := http.NewRequest(http.MethodGet,
-		fmt.Sprintf("%s%s?%s", GITHUB_API_URL, apiURI, query.Encode()), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var s []GithubRefReviewResponse
-	err = DoHTTPRequest(req, true, &s)
-	if err != nil {
-		return nil, err
-	}
-	return s, nil
-}
-
-func (ref *GithubRef) SubmitReview(pull string, id int64, event, body string) error {
-	data := struct {
-		Event string `json:"event"`
-		Body  string `json:"body"`
-	}{
-		Event: event,
-		Body:  body,
-	}
-
-	// POST /repos/:owner/:repo/pulls/:number/reviews/:id/events
-	apiURI := fmt.Sprintf("/repos/%s/pulls/%s/reviews/%d/events", ref.RepoName, pull, id)
-
-	query := url.Values{}
-	query.Set("access_token", Conf.GitHub.AccessToken)
-	content, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-
-	LogAccess.Debugf("POST %s?%s\n%s", apiURI, query.Encode(), content)
-
-	req, err := http.NewRequest(http.MethodPost,
-		fmt.Sprintf("%s%s?%s", GITHUB_API_URL, apiURI, query.Encode()),
-		bytes.NewReader(content))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	var s GithubRefReviewResponse
-	return DoHTTPRequest(req, true, &s)
+	return nil
 }
 
 func webhookHandler(c *gin.Context) {
@@ -360,7 +201,11 @@ func webhookHandler(c *gin.Context) {
 			LogAccess.Error("Add message to queue error: " + err.Error())
 			abortWithError(c, 500, "add to queue error: "+err.Error())
 		} else {
-			markAsPending(ref)
+			client, err := getDefaultAPIClient(payload.Repository.Owner.Login)
+			if err != nil {
+				LogAccess.Errorf("getDefaultAPIClient returns error: %v", err)
+			}
+			markAsPending(client, ref)
 			c.JSON(http.StatusOK, gin.H{
 				"code": 0,
 				"info": "add to queue successfully",
@@ -380,24 +225,13 @@ func webhookHandler(c *gin.Context) {
 			})
 			return
 		}
-		var client *github.Client
-		installationID, ok := Conf.GitHub.Installations[payload.Repository.Owner.Login]
-		if ok {
-			tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
-				Conf.GitHub.AppID, installationID, Conf.GitHub.PrivateKey)
-			if err != nil {
-				LogAccess.Errorf("NewKeyFromFile returns error: %v", err)
-				abortWithError(c, 500, "NewKeyFromFile returns error")
-				return
-			}
 
-			client = github.NewClient(&http.Client{Transport: tr})
-		} else {
-			LogAccess.Error("installationID not found, owner: " + payload.Repository.Owner.Login)
-			abortWithError(c, 403, "No installationID")
+		client, err := getDefaultAPIClient(payload.Repository.Owner.Login)
+		if err != nil {
+			LogAccess.Errorf("getDefaultAPIClient returns error: %v", err)
+			abortWithError(c, 500, "getDefaultAPIClient returns error")
 			return
 		}
-
 		prNum := 0
 		if len(payload.CheckRun.PullRequests) > 0 {
 			prNum = *payload.CheckRun.PullRequests[0].Number
@@ -425,7 +259,7 @@ func webhookHandler(c *gin.Context) {
 			LogAccess.Error("Add message to queue error: " + err.Error())
 			abortWithError(c, 500, "add to queue error: "+err.Error())
 		} else {
-			markAsPending(ref)
+			markAsPending(client, ref)
 			c.JSON(http.StatusOK, gin.H{
 				"code": 0,
 				"info": "add to queue successfully",
@@ -438,25 +272,14 @@ func webhookHandler(c *gin.Context) {
 
 // HasLinterChecks check specified commit whether contain the linter checks
 func HasLinterChecks(ref *GithubRef) (bool, error) {
-	parts := strings.Split(ref.RepoName, "/")
-	// Wrap the shared transport for use with the integration ID authenticating with installation ID.
-	// TODO: add installation ID to db
-	installationID, ok := Conf.GitHub.Installations[parts[0]]
-	if !ok {
-		return false, errors.New("no such installation")
-	}
-	tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
-		Conf.GitHub.AppID, installationID, Conf.GitHub.PrivateKey)
+	client, err := getDefaultAPIClient(ref.owner)
 	if err != nil {
 		LogError.Errorf("load private key failed: %v", err)
 		return false, err
 	}
 
-	// TODO: refine code
 	ctx := context.Background()
-	client := github.NewClient(&http.Client{Transport: tr})
-
-	checkRuns, _, err := client.Checks.ListCheckRunsForRef(ctx, parts[0], parts[1], ref.Sha, nil)
+	checkRuns, _, err := client.Checks.ListCheckRunsForRef(ctx, ref.owner, ref.repo, ref.Sha, nil)
 	if err != nil {
 		LogError.Errorf("github list check runs failed: %v", err)
 		return false, err
@@ -472,15 +295,15 @@ func HasLinterChecks(ref *GithubRef) (bool, error) {
 }
 
 // HasLintStatuses check specified commit whether contain the lint context
-func HasLintStatuses(ref *GithubRef) (bool, error) {
-	statuses, err := ref.GetStatuses()
+func HasLintStatuses(client *github.Client, ref *GithubRef) (bool, error) {
+	statuses, err := ref.GetStatuses(client)
 	if err != nil {
 		LogError.Errorf("github get statuses failed: %v", err)
 		return false, err
 	}
 	lint := 0
 	for _, s := range statuses {
-		if s.Context == "lint" {
+		if s.GetContext() == "lint" {
 			lint++
 		}
 	}
@@ -501,35 +324,42 @@ func WatchLocalRepo() error {
 				if err != nil {
 					break
 				}
+				client, err := getDefaultAPIClient(file.Name())
+				if err != nil {
+					break
+				}
 				for _, subfile := range subfiles {
 					if subfile.IsDir() {
 						repository := file.Name() + "/" + subfile.Name()
-						pulls, err := GetGithubPulls(repository)
+						pulls, err := GetGithubPulls(client, file.Name(), subfile.Name())
 						if err != nil {
+							LogError.Errorf("WatchLocalRepo:GetGithubPulls: %v", err)
 							continue
 						}
 						for _, pull := range pulls {
 							ref := GithubRef{
 								RepoName: repository,
-								Sha:      pull.Head.Sha,
+								Sha:      pull.GetHead().GetSHA(),
 							}
-							exists, err := HasLintStatuses(&ref)
+							exists, err := HasLintStatuses(client, &ref)
 							if err != nil {
+								LogError.Errorf("WatchLocalRepo:HasLintStatuses: %v", err)
 								continue
 							}
 							if !exists {
 								exists, err = HasLinterChecks(&ref)
 								if err != nil {
+									LogError.Errorf("WatchLocalRepo:HasLinterChecks: %v", err)
 									continue
 								}
 							}
 							if !exists {
 								// no statuses, need check
-								message := fmt.Sprintf("%s/pull/%d/commits/%s", ref.RepoName, pull.Number, ref.Sha)
+								message := fmt.Sprintf("%s/pull/%d/commits/%s", ref.RepoName, pull.GetNumber(), ref.Sha)
 								LogAccess.WithField("entry", "local").Info("Push message: " + message)
 								err = MQ.Push(message)
 								if err == nil {
-									markAsPending(ref)
+									markAsPending(client, ref)
 								} else {
 									LogAccess.Error("Add message to queue error: " + err.Error())
 								}
@@ -547,12 +377,12 @@ func WatchLocalRepo() error {
 	return err
 }
 
-func markAsPending(ref GithubRef) {
+func markAsPending(client *github.Client, ref GithubRef) {
 	targetURL := ""
 	if len(Conf.Core.CheckLogURI) > 0 {
 		targetURL = Conf.Core.CheckLogURI + ref.RepoName + "/" + ref.Sha + ".log"
 	}
-	err := ref.UpdateState("lint", "pending", targetURL,
+	err := ref.UpdateState(client, "lint", "pending", targetURL,
 		"check queueing")
 	if err != nil {
 		LogAccess.Error("Update pull request status error: " + err.Error())

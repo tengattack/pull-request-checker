@@ -23,7 +23,6 @@ api:
 github:
   app_id: 12345
   secret: 'xxx'
-  access_token: 'xxx'
   private_key: '/path/to/private-key.pem'
   installations:
     tengattack: 479572

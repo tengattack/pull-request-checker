@@ -37,7 +37,7 @@ func carry(ctx context.Context, repo, cmd string) (string, error) {
 }
 
 // ReportTestResults reports the test results to github
-func ReportTestResults(repo string, cmds []string, client *github.Client, gpull *GithubPull, outputTitle string, ref GithubRef, targetURL string) error {
+func ReportTestResults(repo string, cmds []string, client *github.Client, gpull *github.PullRequest, outputTitle string, ref GithubRef, targetURL string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 

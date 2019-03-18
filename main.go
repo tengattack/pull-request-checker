@@ -61,6 +61,10 @@ func main() {
 		return
 	}
 
+	if err = checker.InitJWTClient(conf.GitHub.AppID, conf.GitHub.PrivateKey); err != nil {
+		log.Fatalf("error: %v", err)
+	}
+
 	var g errgroup.Group
 
 	if checker.Conf.Core.EnableRetries {

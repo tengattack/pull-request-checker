@@ -48,7 +48,6 @@ type SectionAPI struct {
 type SectionGitHub struct {
 	AppID         int            `yaml:"app_id"`
 	Secret        string         `yaml:"secret"`
-	AccessToken   string         `yaml:"access_token"`
 	PrivateKey    string         `yaml:"private_key"`
 	Installations map[string]int `yaml:"installations"`
 }
@@ -102,7 +101,6 @@ func BuildDefaultConf() Config {
 	// GitHub
 	conf.GitHub.AppID = 0
 	conf.GitHub.Secret = ""
-	conf.GitHub.AccessToken = ""
 	conf.GitHub.PrivateKey = ""
 	conf.GitHub.Installations = make(map[string]int)
 
