@@ -9,13 +9,10 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/go-github/github"
-	"github.com/pkg/errors"
 	githubhook "gopkg.in/rjz/githubhook.v0"
 )
 
@@ -41,38 +38,20 @@ type GithubPull struct {
 
 type GithubRef struct {
 	RepoName string `json:"-"`
-	Repo     struct {
+	owner    string
+	repo     string
+
+	Repo struct {
 		Name     string     `json:"name"`
 		Owner    githubUser `json:"owner"`
 		HTMLURL  string     `json:"html_url"`
 		SSHURL   string     `json:"ssh_url"`
-		HTTPSURL string     `json:"clone_url"`
+		CLONEURL string     `json:"clone_url"`
 	} `json:"repo"`
 	Label string     `json:"label"`
 	Ref   string     `json:"ref"`
 	Sha   string     `json:"sha"`
 	User  githubUser `json:"user"`
-}
-
-type GithubRefState struct {
-	Context     string `json:"context"`
-	State       string `json:"state"`
-	TargetURL   string `json:"target_url"`
-	Description string `json:"description"`
-}
-
-type GithubRefComment struct {
-	CommentID string `json:"commit_id,omitempty"`
-	Body      string `json:"body"`
-	Path      string `json:"path"`
-	Position  int    `json:"position"`
-}
-
-type GithubRefReview struct {
-	CommentID string             `json:"commit_id"`
-	Body      string             `json:"body"`
-	Event     string             `json:"event"`
-	Comments  []GithubRefComment `json:"comments,omitempty"`
 }
 
 type GithubRefReviewResponse struct {
@@ -116,12 +95,8 @@ func GetGithubPulls(client *github.Client, owner, repo string) ([]*github.PullRe
 }
 
 // GetGithubPull gets a single pull request.
-func GetGithubPull(client *github.Client, owner, repo, pull string) (*github.PullRequest, error) {
-	num, err := strconv.Atoi(pull)
-	if err != nil {
-		return nil, errors.New("bad PR number")
-	}
-	thePull, _, err := client.PullRequests.Get(context.Background(), owner, repo, num)
+func GetGithubPull(client *github.Client, owner, repo string, prNum int) (*github.PullRequest, error) {
+	thePull, _, err := client.PullRequests.Get(context.Background(), owner, repo, prNum)
 	if err != nil {
 		LogError.Errorf("PullRequests.Get returned error: %v", err)
 		return nil, err
@@ -130,12 +105,8 @@ func GetGithubPull(client *github.Client, owner, repo, pull string) (*github.Pul
 }
 
 // GetGithubPullDiff gets the diff of the pull request.
-func GetGithubPullDiff(client *github.Client, owner, repo, pull string) ([]byte, error) {
-	num, err := strconv.Atoi(pull)
-	if err != nil {
-		return nil, errors.New("bad PR number")
-	}
-	got, _, err := client.PullRequests.GetRaw(context.Background(), owner, repo, num, github.RawOptions{github.Diff})
+func GetGithubPullDiff(client *github.Client, owner, repo string, prNum int) ([]byte, error) {
+	got, _, err := client.PullRequests.GetRaw(context.Background(), owner, repo, prNum, github.RawOptions{github.Diff})
 	if err != nil {
 		LogError.Errorf("PullRequests.GetRaw returned error: %v", err)
 		return nil, err
@@ -145,11 +116,7 @@ func GetGithubPullDiff(client *github.Client, owner, repo, pull string) ([]byte,
 
 // GetStatuses lists the statuses of a repository at the specified reference.
 func (ref *GithubRef) GetStatuses(client *github.Client) ([]*github.RepoStatus, error) {
-	parts := strings.Split(ref.RepoName, "/")
-	if len(parts) < 2 {
-		return nil, errors.New("bad repo name")
-	}
-	statuses, _, err := client.Repositories.ListStatuses(context.Background(), parts[0], parts[1], ref.Sha, nil)
+	statuses, _, err := client.Repositories.ListStatuses(context.Background(), ref.owner, ref.repo, ref.Sha, nil)
 	if err != nil {
 		LogError.Errorf("Repositories.ListStatuses returned error: %v", err)
 		return nil, err
@@ -159,18 +126,13 @@ func (ref *GithubRef) GetStatuses(client *github.Client) ([]*github.RepoStatus, 
 
 // UpdateState creates the status
 func (ref *GithubRef) UpdateState(client *github.Client, ctx, state, targetURL, description string) error {
-	parts := strings.Split(ref.RepoName, "/")
-	if len(parts) < 2 {
-		return errors.New("bad repo name")
-	}
-
 	input := &github.RepoStatus{
 		Context:     github.String(ctx),
 		State:       github.String(state),
 		TargetURL:   github.String(targetURL),
 		Description: github.String(description),
 	}
-	_, _, err := client.Repositories.CreateStatus(context.Background(), parts[0], parts[1], ref.Sha, input)
+	_, _, err := client.Repositories.CreateStatus(context.Background(), ref.owner, ref.repo, ref.Sha, input)
 	if err != nil {
 		LogError.Errorf("Repositories.CreateStatus returned error: %v", err)
 		return err
@@ -179,16 +141,7 @@ func (ref *GithubRef) UpdateState(client *github.Client, ctx, state, targetURL, 
 }
 
 // CreateReview creates a new review on the specified pull request.
-func (ref *GithubRef) CreateReview(client *github.Client, pull, event, body string, comments []*github.DraftReviewComment) error {
-	num, err := strconv.Atoi(pull)
-	if err != nil {
-		return errors.New("bad PR number")
-	}
-	parts := strings.Split(ref.RepoName, "/")
-	if len(parts) < 2 {
-		return errors.New("bad repo name")
-	}
-
+func (ref *GithubRef) CreateReview(client *github.Client, prNum int, event, body string, comments []*github.DraftReviewComment) error {
 	input := &github.PullRequestReviewRequest{
 		CommitID: github.String(ref.Sha),
 		Body:     github.String(body),
@@ -196,7 +149,7 @@ func (ref *GithubRef) CreateReview(client *github.Client, pull, event, body stri
 		Comments: comments,
 	}
 
-	_, _, err = client.PullRequests.CreateReview(context.Background(), parts[0], parts[1], num, input)
+	_, _, err := client.PullRequests.CreateReview(context.Background(), ref.owner, ref.repo, prNum, input)
 	if err != nil {
 		LogError.Errorf("PullRequests.CreateReview returned error: %v", err)
 		return err
@@ -307,7 +260,7 @@ func webhookHandler(c *gin.Context) {
 			LogAccess.Error("Add message to queue error: " + err.Error())
 			abortWithError(c, 500, "add to queue error: "+err.Error())
 		} else {
-			client, err := getDefaultAPIClient(payload.Repository.Owner.Login, Conf.GitHub.AppID, Conf.GitHub.PrivateKey)
+			client, err := getDefaultAPIClient(payload.Repository.Owner.Login)
 			if err != nil {
 				LogAccess.Errorf("getDefaultAPIClient returns error: %v", err)
 			}
@@ -332,7 +285,7 @@ func webhookHandler(c *gin.Context) {
 			return
 		}
 
-		client, err := getDefaultAPIClient(payload.Repository.Owner.Login, Conf.GitHub.AppID, Conf.GitHub.PrivateKey)
+		client, err := getDefaultAPIClient(payload.Repository.Owner.Login)
 		if err != nil {
 			LogAccess.Errorf("getDefaultAPIClient returns error: %v", err)
 			abortWithError(c, 500, "getDefaultAPIClient returns error")
@@ -378,15 +331,14 @@ func webhookHandler(c *gin.Context) {
 
 // HasLinterChecks check specified commit whether contain the linter checks
 func HasLinterChecks(ref *GithubRef) (bool, error) {
-	parts := strings.Split(ref.RepoName, "/")
-	client, err := getDefaultAPIClient(parts[0], Conf.GitHub.AppID, Conf.GitHub.PrivateKey)
+	client, err := getDefaultAPIClient(ref.owner)
 	if err != nil {
 		LogError.Errorf("load private key failed: %v", err)
 		return false, err
 	}
 
 	ctx := context.Background()
-	checkRuns, _, err := client.Checks.ListCheckRunsForRef(ctx, parts[0], parts[1], ref.Sha, nil)
+	checkRuns, _, err := client.Checks.ListCheckRunsForRef(ctx, ref.owner, ref.repo, ref.Sha, nil)
 	if err != nil {
 		LogError.Errorf("github list check runs failed: %v", err)
 		return false, err
@@ -431,7 +383,7 @@ func WatchLocalRepo() error {
 				if err != nil {
 					break
 				}
-				client, err := getDefaultAPIClient(file.Name(), Conf.GitHub.AppID, Conf.GitHub.PrivateKey)
+				client, err := getDefaultAPIClient(file.Name())
 				if err != nil {
 					break
 				}

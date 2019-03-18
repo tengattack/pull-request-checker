@@ -170,12 +170,12 @@ func searchGithubPR(ctx context.Context, client *github.Client, repo, sha string
 	return result.Issues[0].GetNumber(), nil
 }
 
-func getDefaultAPIClient(owner string, appID int, privateKeyPath string) (*github.Client, error) {
+func getDefaultAPIClient(owner string) (*github.Client, error) {
 	var client *github.Client
 	installationID, ok := Conf.GitHub.Installations[owner]
 	if ok {
 		tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
-			appID, installationID, privateKeyPath)
+			Conf.GitHub.AppID, installationID, Conf.GitHub.PrivateKey)
 		if err != nil {
 			return nil, err
 		}

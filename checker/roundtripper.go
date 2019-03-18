@@ -20,7 +20,7 @@ func InitJWTClient(id int, privateKeyFile string) error {
 	if err != nil {
 		return fmt.Errorf("could not read private key: %s", err)
 	}
-	tr := newJWTRoundTripper(id, privateKey)
+	tr := newJWTRoundTripper(id, privateKey, http.DefaultTransport)
 	jwtClient = github.NewClient(&http.Client{Transport: tr})
 	return nil
 }
@@ -35,11 +35,11 @@ type jwtRoundTripper struct {
 	exp time.Time
 }
 
-func newJWTRoundTripper(iss int, key []byte) *jwtRoundTripper {
+func newJWTRoundTripper(iss int, key []byte, transport http.RoundTripper) *jwtRoundTripper {
 	return &jwtRoundTripper{
 		iss:       iss,
 		key:       key,
-		transport: http.DefaultTransport,
+		transport: transport,
 		mu:        &sync.Mutex{},
 	}
 }
@@ -78,6 +78,6 @@ func (j *jwtRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 
-	r.Header.Set("Authorization", "bearer "+token)
+	r.Header.Set("Authorization", "Bearer "+token)
 	return j.transport.RoundTrip(r)
 }
