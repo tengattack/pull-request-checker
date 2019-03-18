@@ -1,13 +1,10 @@
 package checker
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/url"
 	"path/filepath"
 	"time"
 
@@ -155,62 +152,6 @@ func (ref *GithubRef) CreateReview(client *github.Client, prNum int, event, body
 		return err
 	}
 	return nil
-}
-
-func (ref *GithubRef) GetReviews(pull string) ([]GithubRefReviewResponse, error) {
-	// GET /repos/:owner/:repo/pulls/:number/reviews
-	apiURI := fmt.Sprintf("/repos/%s/pulls/%s/reviews", ref.RepoName, pull)
-
-	query := url.Values{}
-	query.Set("access_token", Conf.GitHub.AccessToken)
-
-	LogAccess.Debugf("GET %s?%s", apiURI, query.Encode())
-
-	req, err := http.NewRequest(http.MethodGet,
-		fmt.Sprintf("%s%s?%s", GITHUB_API_URL, apiURI, query.Encode()), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	var s []GithubRefReviewResponse
-	err = DoHTTPRequest(req, true, &s)
-	if err != nil {
-		return nil, err
-	}
-	return s, nil
-}
-
-func (ref *GithubRef) SubmitReview(pull string, id int64, event, body string) error {
-	data := struct {
-		Event string `json:"event"`
-		Body  string `json:"body"`
-	}{
-		Event: event,
-		Body:  body,
-	}
-
-	// POST /repos/:owner/:repo/pulls/:number/reviews/:id/events
-	apiURI := fmt.Sprintf("/repos/%s/pulls/%s/reviews/%d/events", ref.RepoName, pull, id)
-
-	query := url.Values{}
-	query.Set("access_token", Conf.GitHub.AccessToken)
-	content, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-
-	LogAccess.Debugf("POST %s?%s\n%s", apiURI, query.Encode(), content)
-
-	req, err := http.NewRequest(http.MethodPost,
-		fmt.Sprintf("%s%s?%s", GITHUB_API_URL, apiURI, query.Encode()),
-		bytes.NewReader(content))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	var s GithubRefReviewResponse
-	return DoHTTPRequest(req, true, &s)
 }
 
 func webhookHandler(c *gin.Context) {
