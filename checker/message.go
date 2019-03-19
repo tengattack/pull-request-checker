@@ -313,6 +313,16 @@ func HandleMessage(message string) error {
 		log.Close()
 	}()
 
+	exist, err := searchGithubPR(context.Background(), client, repository, commitSha)
+	if err != nil {
+		LogAccess.Errorf("searchGithubPR error: %v", err)
+		return err
+	}
+	if exist == 0 {
+		log.WriteString(fmt.Sprintf("commit:%s no longer exists.\n", commitSha))
+		return nil
+	}
+
 	log.WriteString("unified-ci " + GetVersion() + "\n\n")
 	log.WriteString(fmt.Sprintf("Start fetching %s/pull/%s\n", repository, pull))
 

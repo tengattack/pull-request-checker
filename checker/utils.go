@@ -164,8 +164,8 @@ func searchGithubPR(ctx context.Context, client *github.Client, repo, sha string
 	if err != nil {
 		return 0, err
 	}
-	if result.GetTotal() == 0 {
-		return 0, errors.New("PR number not found")
+	if len(result.Issues) == 0 {
+		return 0, nil
 	}
 	return result.Issues[0].GetNumber(), nil
 }
