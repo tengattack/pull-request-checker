@@ -200,18 +200,21 @@ func CPPLint(filePath string, repoPath string) (lints []LintMessage, err error) 
 }
 
 // PHPLint lints the php files
-func PHPLint(fileName, cwd string) ([]LintMessage, error) {
+func PHPLint(fileName, cwd string) ([]LintMessage, string, error) {
+	var stderr bytes.Buffer
+
 	words, err := shellwords.Parse(Conf.Core.PHPLint)
 	if err != nil {
 		LogError.Error("PHPLint: " + err.Error())
-		return nil, err
+		return nil, stderr.String(), err
 	}
 	words = append(words, "-f", "json", fileName)
 	cmd := exec.Command(words[0], words[1:]...)
+	cmd.Stderr = &stderr
 	cmd.Dir = cwd
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, err
+		return nil, stderr.String(), err
 	}
 
 	LogAccess.Debugf("PHPLint Output:\n%s", out)
@@ -219,21 +222,23 @@ func PHPLint(fileName, cwd string) ([]LintMessage, error) {
 	var results []LintResult
 	err = json.Unmarshal(out, &results)
 	if err != nil {
-		return nil, err
+		return nil, stderr.String(), err
 	}
 
 	if len(results) <= 0 {
-		return []LintMessage{}, nil
+		return []LintMessage{}, stderr.String(), nil
 	}
-	return results[0].Messages, nil
+	return results[0].Messages, stderr.String(), nil
 }
 
 // ESLint lints the js, jsx, es, esx files
-func ESLint(fileName, cwd, eslintrc string) ([]LintMessage, error) {
+func ESLint(fileName, cwd, eslintrc string) ([]LintMessage, string, error) {
+	var stderr bytes.Buffer
+
 	words, err := shellwords.Parse(Conf.Core.ESLint)
 	if err != nil {
 		LogError.Error("ESLint: " + err.Error())
-		return nil, err
+		return nil, stderr.String(), err
 	}
 	if eslintrc != "" {
 		words = append(words, "-c", eslintrc, "-f", "json", fileName)
@@ -242,10 +247,11 @@ func ESLint(fileName, cwd, eslintrc string) ([]LintMessage, error) {
 	}
 	cmd := exec.Command(words[0], words[1:]...)
 	cmd.Dir = cwd
+	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
 		if _, ok := err.(*exec.ExitError); !ok {
-			return nil, err
+			return nil, stderr.String(), err
 		}
 	}
 
@@ -254,29 +260,32 @@ func ESLint(fileName, cwd, eslintrc string) ([]LintMessage, error) {
 	var results []LintResult
 	err = json.Unmarshal(out, &results)
 	if err != nil {
-		return nil, err
+		return nil, stderr.String(), err
 	}
 
 	if len(results) <= 0 {
-		return []LintMessage{}, nil
+		return []LintMessage{}, stderr.String(), nil
 	}
-	return results[0].Messages, nil
+	return results[0].Messages, stderr.String(), nil
 }
 
 // TSLint lints the ts and tsx files
-func TSLint(fileName, cwd string) ([]LintMessage, error) {
+func TSLint(fileName, cwd string) ([]LintMessage, string, error) {
+	var stderr bytes.Buffer
+
 	words, err := shellwords.Parse(Conf.Core.TSLint)
 	if err != nil {
 		LogError.Error("TSLint: " + err.Error())
-		return nil, err
+		return nil, stderr.String(), err
 	}
 	words = append(words, "--format", "json", fileName)
 	cmd := exec.Command(words[0], words[1:]...)
 	cmd.Dir = cwd
+	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
 		if _, ok := err.(*exec.ExitError); !ok {
-			return nil, err
+			return nil, stderr.String(), err
 		}
 	}
 
@@ -285,11 +294,11 @@ func TSLint(fileName, cwd string) ([]LintMessage, error) {
 	var results []TSLintResult
 	err = json.Unmarshal(out, &results)
 	if err != nil {
-		return nil, err
+		return nil, stderr.String(), err
 	}
 
 	if len(results) <= 0 {
-		return []LintMessage{}, nil
+		return []LintMessage{}, stderr.String(), nil
 	}
 
 	var messages []LintMessage
@@ -308,23 +317,26 @@ func TSLint(fileName, cwd string) ([]LintMessage, error) {
 			Message:  lint.Failure,
 		}
 	}
-	return messages, nil
+	return messages, stderr.String(), nil
 }
 
 // SCSSLint lints the scss files
-func SCSSLint(fileName, cwd string) ([]LintMessage, error) {
+func SCSSLint(fileName, cwd string) ([]LintMessage, string, error) {
+	var stderr bytes.Buffer
+
 	words, err := shellwords.Parse(Conf.Core.SCSSLint)
 	if err != nil {
 		LogError.Error("SCSSLint: " + err.Error())
-		return nil, err
+		return nil, stderr.String(), err
 	}
 	words = append(words, "--format=JSON", fileName)
 	cmd := exec.Command(words[0], words[1:]...)
 	cmd.Dir = cwd
+	cmd.Stderr = &stderr
 	out, err := cmd.Output()
 	if err != nil {
 		if _, ok := err.(*exec.ExitError); !ok {
-			return nil, err
+			return nil, stderr.String(), err
 		}
 	}
 
@@ -333,11 +345,11 @@ func SCSSLint(fileName, cwd string) ([]LintMessage, error) {
 	var results map[string][]SCSSLintResult
 	err = json.Unmarshal(out, &results)
 	if err != nil {
-		return nil, err
+		return nil, stderr.String(), err
 	}
 
 	if len(results) <= 0 {
-		return []LintMessage{}, nil
+		return []LintMessage{}, stderr.String(), nil
 	}
 
 	var messages []LintMessage
@@ -359,7 +371,7 @@ func SCSSLint(fileName, cwd string) ([]LintMessage, error) {
 		}
 		break
 	}
-	return messages, nil
+	return messages, stderr.String(), nil
 }
 
 // Goreturns formats the go code
