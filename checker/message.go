@@ -253,10 +253,9 @@ func HandleMessage(message string) error {
 	LogAccess.Infof("Start handling %s/pull/%s", repository, pull)
 
 	ref := GithubRef{
-		owner:    s[0],
-		repo:     s[1],
-		RepoName: repository,
-		Sha:      commitSha,
+		owner: s[0],
+		repo:  s[1],
+		Sha:   commitSha,
 	}
 	targetURL := ""
 	if len(Conf.Core.CheckLogURI) > 0 {
@@ -314,6 +313,16 @@ func HandleMessage(message string) error {
 		log.Close()
 	}()
 
+	exist, err := searchGithubPR(context.Background(), client, repository, commitSha)
+	if err != nil {
+		LogAccess.Errorf("searchGithubPR error: %v", err)
+		return err
+	}
+	if exist == 0 {
+		log.WriteString(fmt.Sprintf("commit:%s no longer exists.\n", commitSha))
+		return nil
+	}
+
 	log.WriteString("unified-ci " + GetVersion() + "\n\n")
 	log.WriteString(fmt.Sprintf("Start fetching %s/pull/%s\n", repository, pull))
 
@@ -354,21 +363,12 @@ func HandleMessage(message string) error {
 		return err
 	}
 
-	/* log.WriteString("$ git remote add " + gpull.Head.User.Login + " " + gpull.Head.Repo.CLONEURL+ "\n")
-	cmd = exec.Command("git", "remote", "add", gpull.Head.User.Login, gpull.Head.Repo.HTTPSURL)
-	cmd.Dir = repoPath
-	err = cmd.Run()
-	if err != nil {
-		LogAccess.Debugf("git remote add %s", err.Error())
-		// return err
-	} */
-
 	installationToken, _, err := jwtClient.Apps.CreateInstallationToken(context.Background(), int64(installationID))
 	if err != nil {
 		return err
 	}
 
-	originURL, err := url.Parse(gpull.GetHead().GetRepo().GetCloneURL()) // e.g. https://github.com/octocat/Hello-World.git
+	originURL, err := url.Parse(gpull.GetBase().GetRepo().GetCloneURL()) // e.g. https://github.com/octocat/Hello-World.git
 	if err != nil {
 		return err
 	}
@@ -376,9 +376,9 @@ func HandleMessage(message string) error {
 	fetchURL := originURL.String()
 
 	// git fetch -f https://x-access-token:token@github.com/octocat/Hello-World.git new-topic:pull-XX
-	branch := fmt.Sprintf("pull-%s", pull)
-	log.WriteString("$ git fetch -f " + gpull.GetHead().GetRepo().GetCloneURL() + fmt.Sprintf("%s:%s\n", gpull.GetHead().GetRef(), branch))
-	cmd = exec.Command("git", "fetch", "-f", fetchURL, fmt.Sprintf("%s:%s", gpull.GetHead().GetRef(), branch))
+	branch := fmt.Sprintf("pull-%d", prNum)
+	log.WriteString("$ git fetch -f " + gpull.GetBase().GetRepo().GetCloneURL() + fmt.Sprintf(" pull/%d/head:%s\n", prNum, branch))
+	cmd = exec.Command("git", "fetch", "-f", fetchURL, fmt.Sprintf("pull/%d/head:%s", prNum, branch))
 	cmd.Dir = repoPath
 	cmd.Stdout = log
 	cmd.Stderr = log
