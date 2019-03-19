@@ -354,15 +354,6 @@ func HandleMessage(message string) error {
 		return err
 	}
 
-	/* log.WriteString("$ git remote add " + gpull.Head.User.Login + " " + gpull.Head.Repo.CLONEURL+ "\n")
-	cmd = exec.Command("git", "remote", "add", gpull.Head.User.Login, gpull.Head.Repo.HTTPSURL)
-	cmd.Dir = repoPath
-	err = cmd.Run()
-	if err != nil {
-		LogAccess.Debugf("git remote add %s", err.Error())
-		// return err
-	} */
-
 	installationToken, _, err := jwtClient.Apps.CreateInstallationToken(context.Background(), int64(installationID))
 	if err != nil {
 		return err
