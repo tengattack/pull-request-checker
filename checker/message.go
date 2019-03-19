@@ -253,10 +253,9 @@ func HandleMessage(message string) error {
 	LogAccess.Infof("Start handling %s/pull/%s", repository, pull)
 
 	ref := GithubRef{
-		owner:    s[0],
-		repo:     s[1],
-		RepoName: repository,
-		Sha:      commitSha,
+		owner: s[0],
+		repo:  s[1],
+		Sha:   commitSha,
 	}
 	targetURL := ""
 	if len(Conf.Core.CheckLogURI) > 0 {

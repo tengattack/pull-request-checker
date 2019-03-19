@@ -34,9 +34,8 @@ type GithubPull struct {
 }
 
 type GithubRef struct {
-	RepoName string `json:"-"`
-	owner    string
-	repo     string
+	owner string
+	repo  string
 
 	Repo struct {
 		Name     string     `json:"name"`
@@ -196,8 +195,7 @@ func webhookHandler(c *gin.Context) {
 			owner: payload.Repository.Owner.Login,
 			repo:  payload.Repository.Name,
 
-			RepoName: payload.Repository.FullName,
-			Sha:      payload.PullRequest.Head.Sha,
+			Sha: payload.PullRequest.Head.Sha,
 		}
 		err = MQ.Push(message)
 		if err != nil {
@@ -259,8 +257,7 @@ func webhookHandler(c *gin.Context) {
 			owner: payload.Repository.Owner.Login,
 			repo:  payload.Repository.Name,
 
-			RepoName: payload.Repository.FullName,
-			Sha:      *payload.CheckRun.HeadSHA,
+			Sha: *payload.CheckRun.HeadSHA,
 		}
 		err = MQ.Push(message)
 		if err != nil {
@@ -338,7 +335,6 @@ func WatchLocalRepo() error {
 				}
 				for _, subfile := range subfiles {
 					if subfile.IsDir() {
-						repository := file.Name() + "/" + subfile.Name()
 						pulls, err := GetGithubPulls(client, file.Name(), subfile.Name())
 						if err != nil {
 							LogError.Errorf("WatchLocalRepo:GetGithubPulls: %v", err)
@@ -349,8 +345,7 @@ func WatchLocalRepo() error {
 								owner: file.Name(),
 								repo:  subfile.Name(),
 
-								RepoName: repository,
-								Sha:      pull.GetHead().GetSHA(),
+								Sha: pull.GetHead().GetSHA(),
 							}
 							exists, err := HasLintStatuses(client, &ref)
 							if err != nil {
@@ -366,7 +361,7 @@ func WatchLocalRepo() error {
 							}
 							if !exists {
 								// no statuses, need check
-								message := fmt.Sprintf("%s/pull/%d/commits/%s", ref.RepoName, pull.GetNumber(), ref.Sha)
+								message := fmt.Sprintf("%s/%s/pull/%d/commits/%s", ref.owner, ref.repo, pull.GetNumber(), ref.Sha)
 								LogAccess.WithField("entry", "local").Info("Push message: " + message)
 								err = MQ.Push(message)
 								if err == nil {
@@ -391,7 +386,7 @@ func WatchLocalRepo() error {
 func markAsPending(client *github.Client, ref GithubRef) {
 	targetURL := ""
 	if len(Conf.Core.CheckLogURI) > 0 {
-		targetURL = Conf.Core.CheckLogURI + ref.RepoName + "/" + ref.Sha + ".log"
+		targetURL = Conf.Core.CheckLogURI + ref.owner + "/" + ref.repo + "/" + ref.Sha + ".log"
 	}
 	err := ref.UpdateState(client, "lint", "pending", targetURL,
 		"check queueing")
