@@ -207,6 +207,8 @@ func webhookHandler(c *gin.Context) {
 			client, err := getDefaultAPIClient(payload.Repository.Owner.Login)
 			if err != nil {
 				LogAccess.Errorf("getDefaultAPIClient returns error: %v", err)
+				abortWithError(c, 500, "getDefaultAPIClient returns error")
+				return
 			}
 			markAsPending(client, ref)
 			c.JSON(http.StatusOK, gin.H{
