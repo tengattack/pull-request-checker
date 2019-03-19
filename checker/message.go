@@ -141,22 +141,42 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 		lints, lintErr = Golint(filepath.Join(repoPath, fileName), repoPath)
 	} else if lintEnabled.PHP && strings.HasSuffix(fileName, ".php") {
 		log.WriteString(fmt.Sprintf("PHPLint '%s'\n", fileName))
-		lints, lintErr = PHPLint(filepath.Join(repoPath, fileName), repoPath)
+		var errlog string
+		lints, errlog, lintErr = PHPLint(filepath.Join(repoPath, fileName), repoPath)
+		if errlog != "" {
+			log.WriteString(errlog + "\n")
+		}
 	} else if lintEnabled.TypeScript && (strings.HasSuffix(fileName, ".ts") ||
 		strings.HasSuffix(fileName, ".tsx")) {
 		log.WriteString(fmt.Sprintf("TSLint '%s'\n", fileName))
-		lints, lintErr = TSLint(filepath.Join(repoPath, fileName), repoPath)
+		var errlog string
+		lints, errlog, lintErr = TSLint(filepath.Join(repoPath, fileName), repoPath)
+		if errlog != "" {
+			log.WriteString(errlog + "\n")
+		}
 	} else if lintEnabled.SCSS && (strings.HasSuffix(fileName, ".scss") ||
 		strings.HasSuffix(fileName, ".css")) {
 		log.WriteString(fmt.Sprintf("SCSSLint '%s'\n", fileName))
-		lints, lintErr = SCSSLint(filepath.Join(repoPath, fileName), repoPath)
+		var errlog string
+		lints, errlog, lintErr = SCSSLint(filepath.Join(repoPath, fileName), repoPath)
+		if errlog != "" {
+			log.WriteString(errlog + "\n")
+		}
 	} else if lintEnabled.JS != "" && strings.HasSuffix(fileName, ".js") {
 		log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
-		lints, lintErr = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
+		var errlog string
+		lints, errlog, lintErr = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
+		if errlog != "" {
+			log.WriteString(errlog + "\n")
+		}
 	} else if lintEnabled.ES != "" && (strings.HasSuffix(fileName, ".es") ||
 		strings.HasSuffix(fileName, ".esx") || strings.HasSuffix(fileName, ".jsx")) {
 		log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
-		lints, lintErr = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.ES)
+		var errlog string
+		lints, errlog, lintErr = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.ES)
+		if errlog != "" {
+			log.WriteString(errlog + "\n")
+		}
 	}
 	if lintErr != nil {
 		return lintErr
@@ -165,7 +185,10 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 		strings.HasSuffix(fileName, ".php")) {
 		// ESLint for HTML & PHP files (ES5)
 		log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
-		lints2, err := ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
+		lints2, errlog, err := ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
+		if errlog != "" {
+			log.WriteString(errlog + "\n")
+		}
 		if err != nil {
 			return err
 		}
