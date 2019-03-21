@@ -240,9 +240,13 @@ func webhookHandler(c *gin.Context) {
 			prNum = *payload.CheckRun.PullRequests[0].Number
 		} else {
 			prNum, err = searchGithubPR(context.Background(), client, payload.Repository.FullName, *payload.CheckRun.HeadSHA)
-			if err != nil || prNum == 0 {
+			if err != nil {
 				LogAccess.Errorf("searchGithubPR error: %v", err)
 				abortWithError(c, 404, "Could not get the PR number")
+				return
+			}
+			if prNum == 0 {
+				LogAccess.Infof("%s no longer exists. No need to review.", *payload.CheckRun.HeadSHA)
 				return
 			}
 		}
