@@ -142,7 +142,7 @@ func CreateCheckRun(ctx context.Context, client *github.Client, gpull *github.Pu
 func getTests(cwd string) (map[string][]string, error) {
 	content, err := ioutil.ReadFile(filepath.Join(cwd, projectTestsConfigFile))
 	if err != nil {
-		if err == os.ErrNotExist {
+		if os.IsNotExist(err) {
 			return nil, nil
 		}
 		return nil, err
