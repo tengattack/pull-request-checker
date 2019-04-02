@@ -10,6 +10,14 @@ import (
 	"github.com/mattn/go-shellwords"
 )
 
+var tester *shellwords.Parser
+
+func init() {
+	tester = shellwords.NewParser()
+	tester.ParseEnv = true
+	tester.ParseBacktick = true
+}
+
 type testResultProblemFound struct {
 	TestTitle string
 }
@@ -22,7 +30,7 @@ func (t *testResultProblemFound) Error() (s string) {
 }
 
 func carry(ctx context.Context, repo, cmd string) (string, error) {
-	words, err := shellwords.Parse(cmd)
+	words, err := tester.Parse(cmd)
 	if err != nil {
 		return "", err
 	}
