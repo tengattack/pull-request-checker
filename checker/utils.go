@@ -138,10 +138,10 @@ func CreateCheckRun(ctx context.Context, client *github.Client, gpull *github.Pu
 	return checkRun, err
 }
 
-func getTests(cwd string) []string {
+func getTests(cwd string) map[string][]string {
 	content, _ := ioutil.ReadFile(filepath.Join(cwd, projectTestsConfigFile))
 	var config struct {
-		Tests []string `yaml:"tests"`
+		Tests map[string][]string `yaml:"tests"`
 	}
 	yaml.Unmarshal(content, &config)
 	return config.Tests

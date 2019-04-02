@@ -525,21 +525,21 @@ func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpu
 	}()
 
 	var wg sync.WaitGroup
-	for _, k := range tests {
-		if cmds, ok := Conf.Tests[k]; ok {
-			pendingTests <- 0
-			wg.Add(1)
-			go func() {
-				defer func() {
-					if info := recover(); info != nil {
-						errReports <- &panicError{Info: info}
-					}
-					wg.Done()
-					<-pendingTests
-				}()
-				errReports <- ReportTestResults(repoPath, cmds, client, gpull, k+" test", ref, targetURL)
+	for k, v := range tests {
+		itemName := k
+		cmds := v
+		pendingTests <- 0
+		wg.Add(1)
+		go func() {
+			defer func() {
+				if info := recover(); info != nil {
+					errReports <- &panicError{Info: info}
+				}
+				wg.Done()
+				<-pendingTests
 			}()
-		}
+			errReports <- ReportTestResults(repoPath, cmds, client, gpull, itemName+" test", ref, targetURL)
+		}()
 	}
 	wg.Wait()
 	defer close(errReports)

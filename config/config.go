@@ -15,7 +15,6 @@ type Config struct {
 	Log          SectionLog          `yaml:"log"`
 	MessageQueue SectionMessageQueue `yaml:"mq"`
 	Concurrency  SectionConcurrency  `yaml:"concurrency"`
-	Tests        map[string][]string `yaml:"tests"`
 }
 
 // SectionCore is a sub section of config.

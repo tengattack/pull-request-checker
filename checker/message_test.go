@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"reflect"
 	"runtime"
 	"testing"
 
@@ -99,5 +100,5 @@ func TestGetTests(t *testing.T) {
 	require.True(ok)
 
 	tests := getTests(path.Join(path.Dir(file), "../"))
-	assert.ElementsMatch(tests, []string{"go"})
+	assert.True(reflect.DeepEqual(tests, map[string][]string{"go": []string{"go test ./..."}}))
 }
