@@ -6,14 +6,18 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strconv"
-	"strings"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/github"
 	"github.com/pkg/errors"
-	"sourcegraph.com/sourcegraph/go-diff/diff"
+	yaml "gopkg.in/yaml.v2"
+)
+
+const (
+	projectTestsConfigFile = ".unified-ci.yml"
 )
 
 type panicError struct {
@@ -135,23 +139,19 @@ func CreateCheckRun(ctx context.Context, client *github.Client, gpull *github.Pu
 	return checkRun, err
 }
 
-func getTests(diffs []*diff.FileDiff) map[string]bool {
-	result := make(map[string]bool)
-	for _, d := range diffs {
-		newName, err := strconv.Unquote(d.NewName)
-		if err != nil {
-			newName = d.NewName
+func getTests(cwd string) (map[string][]string, error) {
+	content, err := ioutil.ReadFile(filepath.Join(cwd, projectTestsConfigFile))
+	if err != nil {
+		if err == os.ErrNotExist {
+			return nil, nil
 		}
-		if strings.HasPrefix(newName, "b/") {
-			fileName := newName[2:]
-			if strings.HasSuffix(fileName, ".go") {
-				result["go"] = true
-			} else if strings.HasSuffix(fileName, ".php") {
-				result["php"] = true
-			}
-		}
+		return nil, err
 	}
-	return result
+	var config struct {
+		Tests map[string][]string `yaml:"tests"`
+	}
+	err = yaml.Unmarshal(content, &config)
+	return config.Tests, err
 }
 
 func searchGithubPR(ctx context.Context, client *github.Client, repo, sha string) (int, error) {
