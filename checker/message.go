@@ -450,7 +450,10 @@ func HandleMessage(message string) error {
 		return err
 	}
 
-	failedTests := runTest(repoPath, diffs, client, gpull, ref, targetURL, log)
+	failedTests, err := runTest(repoPath, diffs, client, gpull, ref, targetURL, log)
+	if err != nil {
+		return err
+	}
 
 	mark := '✔'
 	sumCount := problems + failedTests
@@ -505,14 +508,17 @@ func HandleMessage(message string) error {
 	return err
 }
 
-func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string, log *os.File) (failedTests int) {
+func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string, log *os.File) (failedTests int, err error) {
 	maxPendingTests := Conf.Concurrency.Test
 	if maxPendingTests < 1 {
 		maxPendingTests = 1
 	}
 	pendingTests := make(chan int, maxPendingTests)
 	errReports := make(chan error, maxPendingTests)
-	tests := getTests(repoPath)
+	tests, err := getTests(repoPath)
+	if err != nil {
+		return 0, err
+	}
 
 	go func() {
 		for errReport := range errReports {

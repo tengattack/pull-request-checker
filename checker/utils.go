@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -138,13 +139,19 @@ func CreateCheckRun(ctx context.Context, client *github.Client, gpull *github.Pu
 	return checkRun, err
 }
 
-func getTests(cwd string) map[string][]string {
-	content, _ := ioutil.ReadFile(filepath.Join(cwd, projectTestsConfigFile))
+func getTests(cwd string) (map[string][]string, error) {
+	content, err := ioutil.ReadFile(filepath.Join(cwd, projectTestsConfigFile))
+	if err != nil {
+		if err == os.ErrNotExist {
+			return nil, nil
+		}
+		return nil, err
+	}
 	var config struct {
 		Tests map[string][]string `yaml:"tests"`
 	}
-	yaml.Unmarshal(content, &config)
-	return config.Tests
+	err = yaml.Unmarshal(content, &config)
+	return config.Tests, err
 }
 
 func searchGithubPR(ctx context.Context, client *github.Client, repo, sha string) (int, error) {

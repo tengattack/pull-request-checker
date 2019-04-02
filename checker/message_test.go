@@ -99,6 +99,7 @@ func TestGetTests(t *testing.T) {
 	_, file, _, ok := runtime.Caller(0)
 	require.True(ok)
 
-	tests := getTests(path.Join(path.Dir(file), "../"))
+	tests, err := getTests(path.Join(path.Dir(file), "../"))
+	require.NoError(err)
 	assert.True(reflect.DeepEqual(tests, map[string][]string{"go": []string{"go test ./..."}}))
 }
