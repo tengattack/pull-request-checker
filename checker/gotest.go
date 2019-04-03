@@ -7,16 +7,8 @@ import (
 	"time"
 
 	"github.com/google/go-github/github"
-	"github.com/mattn/go-shellwords"
+	shellwords "github.com/tengattack/go-shellwords"
 )
-
-var tester *shellwords.Parser
-
-func init() {
-	tester = shellwords.NewParser()
-	tester.ParseEnv = true
-	tester.ParseBacktick = true
-}
 
 type testResultProblemFound struct {
 	TestTitle string
@@ -29,8 +21,8 @@ func (t *testResultProblemFound) Error() (s string) {
 	return
 }
 
-func carry(ctx context.Context, repo, cmd string) (string, error) {
-	words, err := tester.Parse(cmd)
+func carry(ctx context.Context, p *shellwords.Parser, repo, cmd string) (string, error) {
+	words, err := p.Parse(cmd)
 	if err != nil {
 		return "", err
 	}
@@ -58,6 +50,11 @@ func ReportTestResults(repo string, cmds []string, client *github.Client, gpull 
 	}
 	checkRunID := checkRun.GetID()
 
+	parser := shellwords.NewParser()
+	parser.ParseEnv = true
+	parser.ParseBacktick = true
+	parser.Dir = repo
+
 	var (
 		conclusion    string
 		outputSummary string
@@ -65,7 +62,7 @@ func ReportTestResults(repo string, cmds []string, client *github.Client, gpull 
 	conclusion = "success"
 	for _, cmd := range cmds {
 		if cmd != "" {
-			out, err := carry(ctx, repo, cmd)
+			out, err := carry(ctx, parser, repo, cmd)
 			outputSummary += ("\n" + out)
 			if err != nil {
 				conclusion = "failure"
