@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/go-github/github"
-	"github.com/mattn/go-shellwords"
+	shellwords "github.com/mattn/go-shellwords"
 )
 
 var tester *shellwords.Parser
