@@ -400,7 +400,8 @@ func HandleMessage(message string) error {
 
 	// git fetch -f https://x-access-token:token@github.com/octocat/Hello-World.git new-topic:pull-XX
 	branch := fmt.Sprintf("pull-%d", prNum)
-	// -u option can be used when fetching into current branch: https://stackoverflow.com/a/32561463/4213218
+	// -u option can be used to bypass the restriction which prevents git to fetch into current branch:
+	// link: https://stackoverflow.com/a/32561463/4213218
 	log.WriteString("$ git fetch -f -u" + gpull.GetBase().GetRepo().GetCloneURL() + fmt.Sprintf(" pull/%d/head:%s\n", prNum, branch))
 	cmd = exec.Command("git", "fetch", "-f", "-u", fetchURL, fmt.Sprintf("pull/%d/head:%s", prNum, branch))
 	cmd.Dir = repoPath
