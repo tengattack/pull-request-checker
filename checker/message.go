@@ -400,8 +400,8 @@ func HandleMessage(message string) error {
 
 	// git fetch -f https://x-access-token:token@github.com/octocat/Hello-World.git new-topic:pull-XX
 	branch := fmt.Sprintf("pull-%d", prNum)
-	log.WriteString("$ git fetch -f " + gpull.GetBase().GetRepo().GetCloneURL() + fmt.Sprintf(" pull/%d/head:%s\n", prNum, branch))
-	cmd = exec.Command("git", "fetch", "-f", fetchURL, fmt.Sprintf("pull/%d/head:%s", prNum, branch))
+	log.WriteString("$ git fetch -f -u" + gpull.GetBase().GetRepo().GetCloneURL() + fmt.Sprintf(" pull/%d/head:%s\n", prNum, branch))
+	cmd = exec.Command("git", "fetch", "-f", "-u", fetchURL, fmt.Sprintf("pull/%d/head:%s", prNum, branch))
 	cmd.Dir = repoPath
 	cmd.Stdout = log
 	cmd.Stderr = log
