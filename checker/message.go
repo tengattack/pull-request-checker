@@ -452,10 +452,7 @@ func HandleMessage(message string) error {
 		return err
 	}
 
-	failedTests, err := runTest(repoPath, diffs, client, gpull, ref, targetURL, log)
-	if err != nil {
-		return err
-	}
+	failedTests := runTest(repoPath, client, gpull, ref, targetURL, log)
 
 	mark := '✔'
 	sumCount := problems + failedTests
@@ -468,13 +465,13 @@ func HandleMessage(message string) error {
 
 	var outputSummary string
 	if sumCount > 0 {
-		comment := fmt.Sprintf("**check**: %d problem(s) found.", sumCount)
+		comment := fmt.Sprintf("**check**: %d problem(s) found: %d failed test(s).", sumCount, failedTests)
 		err = ref.CreateReview(client, prNum, "REQUEST_CHANGES", comment, nil)
 		if err != nil {
 			log.WriteString("error: " + err.Error() + "\n")
 			LogError.Errorf("create review failed: %v", err)
 		}
-		outputSummary = fmt.Sprintf("The check failed! %d problem(s) found.", sumCount)
+		outputSummary = fmt.Sprintf("The check failed! %d problem(s) found: %d failed test(s).", sumCount, failedTests)
 		err = ref.UpdateState(client, "lint", "error", targetURL, outputSummary)
 	} else {
 		err = ref.CreateReview(client, prNum, "APPROVE", "**check**: no problems found.", nil)
@@ -510,7 +507,7 @@ func HandleMessage(message string) error {
 	return err
 }
 
-func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string, log *os.File) (failedTests int, err error) {
+func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string, log *os.File) (failedTests int) {
 	maxPendingTests := Conf.Concurrency.Test
 	if maxPendingTests < 1 {
 		maxPendingTests = 1
@@ -519,22 +516,34 @@ func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpu
 	errReports := make(chan error, maxPendingTests)
 	tests, err := getTests(repoPath)
 	if err != nil {
-		return 0, err
+		// Can not get tests from config: report action_required instead.
+		outputTitle := "Get tests"
+		checkRun, err := CreateCheckRun(context.TODO(), client, gpull, outputTitle, ref, targetURL)
+		if err != nil {
+			msg := fmt.Sprintf("github create '%s' failed: %v\n", outputTitle, err)
+			LogError.Error(msg)
+			log.WriteString(msg)
+			return
+		}
+		UpdateCheckRunWithError(context.TODO(), client, gpull, checkRun.GetID(), outputTitle, outputTitle, err)
+		return
 	}
 
+	done := make(chan struct{})
 	go func() {
 		for errReport := range errReports {
 			if errReport != nil {
-				if _, ok := errReport.(*testResultProblemFound); ok {
+				if _, ok := errReport.(*testNotPass); ok {
 					failedTests++
 				}
 			}
 		}
+		close(done)
 	}()
 
 	var wg sync.WaitGroup
 	for k, v := range tests {
-		itemName := k
+		testName := k
 		cmds := v
 		pendingTests <- 0
 		wg.Add(1)
@@ -546,10 +555,12 @@ func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpu
 				wg.Done()
 				<-pendingTests
 			}()
-			errReports <- ReportTestResults(repoPath, cmds, client, gpull, itemName+" test", ref, targetURL)
+			errReports <- ReportTestResults(repoPath, cmds, client, gpull, testName+" test", ref, targetURL)
 		}()
 	}
 	wg.Wait()
-	defer close(errReports)
+
+	close(errReports)
+	<-done
 	return
 }
