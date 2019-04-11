@@ -465,15 +465,15 @@ func HandleMessage(message string) error {
 
 	var outputSummary string
 	if sumCount > 0 {
-		comment := fmt.Sprintf("**Lint**: %d problem(s) found.\n", failedLints)
-		comment += fmt.Sprintf("**Test**: %d problem(s) found.\n", failedTests)
+		comment := fmt.Sprintf("**lint**: %d problem(s) found.\n", failedLints)
+		comment += fmt.Sprintf("**test**: %d problem(s) found.\n", failedTests)
 		err = ref.CreateReview(client, prNum, "REQUEST_CHANGES", comment, nil)
 		if err != nil {
 			log.WriteString("error: " + err.Error() + "\n")
 			LogError.Errorf("create review failed: %v", err)
 		}
-		outputSummary = fmt.Sprintf("Lint checks failed! %d problem(s) found.\n", failedLints)
-		outputSummary += fmt.Sprintf("Test checks failed! %d problem(s) found.\n", failedTests)
+		outputSummary = fmt.Sprintf("lint checks failed! %d problem(s) found.\n", failedLints)
+		outputSummary += fmt.Sprintf("test checks failed! %d problem(s) found.\n", failedTests)
 		err = ref.UpdateState(client, "lint", "error", targetURL, outputSummary)
 	} else {
 		err = ref.CreateReview(client, prNum, "APPROVE", "**check**: no problems found.", nil)
@@ -533,6 +533,8 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 
 	done := make(chan struct{})
 	go func() {
+		// This goroutine is the only reader of the errReports channel.
+		// It is ready to quit when the errReports channel is closed.
 		for errReport := range errReports {
 			if errReport != nil {
 				if _, ok := errReport.(*testNotPass); ok {
@@ -547,9 +549,11 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 	for k, v := range tests {
 		testName := k
 		cmds := v
+
 		pendingTests <- 0
 		wg.Add(1)
 		go func() {
+			// This goroutine is a writer of the errReports channel
 			defer func() {
 				if info := recover(); info != nil {
 					errReports <- &panicError{Info: info}
@@ -560,9 +564,11 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 			errReports <- ReportTestResults(repoPath, cmds, client, gpull, testName+" test", ref, targetURL)
 		}()
 	}
+	// We must wait for all writers to quit before we close the errReports channel. Otherwise it will panic.
 	wg.Wait()
-
+	// Tell the reader that it may quit
 	close(errReports)
+	// Wait for the reader to quit
 	<-done
 	return
 }
