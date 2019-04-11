@@ -447,7 +447,7 @@ func HandleMessage(message string) error {
 
 	lintEnabled := LintEnabled{}
 	lintEnabled.Init(repoPath)
-	annotations, problems, err := GenerateAnnotations(repoPath, diffs, lintEnabled, log)
+	annotations, failedLints, err := GenerateAnnotations(repoPath, diffs, lintEnabled, log)
 	if err != nil {
 		return err
 	}
@@ -455,7 +455,7 @@ func HandleMessage(message string) error {
 	failedTests := runTest(repoPath, client, gpull, ref, targetURL, log)
 
 	mark := '✔'
-	sumCount := problems + failedTests
+	sumCount := failedLints + failedTests
 	if sumCount > 0 {
 		mark = '✖'
 	}
@@ -465,13 +465,15 @@ func HandleMessage(message string) error {
 
 	var outputSummary string
 	if sumCount > 0 {
-		comment := fmt.Sprintf("**check**: %d problem(s) found: %d failed test(s).", sumCount, failedTests)
+		comment := fmt.Sprintf("**Lint**: %d problem(s) found.\n", failedLints)
+		comment += fmt.Sprintf("**Test**: %d problem(s) found.\n", failedTests)
 		err = ref.CreateReview(client, prNum, "REQUEST_CHANGES", comment, nil)
 		if err != nil {
 			log.WriteString("error: " + err.Error() + "\n")
 			LogError.Errorf("create review failed: %v", err)
 		}
-		outputSummary = fmt.Sprintf("The check failed! %d problem(s) found: %d failed test(s).", sumCount, failedTests)
+		outputSummary = fmt.Sprintf("Lint checks failed! %d problem(s) found.\n", failedLints)
+		outputSummary += fmt.Sprintf("Test checks failed! %d problem(s) found.\n", failedTests)
 		err = ref.UpdateState(client, "lint", "error", targetURL, outputSummary)
 	} else {
 		err = ref.CreateReview(client, prNum, "APPROVE", "**check**: no problems found.", nil)
@@ -495,9 +497,9 @@ func HandleMessage(message string) error {
 			LogAccess.Warn("Too many annotations to push them all at once. Only 50 annotations will be pushed right now.")
 		}
 		var conclusion string
-		if problems > 0 {
+		if failedLints > 0 {
 			conclusion = "failure"
-			outputSummary = fmt.Sprintf("The lint check failed! %d problem(s) found.", problems)
+			outputSummary = fmt.Sprintf("The lint check failed! %d problem(s) found.", failedLints)
 		} else {
 			conclusion = "success"
 			outputSummary = "The lint check succeed!"

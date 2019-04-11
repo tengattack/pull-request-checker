@@ -11,12 +11,12 @@ import (
 )
 
 type testNotPass struct {
-	TestTitle string
+	Title string
 }
 
 func (t *testNotPass) Error() (s string) {
 	if t != nil {
-		return t.TestTitle
+		return t.Title
 	}
 	return
 }
@@ -76,7 +76,7 @@ func ReportTestResults(repo string, cmds []string, client *github.Client, gpull 
 		return err
 	}
 	if conclusion == "failure" {
-		err = &testNotPass{TestTitle: outputTitle}
+		err = &testNotPass{Title: outputTitle}
 		return err
 	}
 	return nil
