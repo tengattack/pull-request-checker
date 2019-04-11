@@ -10,13 +10,13 @@ import (
 	shellwords "github.com/tengattack/go-shellwords"
 )
 
-type testResultProblemFound struct {
-	TestTitle string
+type testNotPass struct {
+	Title string
 }
 
-func (t *testResultProblemFound) Error() (s string) {
+func (t *testNotPass) Error() (s string) {
 	if t != nil {
-		return t.TestTitle
+		return t.Title
 	}
 	return
 }
@@ -76,7 +76,7 @@ func ReportTestResults(repo string, cmds []string, client *github.Client, gpull 
 		return err
 	}
 	if conclusion == "failure" {
-		err = &testResultProblemFound{TestTitle: outputTitle}
+		err = &testNotPass{Title: outputTitle}
 		return err
 	}
 	return nil

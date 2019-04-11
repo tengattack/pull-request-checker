@@ -447,18 +447,15 @@ func HandleMessage(message string) error {
 
 	lintEnabled := LintEnabled{}
 	lintEnabled.Init(repoPath)
-	annotations, problems, err := GenerateAnnotations(repoPath, diffs, lintEnabled, log)
+	annotations, failedLints, err := GenerateAnnotations(repoPath, diffs, lintEnabled, log)
 	if err != nil {
 		return err
 	}
 
-	failedTests, err := runTest(repoPath, diffs, client, gpull, ref, targetURL, log)
-	if err != nil {
-		return err
-	}
+	failedTests := runTest(repoPath, client, gpull, ref, targetURL, log)
 
 	mark := '✔'
-	sumCount := problems + failedTests
+	sumCount := failedLints + failedTests
 	if sumCount > 0 {
 		mark = '✖'
 	}
@@ -468,13 +465,15 @@ func HandleMessage(message string) error {
 
 	var outputSummary string
 	if sumCount > 0 {
-		comment := fmt.Sprintf("**check**: %d problem(s) found.", sumCount)
+		comment := fmt.Sprintf("**lint**: %d problem(s) found.\n", failedLints)
+		comment += fmt.Sprintf("**test**: %d problem(s) found.\n", failedTests)
 		err = ref.CreateReview(client, prNum, "REQUEST_CHANGES", comment, nil)
 		if err != nil {
 			log.WriteString("error: " + err.Error() + "\n")
 			LogError.Errorf("create review failed: %v", err)
 		}
-		outputSummary = fmt.Sprintf("The check failed! %d problem(s) found.", sumCount)
+		outputSummary = fmt.Sprintf("lint checks failed! %d problem(s) found.\n", failedLints)
+		outputSummary += fmt.Sprintf("test checks failed! %d problem(s) found.\n", failedTests)
 		err = ref.UpdateState(client, "lint", "error", targetURL, outputSummary)
 	} else {
 		err = ref.CreateReview(client, prNum, "APPROVE", "**check**: no problems found.", nil)
@@ -498,9 +497,9 @@ func HandleMessage(message string) error {
 			LogAccess.Warn("Too many annotations to push them all at once. Only 50 annotations will be pushed right now.")
 		}
 		var conclusion string
-		if problems > 0 {
+		if failedLints > 0 {
 			conclusion = "failure"
-			outputSummary = fmt.Sprintf("The lint check failed! %d problem(s) found.", problems)
+			outputSummary = fmt.Sprintf("The lint check failed! %d problem(s) found.", failedLints)
 		} else {
 			conclusion = "success"
 			outputSummary = "The lint check succeed!"
@@ -510,7 +509,7 @@ func HandleMessage(message string) error {
 	return err
 }
 
-func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string, log *os.File) (failedTests int, err error) {
+func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string, log *os.File) (failedTests int) {
 	maxPendingTests := Conf.Concurrency.Test
 	if maxPendingTests < 1 {
 		maxPendingTests = 1
@@ -519,26 +518,42 @@ func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpu
 	errReports := make(chan error, maxPendingTests)
 	tests, err := getTests(repoPath)
 	if err != nil {
-		return 0, err
+		// Can not get tests from config: report action_required instead.
+		outputTitle := "tests"
+		checkRun, err := CreateCheckRun(context.TODO(), client, gpull, outputTitle, ref, targetURL)
+		if err != nil {
+			msg := fmt.Sprintf("github create check run '%s' failed: %v\n", outputTitle, err)
+			LogError.Error(msg)
+			log.WriteString(msg)
+			return
+		}
+		UpdateCheckRunWithError(context.TODO(), client, gpull, checkRun.GetID(), outputTitle, outputTitle, err)
+		return
 	}
 
+	done := make(chan struct{})
 	go func() {
+		// This goroutine is the only reader of the errReports channel.
+		// It is ready to quit when the errReports channel is closed and drained.
 		for errReport := range errReports {
 			if errReport != nil {
-				if _, ok := errReport.(*testResultProblemFound); ok {
+				if _, ok := errReport.(*testNotPass); ok {
 					failedTests++
 				}
 			}
 		}
+		close(done)
 	}()
 
 	var wg sync.WaitGroup
 	for k, v := range tests {
-		itemName := k
+		testName := k
 		cmds := v
+
 		pendingTests <- 0
 		wg.Add(1)
 		go func() {
+			// This goroutine is a writer of the errReports channel
 			defer func() {
 				if info := recover(); info != nil {
 					errReports <- &panicError{Info: info}
@@ -546,10 +561,14 @@ func runTest(repoPath string, diffs []*diff.FileDiff, client *github.Client, gpu
 				wg.Done()
 				<-pendingTests
 			}()
-			errReports <- ReportTestResults(repoPath, cmds, client, gpull, itemName+" test", ref, targetURL)
+			errReports <- ReportTestResults(repoPath, cmds, client, gpull, testName+" test", ref, targetURL)
 		}()
 	}
+	// We must wait for all writers to quit before we close the errReports channel. Otherwise it will panic.
 	wg.Wait()
-	defer close(errReports)
+	// Tell the reader that it may quit
+	close(errReports)
+	// Wait for the reader to quit
+	<-done
 	return
 }
