@@ -369,7 +369,7 @@ func HandleMessage(message string) error {
 		checkRunID = checkRun.GetID()
 	}
 
-	err = ref.UpdateState(client, "lint", "pending", targetURL, "checking")
+	err = ref.UpdateState(client, AppName, "pending", targetURL, "checking")
 	if err != nil {
 		LogAccess.Error("Update pull request status error: " + err.Error())
 		return err
@@ -472,9 +472,8 @@ func HandleMessage(message string) error {
 			log.WriteString("error: " + err.Error() + "\n")
 			LogError.Errorf("create review failed: %v", err)
 		}
-		outputSummary = fmt.Sprintf("lint checks failed! %d problem(s) found.\n", failedLints)
-		outputSummary += fmt.Sprintf("test checks failed! %d problem(s) found.\n", failedTests)
-		err = ref.UpdateState(client, "lint", "error", targetURL, outputSummary)
+		outputSummary = fmt.Sprintf("The check failed! %d problem(s) found.", sumCount)
+		err = ref.UpdateState(client, AppName, "error", targetURL, outputSummary)
 	} else {
 		err = ref.CreateReview(client, prNum, "APPROVE", "**check**: no problems found.", nil)
 		if err != nil {
@@ -482,7 +481,7 @@ func HandleMessage(message string) error {
 			LogError.Errorf("create review failed: %v", err)
 		}
 		outputSummary = "The check succeed!"
-		err = ref.UpdateState(client, "lint", "success", targetURL, outputSummary)
+		err = ref.UpdateState(client, AppName, "success", targetURL, outputSummary)
 	}
 	if err == nil {
 		log.WriteString("done.")
