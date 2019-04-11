@@ -519,10 +519,10 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 	tests, err := getTests(repoPath)
 	if err != nil {
 		// Can not get tests from config: report action_required instead.
-		outputTitle := "Get tests"
+		outputTitle := "tests"
 		checkRun, err := CreateCheckRun(context.TODO(), client, gpull, outputTitle, ref, targetURL)
 		if err != nil {
-			msg := fmt.Sprintf("github create '%s' failed: %v\n", outputTitle, err)
+			msg := fmt.Sprintf("github create check run '%s' failed: %v\n", outputTitle, err)
 			LogError.Error(msg)
 			log.WriteString(msg)
 			return
@@ -534,7 +534,7 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 	done := make(chan struct{})
 	go func() {
 		// This goroutine is the only reader of the errReports channel.
-		// It is ready to quit when the errReports channel is closed.
+		// It is ready to quit when the errReports channel is closed and drained.
 		for errReport := range errReports {
 			if errReport != nil {
 				if _, ok := errReport.(*testNotPass); ok {
