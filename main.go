@@ -13,7 +13,6 @@ import (
 )
 
 func main() {
-	checker.SetVersion(checker.Version)
 
 	configPath := flag.String("config", "", "config file")
 	showHelp := flag.Bool("help", false, "show help message")
