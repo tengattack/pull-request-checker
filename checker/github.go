@@ -312,7 +312,7 @@ func HasLintStatuses(client *github.Client, ref *GithubRef) (bool, error) {
 	}
 	lint := 0
 	for _, s := range statuses {
-		if s.GetContext() == "lint" {
+		if s.GetContext() == AppName {
 			lint++
 		}
 	}
