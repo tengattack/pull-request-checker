@@ -312,7 +312,7 @@ func HasLintStatuses(client *github.Client, ref *GithubRef) (bool, error) {
 	}
 	lint := 0
 	for _, s := range statuses {
-		if s.GetContext() == "lint" {
+		if s.GetContext() == AppName {
 			lint++
 		}
 	}
@@ -392,7 +392,7 @@ func markAsPending(client *github.Client, ref GithubRef) {
 	if len(Conf.Core.CheckLogURI) > 0 {
 		targetURL = Conf.Core.CheckLogURI + ref.owner + "/" + ref.repo + "/" + ref.Sha + ".log"
 	}
-	err := ref.UpdateState(client, "lint", "pending", targetURL,
+	err := ref.UpdateState(client, AppName, "pending", targetURL,
 		"check queueing")
 	if err != nil {
 		LogAccess.Error("Update pull request status error: " + err.Error())

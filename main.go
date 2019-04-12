@@ -12,14 +12,13 @@ import (
 	"github.com/tengattack/unified-ci/config"
 )
 
-var (
+const (
 	// Version is the version of unified-ci
 	Version = "0.1.2"
 )
 
 func main() {
 	checker.SetVersion(Version)
-
 	configPath := flag.String("config", "", "config file")
 	showHelp := flag.Bool("help", false, "show help message")
 	showVerbose := flag.Bool("verbose", false, "show verbose debug log")
@@ -27,12 +26,12 @@ func main() {
 	flag.Parse()
 
 	if *showHelp {
-		fmt.Printf("unified-ci %s\n\n", Version)
+		fmt.Printf(checker.UserAgent() + "\n\n")
 		flag.Usage()
 		return
 	}
 	if *showVersion {
-		fmt.Printf("unified-ci %s\n", Version)
+		fmt.Printf(checker.UserAgent() + "\n\n")
 		return
 	}
 	if *configPath == "" {
