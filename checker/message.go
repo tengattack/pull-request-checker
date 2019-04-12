@@ -452,7 +452,11 @@ func HandleMessage(message string) error {
 		return err
 	}
 
-	failedTests := runTest(repoPath, client, gpull, ref, targetURL, log)
+	noTest := true
+	failedTests, passedTests, errTests := runTest(repoPath, client, gpull, ref, targetURL, log)
+	if failedTests+passedTests+errTests > 0 {
+		noTest = false
+	}
 
 	mark := '✔'
 	sumCount := failedLints + failedTests
@@ -466,7 +470,10 @@ func HandleMessage(message string) error {
 	var outputSummary string
 	if sumCount > 0 {
 		comment := fmt.Sprintf("**lint**: %d problem(s) found.\n", failedLints)
-		comment += fmt.Sprintf("**test**: %d problem(s) found.\n", failedTests)
+		if !noTest {
+			comment += fmt.Sprintf("**test**: %d problem(s) found.\n", failedTests)
+		}
+
 		err = ref.CreateReview(client, prNum, "REQUEST_CHANGES", comment, nil)
 		if err != nil {
 			log.WriteString("error: " + err.Error() + "\n")
@@ -508,7 +515,7 @@ func HandleMessage(message string) error {
 	return err
 }
 
-func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string, log *os.File) (failedTests int) {
+func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string, log *os.File) (failedTests, passedTests, errTests int) {
 	maxPendingTests := Conf.Concurrency.Test
 	if maxPendingTests < 1 {
 		maxPendingTests = 1
@@ -538,7 +545,11 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 			if errReport != nil {
 				if _, ok := errReport.(*testNotPass); ok {
 					failedTests++
+				} else {
+					errTests++
 				}
+			} else {
+				passedTests++
 			}
 		}
 		close(done)
