@@ -17,3 +17,13 @@ var (
 	// MQ is the message queue
 	MQ mq.MessageQueue
 )
+
+var userAgent string
+
+// UserAgent is the user agent for this checker
+func UserAgent() string {
+	if userAgent == "" {
+		userAgent = AppName + "/" + GetVersion()
+	}
+	return userAgent
+}

@@ -20,7 +20,7 @@ func versionHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"code": 0,
 		"info": gin.H{
-			"version": Version,
+			"version": GetVersion(),
 		},
 	})
 }

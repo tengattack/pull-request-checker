@@ -346,7 +346,7 @@ func HandleMessage(message string) error {
 		return nil
 	}
 
-	log.WriteString("unified-ci " + Version + "\n\n")
+	log.WriteString(UserAgent() + "\n\n")
 	log.WriteString(fmt.Sprintf("Start fetching %s/pull/%s\n", repository, pull))
 
 	gpull, err = GetGithubPull(client, ref.owner, ref.repo, prNum)

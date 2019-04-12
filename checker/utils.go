@@ -36,7 +36,7 @@ func InitHTTPRequest(req *http.Request, isJSONResponse bool) {
 	if isJSONResponse {
 		req.Header.Set("Accept", "application/json")
 	}
-	req.Header.Set("User-Agent", UserAgent)
+	req.Header.Set("User-Agent", UserAgent())
 }
 
 // DoHTTPRequest sends request and gets response to struct
