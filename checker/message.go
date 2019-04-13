@@ -558,7 +558,7 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 	var wg sync.WaitGroup
 	for k, v := range tests {
 		testName := k
-		cmds := v
+		tasks := v
 
 		pendingTests <- 0
 		wg.Add(1)
@@ -571,7 +571,7 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 				wg.Done()
 				<-pendingTests
 			}()
-			errReports <- ReportTestResults(repoPath, cmds, client, gpull, testName+" test", ref, targetURL)
+			errReports <- ReportTestResults(repoPath, tasks, client, gpull, testName+" test", ref, targetURL)
 		}()
 	}
 	// We must wait for all writers to quit before we close the errReports channel. Otherwise it will panic.

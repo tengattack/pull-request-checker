@@ -139,7 +139,9 @@ func CreateCheckRun(ctx context.Context, client *github.Client, gpull *github.Pu
 	return checkRun, err
 }
 
-func getTests(cwd string) (map[string][]string, error) {
+type testTask map[string]string
+
+func getTests(cwd string) (map[string][]testTask, error) {
 	content, err := ioutil.ReadFile(filepath.Join(cwd, projectTestsConfigFile))
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -148,7 +150,7 @@ func getTests(cwd string) (map[string][]string, error) {
 		return nil, err
 	}
 	var config struct {
-		Tests map[string][]string `yaml:"tests"`
+		Tests map[string][]testTask `yaml:"tests"`
 	}
 	err = yaml.Unmarshal(content, &config)
 	return config.Tests, err

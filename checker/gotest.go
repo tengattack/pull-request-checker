@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os/exec"
+	"regexp"
 	"time"
 
 	"github.com/google/go-github/github"
@@ -37,7 +38,7 @@ func carry(ctx context.Context, p *shellwords.Parser, repo, cmd string) (string,
 }
 
 // ReportTestResults reports the test results to github
-func ReportTestResults(repo string, cmds []string, client *github.Client, gpull *github.PullRequest, outputTitle string, ref GithubRef, targetURL string) error {
+func ReportTestResults(repo string, tasks []testTask, client *github.Client, gpull *github.PullRequest, outputTitle string, ref GithubRef, targetURL string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
@@ -60,13 +61,29 @@ func ReportTestResults(repo string, cmds []string, client *github.Client, gpull 
 		outputSummary string
 	)
 	conclusion = "success"
-	for _, cmd := range cmds {
-		if cmd != "" {
-			out, err := carry(ctx, parser, repo, cmd)
-			outputSummary += ("\n" + out)
-			if err != nil {
-				conclusion = "failure"
-				break
+	for _, task := range tasks {
+		if task != nil {
+			cmd, _ := task["cmd"]
+			if cmd != "" {
+				out, errCmd := carry(ctx, parser, repo, cmd)
+				coverage, _ := task["coverage"]
+				if coverage != "" {
+					cover := "unknown"
+					r, err := regexp.Compile(coverage)
+					if err == nil {
+						match := r.FindStringSubmatch(out)
+						if len(match) > 1 {
+							cover = match[1]
+						}
+					}
+					outputSummary += ("\n" + "Test coverage: " + cover)
+				} else {
+					outputSummary += ("\n" + out)
+				}
+				if errCmd != nil {
+					conclusion = "failure"
+					break
+				}
 			}
 		}
 	}

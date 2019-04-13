@@ -4,7 +4,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
-	"reflect"
 	"runtime"
 	"testing"
 
@@ -90,20 +89,4 @@ func TestGenerateComments(t *testing.T) {
 			}
 		})
 	}
-}
-
-func TestGetTests(t *testing.T) {
-	assert := assert.New(t)
-	require := require.New(t)
-
-	_, file, _, ok := runtime.Caller(0)
-	require.True(ok)
-
-	tests, err := getTests(path.Join(path.Dir(file), "../"))
-	require.NoError(err)
-	assert.True(reflect.DeepEqual(tests, map[string][]string{"go": []string{"go test ./..."}}))
-
-	tests, err = getTests(path.Dir(file))
-	require.NoError(err)
-	assert.Empty(tests)
 }
