@@ -471,7 +471,7 @@ func HandleMessage(message string) error {
 	if sumCount > 0 {
 		comment := fmt.Sprintf("**lint**: %d problem(s) found.\n", failedLints)
 		if !noTest {
-			comment += fmt.Sprintf("**test**: %d problem(s) found.\n", failedTests)
+			comment += fmt.Sprintf("**test**: %d problem(s) found.\n\n", failedTests)
 			comment += testMsg
 		}
 
@@ -483,7 +483,11 @@ func HandleMessage(message string) error {
 		outputSummary = fmt.Sprintf("The check failed! %d problem(s) found.", sumCount)
 		err = ref.UpdateState(client, AppName, "error", targetURL, outputSummary)
 	} else {
-		err = ref.CreateReview(client, prNum, "APPROVE", "**check**: no problems found.", nil)
+		comment := "**check**: no problems found.\n"
+		if !noTest {
+			comment += ("\n" + testMsg)
+		}
+		err = ref.CreateReview(client, prNum, "APPROVE", comment, nil)
 		if err != nil {
 			log.WriteString("error: " + err.Error() + "\n")
 			LogError.Errorf("create review failed: %v", err)
