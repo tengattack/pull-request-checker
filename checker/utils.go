@@ -139,7 +139,12 @@ func CreateCheckRun(ctx context.Context, client *github.Client, gpull *github.Pu
 	return checkRun, err
 }
 
-func getTests(cwd string) (map[string][]string, error) {
+type goTestsConfig struct {
+	Coverage string   `yaml:"coverage"`
+	Cmds     []string `yaml:"cmds"`
+}
+
+func getTests(cwd string) (map[string]goTestsConfig, error) {
 	content, err := ioutil.ReadFile(filepath.Join(cwd, projectTestsConfigFile))
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -148,10 +153,23 @@ func getTests(cwd string) (map[string][]string, error) {
 		return nil, err
 	}
 	var config struct {
-		Tests map[string][]string `yaml:"tests"`
+		Tests map[string]goTestsConfig `yaml:"tests"`
 	}
 	err = yaml.Unmarshal(content, &config)
-	return config.Tests, err
+	if err != nil {
+		var cfg struct {
+			Tests map[string][]string `yaml:"tests"`
+		}
+		err = yaml.Unmarshal(content, &cfg)
+		if err != nil {
+			return nil, err
+		}
+		config.Tests = make(map[string]goTestsConfig)
+		for k, v := range cfg.Tests {
+			config.Tests[k] = goTestsConfig{Cmds: v, Coverage: ""}
+		}
+	}
+	return config.Tests, nil
 }
 
 func searchGithubPR(ctx context.Context, client *github.Client, repo, sha string) (int, error) {

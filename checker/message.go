@@ -452,7 +452,11 @@ func HandleMessage(message string) error {
 		return err
 	}
 
-	failedTests := runTest(repoPath, client, gpull, ref, targetURL, log)
+	noTest := true
+	failedTests, passedTests, errTests, testMsg := runTest(repoPath, client, gpull, ref, targetURL, log)
+	if failedTests+passedTests+errTests > 0 {
+		noTest = false
+	}
 
 	mark := '✔'
 	sumCount := failedLints + failedTests
@@ -466,7 +470,11 @@ func HandleMessage(message string) error {
 	var outputSummary string
 	if sumCount > 0 {
 		comment := fmt.Sprintf("**lint**: %d problem(s) found.\n", failedLints)
-		comment += fmt.Sprintf("**test**: %d problem(s) found.\n", failedTests)
+		if !noTest {
+			comment += fmt.Sprintf("**test**: %d problem(s) found.\n\n", failedTests)
+			comment += testMsg
+		}
+
 		err = ref.CreateReview(client, prNum, "REQUEST_CHANGES", comment, nil)
 		if err != nil {
 			log.WriteString("error: " + err.Error() + "\n")
@@ -475,7 +483,11 @@ func HandleMessage(message string) error {
 		outputSummary = fmt.Sprintf("The check failed! %d problem(s) found.", sumCount)
 		err = ref.UpdateState(client, AppName, "error", targetURL, outputSummary)
 	} else {
-		err = ref.CreateReview(client, prNum, "APPROVE", "**check**: no problems found.", nil)
+		comment := "**check**: no problems found.\n"
+		if !noTest {
+			comment += ("\n" + testMsg)
+		}
+		err = ref.CreateReview(client, prNum, "APPROVE", comment, nil)
 		if err != nil {
 			log.WriteString("error: " + err.Error() + "\n")
 			LogError.Errorf("create review failed: %v", err)
@@ -508,7 +520,8 @@ func HandleMessage(message string) error {
 	return err
 }
 
-func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string, log *os.File) (failedTests int) {
+func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string,
+	log *os.File) (failedTests, passedTests, errTests int, testMsg string) {
 	maxPendingTests := Conf.Concurrency.Test
 	if maxPendingTests < 1 {
 		maxPendingTests = 1
@@ -538,16 +551,24 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 			if errReport != nil {
 				if _, ok := errReport.(*testNotPass); ok {
 					failedTests++
+				} else {
+					errTests++
 				}
+			} else {
+				passedTests++
 			}
 		}
 		close(done)
 	}()
 
 	var wg sync.WaitGroup
+	msgList := make([]string, len(tests))
+	counter := 0
 	for k, v := range tests {
+		i := counter
+		counter++
 		testName := k
-		cmds := v
+		testCfg := v
 
 		pendingTests <- 0
 		wg.Add(1)
@@ -560,14 +581,27 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 				wg.Done()
 				<-pendingTests
 			}()
-			errReports <- ReportTestResults(repoPath, cmds, client, gpull, testName+" test", ref, targetURL)
+			var err error
+			msgList[i], err = ReportTestResults(repoPath, testCfg.Cmds, testCfg.Coverage, client, gpull,
+				testName+" test", ref, targetURL)
+			errReports <- err
 		}()
 	}
+
 	// We must wait for all writers to quit before we close the errReports channel. Otherwise it will panic.
 	wg.Wait()
 	// Tell the reader that it may quit
 	close(errReports)
 	// Wait for the reader to quit
 	<-done
+
+	for i, v := range msgList {
+		if v != "" {
+			if i > 0 {
+				testMsg += "\n"
+			}
+			testMsg += v
+		}
+	}
 	return
 }
