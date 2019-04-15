@@ -453,7 +453,7 @@ func HandleMessage(message string) error {
 	}
 
 	noTest := true
-	failedTests, passedTests, errTests := runTest(repoPath, client, gpull, ref, targetURL, log)
+	failedTests, passedTests, errTests, testMsg := runTest(repoPath, client, gpull, ref, targetURL, log)
 	if failedTests+passedTests+errTests > 0 {
 		noTest = false
 	}
@@ -472,6 +472,7 @@ func HandleMessage(message string) error {
 		comment := fmt.Sprintf("**lint**: %d problem(s) found.\n", failedLints)
 		if !noTest {
 			comment += fmt.Sprintf("**test**: %d problem(s) found.\n", failedTests)
+			comment += testMsg
 		}
 
 		err = ref.CreateReview(client, prNum, "REQUEST_CHANGES", comment, nil)
@@ -515,7 +516,8 @@ func HandleMessage(message string) error {
 	return err
 }
 
-func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string, log *os.File) (failedTests, passedTests, errTests int) {
+func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string,
+	log *os.File) (failedTests, passedTests, errTests int, testMsg string) {
 	maxPendingTests := Conf.Concurrency.Test
 	if maxPendingTests < 1 {
 		maxPendingTests = 1
@@ -556,7 +558,11 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 	}()
 
 	var wg sync.WaitGroup
+	msgList := make([]string, len(tests))
+	counter := 0
 	for k, v := range tests {
+		i := counter
+		counter++
 		testName := k
 		testCfg := v
 
@@ -571,8 +577,10 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 				wg.Done()
 				<-pendingTests
 			}()
-			errReports <- ReportTestResults(repoPath, testCfg.Cmds, testCfg.Coverage, client, gpull,
+			var err error
+			msgList[i], err = ReportTestResults(repoPath, testCfg.Cmds, testCfg.Coverage, client, gpull,
 				testName+" test", ref, targetURL)
+			errReports <- err
 		}()
 	}
 
@@ -582,5 +590,12 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 	close(errReports)
 	// Wait for the reader to quit
 	<-done
+
+	for i, v := range msgList {
+		if i > 0 {
+			testMsg += "\n"
+		}
+		testMsg += v
+	}
 	return
 }

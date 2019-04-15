@@ -38,7 +38,8 @@ func carry(ctx context.Context, p *shellwords.Parser, repo, cmd string) (string,
 }
 
 // ReportTestResults reports the test results to github
-func ReportTestResults(repo string, cmds []string, coveragePattern string, client *github.Client, gpull *github.PullRequest, outputTitle string, ref GithubRef, targetURL string) error {
+func ReportTestResults(repo string, cmds []string, coveragePattern string, client *github.Client, gpull *github.PullRequest,
+	outputTitle string, ref GithubRef, targetURL string) (addMsg string, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
@@ -47,7 +48,7 @@ func ReportTestResults(repo string, cmds []string, coveragePattern string, clien
 	checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
 	if err != nil {
 		LogError.Errorf("github create %s failed: %v", outputTitle, err)
-		return err
+		return "", err
 	}
 	checkRunID := checkRun.GetID()
 
@@ -74,17 +75,18 @@ func ReportTestResults(repo string, cmds []string, coveragePattern string, clien
 	if conclusion == "success" && coveragePattern != "" {
 		result, _ := parseCoverage(coveragePattern, outputSummary)
 		outputSummary += ("\n" + "Test coverage: " + result)
+		addMsg += (outputTitle + " coverage: " + result)
 	}
 	err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, outputTitle, "```\n"+outputSummary+"\n```", nil)
 	if err != nil {
 		LogError.Errorf("report test results to github failed: %v", err)
-		return err
+		return "", err
 	}
 	if conclusion == "failure" {
 		err = &testNotPass{Title: outputTitle}
-		return err
+		return "", err
 	}
-	return nil
+	return addMsg, nil
 }
 
 func parseCoverage(pattern, output string) (string, error) {
