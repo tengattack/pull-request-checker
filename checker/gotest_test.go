@@ -19,7 +19,7 @@ func TestCoverRegex(t *testing.T) {
 	curDir := path.Dir(filepath)
 	repo := curDir + "/../testdata/go"
 
-	tests, err := getTests2(repo)
+	tests, err := getTests(repo)
 	require.NoError(err)
 	test, ok := tests["go"]
 	require.True(ok)

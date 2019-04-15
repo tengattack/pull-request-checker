@@ -522,23 +522,19 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 	}
 	pendingTests := make(chan int, maxPendingTests)
 	errReports := make(chan error, maxPendingTests)
-	var tests map[string][]string
-	tests2, err := getTests2(repoPath)
+	tests, err := getTests(repoPath)
 	if err != nil {
-		tests, err = getTests(repoPath)
+		// Can not get tests from config: report action_required instead.
+		outputTitle := "tests"
+		checkRun, err := CreateCheckRun(context.TODO(), client, gpull, outputTitle, ref, targetURL)
 		if err != nil {
-			// Can not get tests from config: report action_required instead.
-			outputTitle := "tests"
-			checkRun, err := CreateCheckRun(context.TODO(), client, gpull, outputTitle, ref, targetURL)
-			if err != nil {
-				msg := fmt.Sprintf("github create check run '%s' failed: %v\n", outputTitle, err)
-				LogError.Error(msg)
-				log.WriteString(msg)
-				return
-			}
-			UpdateCheckRunWithError(context.TODO(), client, gpull, checkRun.GetID(), outputTitle, outputTitle, err)
+			msg := fmt.Sprintf("github create check run '%s' failed: %v\n", outputTitle, err)
+			LogError.Error(msg)
+			log.WriteString(msg)
 			return
 		}
+		UpdateCheckRunWithError(context.TODO(), client, gpull, checkRun.GetID(), outputTitle, outputTitle, err)
+		return
 	}
 
 	done := make(chan struct{})
@@ -560,46 +556,24 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 	}()
 
 	var wg sync.WaitGroup
-	if tests2 != nil {
-		for k, v := range tests2 {
-			testName := k
-			testCfg := v
+	for k, v := range tests {
+		testName := k
+		testCfg := v
 
-			pendingTests <- 0
-			wg.Add(1)
-			go func() {
-				// This goroutine is a writer of the errReports channel
-				defer func() {
-					if info := recover(); info != nil {
-						errReports <- &panicError{Info: info}
-					}
-					wg.Done()
-					<-pendingTests
-				}()
-				errReports <- ReportTestResults(repoPath, testCfg.Cmds, testCfg.Coverage, client, gpull,
-					testName+" test", ref, targetURL)
+		pendingTests <- 0
+		wg.Add(1)
+		go func() {
+			// This goroutine is a writer of the errReports channel
+			defer func() {
+				if info := recover(); info != nil {
+					errReports <- &panicError{Info: info}
+				}
+				wg.Done()
+				<-pendingTests
 			}()
-
-		}
-	} else {
-		for k, v := range tests {
-			testName := k
-			cmds := v
-
-			pendingTests <- 0
-			wg.Add(1)
-			go func() {
-				// This goroutine is a writer of the errReports channel
-				defer func() {
-					if info := recover(); info != nil {
-						errReports <- &panicError{Info: info}
-					}
-					wg.Done()
-					<-pendingTests
-				}()
-				errReports <- ReportTestResults(repoPath, cmds, "", client, gpull, testName+" test", ref, targetURL)
-			}()
-		}
+			errReports <- ReportTestResults(repoPath, testCfg.Cmds, testCfg.Coverage, client, gpull,
+				testName+" test", ref, targetURL)
+		}()
 	}
 
 	// We must wait for all writers to quit before we close the errReports channel. Otherwise it will panic.
