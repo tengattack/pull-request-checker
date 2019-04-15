@@ -62,11 +62,13 @@ func ReportTestResults(repo string, cmds []string, coveragePattern string, clien
 	)
 	conclusion = "success"
 	for _, cmd := range cmds {
-		out, errCmd := carry(ctx, parser, repo, cmd)
-		outputSummary += ("\n" + out)
-		if errCmd != nil {
-			conclusion = "failure"
-			break
+		if cmd != "" {
+			out, errCmd := carry(ctx, parser, repo, cmd)
+			outputSummary += ("\n" + out)
+			if errCmd != nil {
+				conclusion = "failure"
+				break
+			}
 		}
 	}
 	if conclusion == "success" && coveragePattern != "" {
