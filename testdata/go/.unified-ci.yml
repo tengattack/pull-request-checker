@@ -1,5 +1,6 @@
 tests:
   go:
-    - cmd: 'go test -coverpkg=./... -coverprofile=cover.out ./...'
-    - cmd: 'go tool cover -func=cover.out'
-      coverage: 'total:.*?[-+]?((?:\d*\.\d+|\d+)%)'
+    coverage: 'total:.*?[-+]?((?:\d*\.\d+|\d+)%)'
+    cmds:
+      - 'go test -coverpkg=./... -coverprofile=cover.out ./...'
+      - 'go tool cover -func=cover.out'

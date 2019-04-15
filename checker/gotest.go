@@ -38,7 +38,7 @@ func carry(ctx context.Context, p *shellwords.Parser, repo, cmd string) (string,
 }
 
 // ReportTestResults reports the test results to github
-func ReportTestResults(repo string, tasks []testTask, client *github.Client, gpull *github.PullRequest, outputTitle string, ref GithubRef, targetURL string) error {
+func ReportTestResults(repo string, cmds []string, coveragePattern string, client *github.Client, gpull *github.PullRequest, outputTitle string, ref GithubRef, targetURL string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
@@ -61,24 +61,17 @@ func ReportTestResults(repo string, tasks []testTask, client *github.Client, gpu
 		outputSummary string
 	)
 	conclusion = "success"
-	for _, task := range tasks {
-		if task != nil {
-			cmd, _ := task["cmd"]
-			if cmd != "" {
-				out, errCmd := carry(ctx, parser, repo, cmd)
-				coverage, _ := task["coverage"]
-				if coverage != "" {
-					result, _ := parseCoverage(coverage, out)
-					outputSummary += ("\n" + "Test coverage: " + result)
-				} else {
-					outputSummary += ("\n" + out)
-				}
-				if errCmd != nil {
-					conclusion = "failure"
-					break
-				}
-			}
+	for _, cmd := range cmds {
+		out, errCmd := carry(ctx, parser, repo, cmd)
+		outputSummary += ("\n" + out)
+		if errCmd != nil {
+			conclusion = "failure"
+			break
 		}
+	}
+	if conclusion == "success" && coveragePattern != "" {
+		result, _ := parseCoverage(coveragePattern, outputSummary)
+		outputSummary += ("\n" + "Test coverage: " + result)
 	}
 	err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, outputTitle, "```\n"+outputSummary+"\n```", nil)
 	if err != nil {

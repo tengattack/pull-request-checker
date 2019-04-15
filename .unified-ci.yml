@@ -1,5 +1,3 @@
 tests:
   go:
-    - cmd: 'go test -coverpkg=./... -coverprofile=cover.out ./...'
-    - cmd: 'go tool cover -func=cover.out'
-      coverage: 'total:.*?[-+]?((?:\d*\.\d+|\d+)%)'
+    - 'go test ./...' # go test flags: https://golang.org/cmd/go/#hdr-Test_packages

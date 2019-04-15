@@ -19,10 +19,10 @@ func TestCoverRegex(t *testing.T) {
 	curDir := path.Dir(filepath)
 	repo := curDir + "/../testdata/go"
 
-	tests, err := getTests(repo)
+	tests, err := getTests2(repo)
 	require.NoError(err)
-	tasks := tests["go"]
-	require.Equal(2, len(tasks))
+	test, ok := tests["go"]
+	require.True(ok)
 
 	parser := shellwords.NewParser()
 	parser.ParseEnv = true
@@ -30,16 +30,16 @@ func TestCoverRegex(t *testing.T) {
 	parser.Dir = repo
 
 	var result string
-	for _, task := range tasks {
-		cmd, _ := task["cmd"]
-		assert.NotEmpty(cmd)
+	var output string
+	for _, cmd := range test.Cmds {
 		out, errCmd := carry(context.Background(), parser, repo, cmd)
 		assert.NoError(errCmd)
-		coverage, _ := task["coverage"]
-		if coverage != "" {
-			result, err = parseCoverage(coverage, out)
-			assert.NoError(err)
-		}
+		output += ("\n" + out)
+	}
+
+	if test.Coverage != "" {
+		result, err = parseCoverage(test.Coverage, output)
+		assert.NoError(err)
 	}
 	assert.Equal("42.9%", result)
 }

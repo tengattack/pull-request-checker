@@ -139,9 +139,7 @@ func CreateCheckRun(ctx context.Context, client *github.Client, gpull *github.Pu
 	return checkRun, err
 }
 
-type testTask map[string]string
-
-func getTests(cwd string) (map[string][]testTask, error) {
+func getTests(cwd string) (map[string][]string, error) {
 	content, err := ioutil.ReadFile(filepath.Join(cwd, projectTestsConfigFile))
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -150,10 +148,33 @@ func getTests(cwd string) (map[string][]testTask, error) {
 		return nil, err
 	}
 	var config struct {
-		Tests map[string][]testTask `yaml:"tests"`
+		Tests map[string][]string `yaml:"tests"`
 	}
 	err = yaml.Unmarshal(content, &config)
 	return config.Tests, err
+}
+
+type goTestsConfig struct {
+	Coverage string   `yaml:coverage`
+	Cmds     []string `yaml:cmds`
+}
+
+func getTests2(cwd string) (map[string]goTestsConfig, error) {
+	content, err := ioutil.ReadFile(filepath.Join(cwd, projectTestsConfigFile))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var config struct {
+		Tests map[string]goTestsConfig `yaml:"tests"`
+	}
+	err = yaml.Unmarshal(content, &config)
+	if err != nil {
+		return nil, err
+	}
+	return config.Tests, nil
 }
 
 func searchGithubPR(ctx context.Context, client *github.Client, repo, sha string) (int, error) {
