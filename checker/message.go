@@ -592,10 +592,12 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 	<-done
 
 	for i, v := range msgList {
-		if i > 0 {
-			testMsg += "\n"
+		if v != "" {
+			if i > 0 {
+				testMsg += "\n"
+			}
+			testMsg += v
 		}
-		testMsg += v
 	}
 	return
 }
