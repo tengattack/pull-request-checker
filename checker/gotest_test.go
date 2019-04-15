@@ -3,7 +3,6 @@ package checker
 import (
 	"context"
 	"path"
-	"regexp"
 	"runtime"
 	"testing"
 
@@ -30,7 +29,7 @@ func TestCoverRegex(t *testing.T) {
 	parser.ParseBacktick = true
 	parser.Dir = repo
 
-	cover := "unknown"
+	var result string
 	for _, task := range tasks {
 		cmd, _ := task["cmd"]
 		assert.NotEmpty(cmd)
@@ -38,12 +37,9 @@ func TestCoverRegex(t *testing.T) {
 		assert.NoError(errCmd)
 		coverage, _ := task["coverage"]
 		if coverage != "" {
-			r := regexp.MustCompile(coverage)
-			match := r.FindStringSubmatch(out)
-			if len(match) > 1 {
-				cover = match[1]
-			}
+			result, err = parseCoverage(coverage, out)
+			assert.NoError(err)
 		}
 	}
-	assert.Equal("42.9%", cover)
+	assert.Equal("42.9%", result)
 }

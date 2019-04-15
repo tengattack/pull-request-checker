@@ -68,15 +68,8 @@ func ReportTestResults(repo string, tasks []testTask, client *github.Client, gpu
 				out, errCmd := carry(ctx, parser, repo, cmd)
 				coverage, _ := task["coverage"]
 				if coverage != "" {
-					cover := "unknown"
-					r, err := regexp.Compile(coverage)
-					if err == nil {
-						match := r.FindStringSubmatch(out)
-						if len(match) > 1 {
-							cover = match[1]
-						}
-					}
-					outputSummary += ("\n" + "Test coverage: " + cover)
+					result, _ := parseCoverage(coverage, out)
+					outputSummary += ("\n" + "Test coverage: " + result)
 				} else {
 					outputSummary += ("\n" + out)
 				}
@@ -97,4 +90,17 @@ func ReportTestResults(repo string, tasks []testTask, client *github.Client, gpu
 		return err
 	}
 	return nil
+}
+
+func parseCoverage(pattern, output string) (string, error) {
+	coverage := "unknown"
+	r, err := regexp.Compile(pattern)
+	if err != nil {
+		return "", err
+	}
+	match := r.FindStringSubmatch(output)
+	if len(match) > 1 {
+		coverage = match[1]
+	}
+	return coverage, nil
 }
