@@ -6,10 +6,10 @@ import (
 	"log"
 	"os"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/tengattack/unified-ci/checker"
 	"github.com/tengattack/unified-ci/config"
+	"github.com/tengattack/unified-ci/store"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -56,12 +56,17 @@ func main() {
 		log.Fatalf("error: %v", err)
 	}
 
-	if err = checker.InitMessageQueue(); err != nil {
-		return
-	}
-
 	if err = checker.InitJWTClient(conf.GitHub.AppID, conf.GitHub.PrivateKey); err != nil {
 		log.Fatalf("error: %v", err)
+	}
+
+	if err = store.Init("file.db"); err != nil {
+		log.Fatalf("error: %v", err)
+	}
+	defer store.Deinit()
+
+	if err = checker.InitMessageQueue(); err != nil {
+		return
 	}
 
 	var g errgroup.Group
