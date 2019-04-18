@@ -9,7 +9,19 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-var db *sqlx.DB
+// CommitsInfo struct
+type CommitsInfo struct {
+	Owner    string   `db:"owner"`
+	Repo     string   `db:"repo"`
+	Sha      string   `db:"sha"`
+	Author   string   `db:"author"`
+	Coverage *float64 `db:"coverage"`
+}
+
+var (
+	rwCommitsInfo = new(sync.RWMutex)
+	db            *sqlx.DB
+)
 
 // Init the sqlite database
 func Init(file string) (err error) {
@@ -28,7 +40,7 @@ func Init(file string) (err error) {
 		db.Close()
 		return err
 	}
-	_, err = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS uniq ON commits_info (owner, repo, sha)`)
+	_, err = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS IDX_OWNER_REPO_SHA ON commits_info (owner, repo, sha)`)
 	if err != nil {
 		db.Close()
 		return err
@@ -41,22 +53,11 @@ func Deinit() {
 	db.Close()
 }
 
-// CommitsInfo struct
-type CommitsInfo struct {
-	Owner    string   `db:"owner"`
-	Repo     string   `db:"repo"`
-	Sha      string   `db:"sha"`
-	Author   string   `db:"author"`
-	Coverage *float64 `db:"coverage"`
-}
-
-var rwCommitsInfo sync.RWMutex
-
 // Save to db
 func (c *CommitsInfo) Save() error {
 	rwCommitsInfo.Lock()
 	defer rwCommitsInfo.Unlock()
-	_, err := db.Exec("INSERT OR REPLACE INTO commits_info (owner, repo, sha, author, coverage) VALUES(?,?,?,?,?)",
+	_, err := db.Exec("INSERT OR REPLACE INTO commits_info (owner, repo, sha, author, coverage) VALUES (?, ?, ?, ?, ?)",
 		c.Owner, c.Repo, c.Sha, c.Author, c.Coverage)
 	if err != nil {
 		return err

@@ -90,8 +90,9 @@ func ReportTestResults(repo string, cmds []string, coveragePattern string, clien
 			err := c.Save()
 			if err != nil {
 				result += fmt.Sprintf(" (Failed to save: %v)", err)
-				LogError.Errorf("Failed to save test coverage: %v", err)
 			}
+		} else {
+			LogError.Errorf("Failed to parse '%s': %v", result, err)
 		}
 
 		outputSummary += ("\n" + "Test coverage: " + result)
