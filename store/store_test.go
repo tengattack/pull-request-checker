@@ -1,7 +1,6 @@
 package store
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,9 +11,7 @@ func TestSaveCommitsInfo(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	err := os.Remove("file.db")
-	require.NoError(err)
-	err = Init("file.db")
+	err := Init("file.db")
 	require.NoError(err)
 	defer Deinit()
 
