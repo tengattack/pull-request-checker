@@ -3,12 +3,15 @@ package checker
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os/exec"
 	"regexp"
 	"time"
 
 	"github.com/google/go-github/github"
 	shellwords "github.com/tengattack/go-shellwords"
+	"github.com/tengattack/unified-ci/store"
+	"github.com/tengattack/unified-ci/util"
 )
 
 type testNotPass struct {
@@ -39,7 +42,7 @@ func carry(ctx context.Context, p *shellwords.Parser, repo, cmd string) (string,
 
 // ReportTestResults reports the test results to github
 func ReportTestResults(repo string, cmds []string, coveragePattern string, client *github.Client, gpull *github.PullRequest,
-	outputTitle string, ref GithubRef, targetURL string) (addMsg string, err error) {
+	outputTitle string, ref GithubRef, targetURL string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 
@@ -60,6 +63,7 @@ func ReportTestResults(repo string, cmds []string, coveragePattern string, clien
 	var (
 		conclusion    string
 		outputSummary string
+		reportMessage string
 	)
 	conclusion = "success"
 	for _, cmd := range cmds {
@@ -74,10 +78,28 @@ func ReportTestResults(repo string, cmds []string, coveragePattern string, clien
 	}
 	if conclusion == "success" && coveragePattern != "" {
 		result, _ := parseCoverage(coveragePattern, outputSummary)
+		pct, err := util.ParseFloatPercent(result, 64)
+		if err == nil {
+			c := store.CommitsInfo{
+				Owner:    ref.owner,
+				Repo:     ref.repo,
+				Sha:      ref.Sha,
+				Author:   gpull.GetHead().GetUser().GetLogin(),
+				Coverage: &pct,
+			}
+			err := c.Save()
+			if err != nil {
+				result += fmt.Sprintf(" (Failed to save: %v)", err)
+			}
+		} else {
+			LogError.Errorf("Failed to parse '%s': %v", result, err)
+			// PASS
+		}
+
 		outputSummary += ("\n" + "Test coverage: " + result)
-		addMsg = (outputTitle + " coverage: " + result)
+		reportMessage = (outputTitle + " coverage: " + result)
 	}
-	err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, addMsg, "```\n"+outputSummary+"\n```", nil)
+	err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, reportMessage, "```\n"+outputSummary+"\n```", nil)
 	if err != nil {
 		LogError.Errorf("report test results to github failed: %v", err)
 		return "", err
@@ -86,7 +108,7 @@ func ReportTestResults(repo string, cmds []string, coveragePattern string, clien
 		err = &testNotPass{Title: outputTitle}
 		return "", err
 	}
-	return addMsg, nil
+	return reportMessage, nil
 }
 
 func parseCoverage(pattern, output string) (string, error) {

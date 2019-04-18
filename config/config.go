@@ -21,6 +21,7 @@ type Config struct {
 type SectionCore struct {
 	EnableRetries bool   `yaml:"enable_retries"`
 	MaxRetries    int64  `yaml:"max_retries"`
+	DBFile        string `yaml:"db_file"`
 	WorkDir       string `yaml:"work_dir"`
 	LogsDir       string `yaml:"logs_dir"`
 	CheckLogURI   string `yaml:"check_log_uri"`
@@ -77,6 +78,7 @@ func BuildDefaultConf() Config {
 	// Core
 	conf.Core.EnableRetries = true
 	conf.Core.MaxRetries = 50
+	conf.Core.DBFile = "file.db"
 	conf.Core.WorkDir = "tmp"
 	conf.Core.LogsDir = "logs"
 	conf.Core.CheckLogURI = ""
