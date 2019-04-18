@@ -12,14 +12,9 @@ func TestSaveCommitsInfo(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	err := Init("file name.db")
+	fileDB := "file name.db"
+	err := Init(fileDB)
 	require.NoError(err)
-	Deinit()
-
-	err = Init("file name.db")
-	require.NoError(err)
-	defer os.Remove("file name.db")
-	defer Deinit()
 
 	c := &CommitsInfo{
 		Owner:    "owner",
@@ -28,8 +23,14 @@ func TestSaveCommitsInfo(t *testing.T) {
 		Author:   "author",
 		Coverage: nil,
 	}
-
 	assert.NoError(c.Save())
+	Deinit()
+
+	// Init should be idempotent
+	err = Init(fileDB)
+	require.NoError(err)
+	defer os.Remove(fileDB)
+	defer Deinit()
 
 	cc, err := LoadCommitsInfo(c.Owner, c.Repo, c.Sha)
 	assert.NoError(err)

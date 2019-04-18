@@ -3,6 +3,7 @@ core:
   enable_retries: true
   max_retries: 50
 
+  db_file: 'file.db'
   work_dir: 'tmp'
   logs_dir: 'logs'
   check_log_uri: 'http://example.com/checker/logs/'

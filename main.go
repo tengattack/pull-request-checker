@@ -60,7 +60,7 @@ func main() {
 		log.Fatalf("error: %v", err)
 	}
 
-	if err = store.Init("file.db"); err != nil {
+	if err = store.Init(conf.Core.DBFile); err != nil {
 		log.Fatalf("error: %v", err)
 	}
 	defer store.Deinit()

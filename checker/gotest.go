@@ -93,6 +93,7 @@ func ReportTestResults(repo string, cmds []string, coveragePattern string, clien
 			}
 		} else {
 			LogError.Errorf("Failed to parse '%s': %v", result, err)
+			// PASS
 		}
 
 		outputSummary += ("\n" + "Test coverage: " + result)
