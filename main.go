@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/tengattack/unified-ci/checker"
 	"github.com/tengattack/unified-ci/config"
@@ -69,33 +71,44 @@ func main() {
 		return
 	}
 
-	var g errgroup.Group
+	watch := make(chan struct{})
+	go func() {
+		var g errgroup.Group
 
-	if checker.Conf.Core.EnableRetries {
+		if checker.Conf.Core.EnableRetries {
+			g.Go(func() error {
+				// Start error message retries
+				checker.RetryErrorMessages()
+				return nil
+			})
+		}
+
 		g.Go(func() error {
-			// Start error message retries
-			checker.RetryErrorMessages()
+			// Start message subscription
+			checker.StartMessageSubscription()
 			return nil
 		})
-	}
 
-	g.Go(func() error {
-		// Start message subscription
-		checker.StartMessageSubscription()
-		return nil
-	})
+		g.Go(func() error {
+			// Run httpd server
+			return checker.RunHTTPServer()
+		})
 
-	g.Go(func() error {
-		// Run httpd server
-		return checker.RunHTTPServer()
-	})
+		g.Go(func() error {
+			// Run local repo watcher
+			return checker.WatchLocalRepo()
+		})
 
-	g.Go(func() error {
-		// Run local repo watcher
-		return checker.WatchLocalRepo()
-	})
+		if err = g.Wait(); err != nil {
+			checker.LogError.Fatal(err)
+		}
 
-	if err = g.Wait(); err != nil {
-		checker.LogError.Fatal(err)
+		close(watch)
+	}()
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
+	select {
+	case <-shutdown:
+	case <-watch:
 	}
 }
