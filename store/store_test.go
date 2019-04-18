@@ -12,8 +12,6 @@ func TestSaveCommitsInfo(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	erro := os.Remove("file.db")
-	require.NoError(erro)
 	err := Init("file name.db")
 	require.NoError(err)
 	Deinit()
