@@ -1,6 +1,7 @@
 package store
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,7 +12,9 @@ func TestSaveCommitsInfo(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	err := Init("file.db")
+	err := os.Remove("file.db")
+	require.NoError(err)
+	err = Init("file.db")
 	require.NoError(err)
 	defer Deinit()
 
@@ -19,8 +22,8 @@ func TestSaveCommitsInfo(t *testing.T) {
 		Owner:    "owner",
 		Repo:     "repo",
 		Sha:      "sha",
-		Coverage: nil,
 		Author:   "author",
+		Coverage: nil,
 	}
 
 	assert.NoError(c.Save())
@@ -37,4 +40,6 @@ func TestSaveCommitsInfo(t *testing.T) {
 	cc, err = LoadCommitsInfo(c.Owner, c.Repo, c.Sha)
 	assert.NoError(err)
 	assert.Equal(cc, c)
+
+	db.Exec("DROP TABLE commits_info")
 }

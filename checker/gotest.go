@@ -84,12 +84,13 @@ func ReportTestResults(repo string, cmds []string, coveragePattern string, clien
 				Owner:    ref.owner,
 				Repo:     ref.repo,
 				Sha:      ref.Sha,
-				Coverage: &pct,
 				Author:   gpull.GetHead().GetUser().GetLogin(),
+				Coverage: &pct,
 			}
 			err := c.Save()
 			if err != nil {
 				result += fmt.Sprintf(" (Failed to save: %v)", err)
+				LogError.Errorf("Failed to save test coverage: %v", err)
 			}
 		}
 
