@@ -15,6 +15,7 @@ type CommitsInfo struct {
 	Repo     string   `db:"repo"`
 	Sha      string   `db:"sha"`
 	Author   string   `db:"author"`
+	Test     string   `db:"test"`
 	Coverage *float64 `db:"coverage"`
 }
 
@@ -29,18 +30,20 @@ func Init(file string) (err error) {
 	if err != nil {
 		return err
 	}
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS commits_info (
+	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS commits_tests (
 		owner TEXT NOT NULL DEFAULT '',
 		repo TEXT NOT NULL DEFAULT '',
 		sha TEXT NOT NULL,
 		author TEXT NOT NULL DEFAULT '',
-		coverage REAL DEFAULT NULL
+		test TEXT NOT NULL DEFAULT '',
+		coverage REAL DEFAULT NULL,
+		UNIQUE (owner, repo, sha, test)
 	)`)
 	if err != nil {
 		db.Close()
 		return err
 	}
-	_, err = db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS IDX_OWNER_REPO_SHA ON commits_info (owner, repo, sha)`)
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS IDX_OWNER_REPO_SHA ON commits_tests (owner, repo, sha)`)
 	if err != nil {
 		db.Close()
 		return err
@@ -57,20 +60,21 @@ func Deinit() {
 func (c *CommitsInfo) Save() error {
 	rwCommitsInfo.Lock()
 	defer rwCommitsInfo.Unlock()
-	_, err := db.Exec("INSERT OR REPLACE INTO commits_info (owner, repo, sha, author, coverage) VALUES (?, ?, ?, ?, ?)",
-		c.Owner, c.Repo, c.Sha, c.Author, c.Coverage)
+	_, err := db.Exec("INSERT OR REPLACE INTO commits_tests (owner, repo, sha, author, test, coverage) VALUES (?, ?, ?, ?, ?, ?)",
+		c.Owner, c.Repo, c.Sha, c.Author, c.Test, c.Coverage)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-// LoadCommitsInfo gets a CommitsInfo by owner, repo and sha
-func LoadCommitsInfo(owner, repo, sha string) (*CommitsInfo, error) {
+// LoadCommitsInfo gets a CommitsInfo by owner, repo, sha and test
+func LoadCommitsInfo(owner, repo, sha, test string) (*CommitsInfo, error) {
 	rwCommitsInfo.RLock()
 	defer rwCommitsInfo.RUnlock()
 	var c CommitsInfo
-	err := db.Get(&c, "SELECT * FROM commits_info WHERE owner = ? AND repo = ? AND sha = ?", owner, repo, sha)
+	err := db.Get(&c, "SELECT * FROM commits_tests WHERE owner = ? AND repo = ? AND sha = ? AND test = ?",
+		owner, repo, sha, test)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -78,4 +82,17 @@ func LoadCommitsInfo(owner, repo, sha string) (*CommitsInfo, error) {
 		return nil, err
 	}
 	return &c, nil
+}
+
+// ListCommitsInfo lists CommitsInfos by owner, repo and sha
+func ListCommitsInfo(owner, repo, sha string) ([]CommitsInfo, error) {
+	rwCommitsInfo.RLock()
+	defer rwCommitsInfo.RUnlock()
+	var c []CommitsInfo
+	err := db.Select(&c, "SELECT * FROM commits_tests WHERE owner = ? AND repo = ? AND sha = ?",
+		owner, repo, sha)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
 }

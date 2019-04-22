@@ -13,35 +13,52 @@ func TestSaveCommitsInfo(t *testing.T) {
 	require := require.New(t)
 
 	fileDB := "file name.db"
-	err := Init(fileDB)
-	require.NoError(err)
+	require.NoError(Init(fileDB))
 
-	c := &CommitsInfo{
+	c1 := &CommitsInfo{
 		Owner:    "owner",
 		Repo:     "repo",
 		Sha:      "sha",
 		Author:   "author",
+		Test:     "Go",
 		Coverage: nil,
 	}
-	assert.NoError(c.Save())
+	assert.NoError(c1.Save())
+
+	c2 := &CommitsInfo{
+		Owner:    "owner",
+		Repo:     "repo",
+		Sha:      "sha",
+		Author:   "author",
+		Test:     "C",
+		Coverage: nil,
+	}
+	assert.NoError(c2.Save())
 	Deinit()
 
 	// Init should be idempotent
-	err = Init(fileDB)
-	require.NoError(err)
+	require.NoError(Init(fileDB))
 	defer os.Remove(fileDB)
 	defer Deinit()
 
-	cc, err := LoadCommitsInfo(c.Owner, c.Repo, c.Sha)
+	cc, err := ListCommitsInfo(c1.Owner, c1.Repo, c1.Sha)
 	assert.NoError(err)
-	assert.Equal(cc, c)
+	assert.ElementsMatch(cc, []CommitsInfo{*c1, *c2})
 
 	coverage := 0.5
-	c.Coverage = &coverage
+	c1.Coverage = &coverage
 
-	assert.NoError(c.Save())
+	assert.NoError(c1.Save())
 
-	cc, err = LoadCommitsInfo(c.Owner, c.Repo, c.Sha)
+	c, err := LoadCommitsInfo(c1.Owner, c1.Repo, c1.Sha, c1.Test)
 	assert.NoError(err)
-	assert.Equal(cc, c)
+	assert.Equal(c1, c)
+
+	c, err = LoadCommitsInfo(c1.Owner, c1.Repo, c1.Sha, "php")
+	assert.NoError(err)
+	assert.Empty(c)
+
+	cc, err = ListCommitsInfo(c1.Owner, c1.Repo, "Sha")
+	assert.NoError(err)
+	assert.Empty(c)
 }
