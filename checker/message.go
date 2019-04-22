@@ -17,6 +17,8 @@ import (
 
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/github"
+	"github.com/tengattack/unified-ci/store"
+	"github.com/tengattack/unified-ci/util"
 	"golang.org/x/sync/errgroup"
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
@@ -528,10 +530,11 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 	}
 	pendingTests := make(chan int, maxPendingTests)
 	errReports := make(chan error, maxPendingTests)
+
 	tests, err := getTests(repoPath)
 	if err != nil {
 		// Can not get tests from config: report action_required instead.
-		outputTitle := "tests"
+		outputTitle := "wrong tests config"
 		checkRun, err := CreateCheckRun(context.TODO(), client, gpull, outputTitle, ref, targetURL)
 		if err != nil {
 			msg := fmt.Sprintf("github create check run '%s' failed: %v\n", outputTitle, err)
@@ -562,13 +565,21 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 	}()
 
 	var wg sync.WaitGroup
-	msgList := make([]string, len(tests))
-	counter := 0
+	var headCoverage sync.Map
+
 	for k, v := range tests {
-		i := counter
-		counter++
 		testName := k
 		testCfg := v
+
+		emptyCfg := true
+		for _, c := range testCfg.Cmds {
+			if c != "" {
+				emptyCfg = false
+			}
+		}
+		if emptyCfg {
+			continue
+		}
 
 		pendingTests <- 0
 		wg.Add(1)
@@ -581,9 +592,9 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 				wg.Done()
 				<-pendingTests
 			}()
-			var err error
-			msgList[i], err = ReportTestResults(repoPath, testCfg.Cmds, testCfg.Coverage, client, gpull,
-				testName+" test", ref, targetURL)
+			percentage, err := ReportTestResults(repoPath, testCfg.Cmds, testCfg.Coverage, client, gpull,
+				testName, ref, targetURL)
+			headCoverage.Store(testName, percentage)
 			errReports <- err
 		}()
 	}
@@ -595,13 +606,89 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 	// Wait for the reader to quit
 	<-done
 
-	for i, v := range msgList {
-		if v != "" {
-			if i > 0 {
-				testMsg += "\n"
+	// compare test coverage with base
+	baseInfo, err := store.ListCommitsInfo(ref.owner, ref.repo, gpull.GetBase().GetSHA())
+	if err != nil {
+		msg := fmt.Sprintf("Failed to load base info: %v\n", err)
+		LogError.Error(msg)
+		log.WriteString(msg)
+		// PASS
+	}
+
+	testsNotInTheBase := make(map[string]goTestsConfig)
+	for testName, testCfg := range tests {
+		found := false
+		for _, v := range baseInfo {
+			if testName == v.Test {
+				found = true
+				break
 			}
-			testMsg += v
+		}
+		if !found {
+			testsNotInTheBase[testName] = testCfg
 		}
 	}
+	var baseCoverage sync.Map
+	if len(testsNotInTheBase) > 0 {
+		log.WriteString("$ git checkout -f " + gpull.GetBase().GetSHA() + "\n")
+		cmd := exec.Command("git", "checkout", "-f", gpull.GetBase().GetSHA())
+		cmd.Dir = repoPath
+		cmd.Stdout = log
+		cmd.Stderr = log
+		err = cmd.Run()
+		if err != nil {
+			msg := fmt.Sprintf("Failed to checkout to base: %s\n", gpull.GetBase().GetSHA())
+			LogError.Error(msg)
+			log.WriteString(msg)
+		} else {
+			for k, v := range testsNotInTheBase {
+				testName := k
+				testCfg := v
+
+				pendingTests <- 0
+				wg.Add(1)
+				go func() {
+					defer func() {
+						wg.Done()
+						<-pendingTests
+					}()
+
+					_, reportMessage, _ := launchCommands(context.TODO(), testName, repoPath,
+						testCfg.Cmds, testCfg.Coverage, gpull, ref, false)
+					baseCoverage.Store(testName, reportMessage)
+				}()
+			}
+		}
+	}
+	for _, v := range baseInfo {
+		if v.Coverage == nil {
+			baseCoverage.Store(v.Test, "")
+		} else {
+			baseCoverage.Store(v.Test, util.FormatFloatPercent(*v.Coverage))
+		}
+	}
+	wg.Wait()
+
+	headCoverage.Range(func(key, value interface{}) bool {
+		testName, _ := key.(string)
+		currentResult, _ := value.(string)
+
+		interfaceValue, _ := baseCoverage.Load(testName)
+		baseResult, _ := interfaceValue.(string)
+
+		currentPercentage, _ := util.ParseFloatPercent(currentResult, 64)
+		basePercentage, _ := util.ParseFloatPercent(baseResult, 64)
+		testMsg = "```diff\n"
+		if currentPercentage > basePercentage {
+			testMsg += "+ "
+		} else if currentPercentage < basePercentage {
+			testMsg += "- "
+		} else {
+			testMsg += "  "
+		}
+		testMsg += (testName + " test coverage: " + baseResult + " -> " + currentResult)
+		testMsg += "\n```"
+		return true
+	})
 	return
 }
