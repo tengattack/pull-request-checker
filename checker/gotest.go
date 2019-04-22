@@ -69,17 +69,21 @@ func ReportTestResults(repo string, cmds []string, coveragePattern string, clien
 	return reportMessage, nil
 }
 
-func parseCoverage(pattern, output string) (string, error) {
+func parseCoverage(pattern, output string) (string, float64, error) {
 	coverage := "unknown"
 	r, err := regexp.Compile(pattern)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	match := r.FindStringSubmatch(output)
 	if len(match) > 1 {
 		coverage = match[1]
 	}
-	return coverage, nil
+	pct, err := util.ParseFloatPercent(coverage, 64)
+	if err != nil {
+		return coverage, 0, err
+	}
+	return coverage, pct, nil
 }
 
 func launchCommands(ctx context.Context, testName, repo string, cmds []string, coveragePattern string, gpull *github.PullRequest,
@@ -102,9 +106,9 @@ func launchCommands(ctx context.Context, testName, repo string, cmds []string, c
 			}
 		}
 	}
+	// get test coverage even if the conclusion is failure when ignoring the failed tests
 	if coveragePattern != "" && (!breakOnFails || conclusion == "success") {
-		percentage, _ := parseCoverage(coveragePattern, outputSummary)
-		pct, err := util.ParseFloatPercent(percentage, 64)
+		percentage, pct, err := parseCoverage(coveragePattern, outputSummary)
 		if err == nil {
 			c := store.CommitsInfo{
 				Owner:    ref.owner,

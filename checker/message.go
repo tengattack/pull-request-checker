@@ -15,11 +15,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tengattack/unified-ci/store"
-	"github.com/tengattack/unified-ci/util"
-
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/github"
+	"github.com/tengattack/unified-ci/store"
+	"github.com/tengattack/unified-ci/util"
 	"golang.org/x/sync/errgroup"
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
