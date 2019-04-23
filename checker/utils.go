@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation"
@@ -18,6 +19,10 @@ import (
 
 const (
 	projectTestsConfigFile = ".unified-ci.yml"
+)
+
+var (
+	percentageRegexp = regexp.MustCompile(`[-+]?(?:\d*\.\d+|\d+)%`)
 )
 
 type panicError struct {
