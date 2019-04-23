@@ -607,7 +607,55 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 	<-done
 
 	// compare test coverage with base
-	baseInfo, err := store.ListCommitsInfo(ref.owner, ref.repo, gpull.GetBase().GetSHA())
+	baseCoverage, _ := findBaseCoverage(repoPath, tests, gpull, ref, log)
+	headCoverage.Range(func(key, value interface{}) bool {
+		testName, _ := key.(string)
+		currentResult, _ := value.(string)
+
+		interfaceValue, _ := baseCoverage.Load(testName)
+		baseResult, _ := interfaceValue.(string)
+
+		currentPercentage, _ := util.ParseFloatPercent(currentResult, 64)
+		basePercentage, _ := util.ParseFloatPercent(baseResult, 64)
+		testMsg = "```diff\n"
+		if currentPercentage > basePercentage {
+			testMsg += "+ "
+		} else if currentPercentage < basePercentage {
+			testMsg += "- "
+		} else {
+			testMsg += "  "
+		}
+		testMsg += (testName + " test coverage: " + baseResult + " -> " + currentResult)
+		testMsg += "\n```"
+		return true
+	})
+	return
+}
+
+func findBaseCoverage(repoPath string, tests map[string]goTestsConfig, gpull *github.PullRequest, ref GithubRef,
+	log *os.File) (*sync.Map, error) {
+	maxPendingTests := Conf.Concurrency.Test
+	if maxPendingTests < 1 {
+		maxPendingTests = 1
+	}
+	pendingTests := make(chan int, maxPendingTests)
+
+	var baseSHA strings.Builder
+	goBackN := strconv.Itoa(gpull.GetCommits())
+	log.WriteString(fmt.Sprintf("$ git rev-parse --verify HEAD~%s\n", goBackN))
+	cmd := exec.Command("git", "rev-parse", "--verify", "HEAD~"+goBackN)
+	cmd.Dir = repoPath
+	cmd.Stdout = &baseSHA
+	cmd.Stderr = log
+	err := cmd.Run()
+	if err != nil {
+		msg := fmt.Sprintf("Failed to rev-parse base SHA: %v\n", err)
+		LogError.Error(msg)
+		log.WriteString(msg)
+		return nil, err
+	}
+	log.WriteString("Got base SHA: " + baseSHA.String() + "\n")
+	baseInfo, err := store.ListCommitsInfo(ref.owner, ref.repo, baseSHA.String())
 	if err != nil {
 		msg := fmt.Sprintf("Failed to load base info: %v\n", err)
 		LogError.Error(msg)
@@ -628,16 +676,17 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 			testsNotInTheBase[testName] = testCfg
 		}
 	}
+	var wg sync.WaitGroup
 	var baseCoverage sync.Map
 	if len(testsNotInTheBase) > 0 {
-		log.WriteString("$ git checkout -f " + gpull.GetBase().GetSHA() + "\n")
-		cmd := exec.Command("git", "checkout", "-f", gpull.GetBase().GetSHA())
+		log.WriteString(fmt.Sprintf("$ git reset --hard HEAD~%s\n", goBackN))
+		cmd := exec.Command("git", "reset", "--hard", "HEAD~"+goBackN)
 		cmd.Dir = repoPath
 		cmd.Stdout = log
 		cmd.Stderr = log
 		err = cmd.Run()
 		if err != nil {
-			msg := fmt.Sprintf("Failed to checkout to base: %s\n", gpull.GetBase().GetSHA())
+			msg := "Failed to reset to base.\n"
 			LogError.Error(msg)
 			log.WriteString(msg)
 		} else {
@@ -668,27 +717,5 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 		}
 	}
 	wg.Wait()
-
-	headCoverage.Range(func(key, value interface{}) bool {
-		testName, _ := key.(string)
-		currentResult, _ := value.(string)
-
-		interfaceValue, _ := baseCoverage.Load(testName)
-		baseResult, _ := interfaceValue.(string)
-
-		currentPercentage, _ := util.ParseFloatPercent(currentResult, 64)
-		basePercentage, _ := util.ParseFloatPercent(baseResult, 64)
-		testMsg = "```diff\n"
-		if currentPercentage > basePercentage {
-			testMsg += "+ "
-		} else if currentPercentage < basePercentage {
-			testMsg += "- "
-		} else {
-			testMsg += "  "
-		}
-		testMsg += (testName + " test coverage: " + baseResult + " -> " + currentResult)
-		testMsg += "\n```"
-		return true
-	})
-	return
+	return &baseCoverage, nil
 }
