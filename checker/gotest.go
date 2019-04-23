@@ -57,7 +57,7 @@ func ReportTestResults(repo string, cmds []string, coveragePattern string, clien
 	checkRunID := checkRun.GetID()
 
 	conclusion, reportMessage, outputSummary := launchCommands(ctx, testName, repo, cmds, coveragePattern, gpull, ref, false)
-	err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, reportMessage, "```\n"+outputSummary+"\n```", nil)
+	err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, "Coverage: "+reportMessage, "```\n"+outputSummary+"\n```", nil)
 	if err != nil {
 		LogError.Errorf("report test results to github failed: %v", err)
 		return reportMessage, err
