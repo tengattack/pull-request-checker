@@ -608,7 +608,14 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 	<-done
 
 	// compare test coverage with base
-	baseCoverage, _ := findBaseCoverage(repoPath, tests, gpull, ref, log)
+	baseSHA, err := getBaseSHA(client, ref.owner, ref.repo, gpull.GetNumber())
+	if err != nil {
+		msg := fmt.Sprintf("Cannot get BaseSHA: %v", err)
+		LogError.Error(msg)
+		log.WriteString(msg)
+		return
+	}
+	baseCoverage, _ := findBaseCoverage(repoPath, baseSHA, tests, gpull, ref, log)
 	testMsg = diffCoverage(&headCoverage, baseCoverage)
 	return
 }
@@ -639,7 +646,22 @@ func diffCoverage(headCoverage, baseCoverage *sync.Map) string {
 	return testMsg
 }
 
-func findBaseCoverage(repoPath string, tests map[string]goTestsConfig, gpull *github.PullRequest, ref GithubRef,
+func getBaseSHA(client *github.Client, owner, repo string, prNum int) (string, error) {
+	opt := &github.ListOptions{Page: 1, PerPage: 1}
+	commits, _, err := client.PullRequests.ListCommits(context.Background(), owner, repo, prNum, opt)
+	if err != nil {
+		return "", err
+	}
+	var baseSHA string
+	if len(commits) > 0 {
+		if length := len(commits[0].Parents); length > 0 {
+			baseSHA = commits[0].Parents[length-1].GetSHA()
+		}
+	}
+	return baseSHA, nil
+}
+
+func findBaseCoverage(repoPath string, baseSHA string, tests map[string]goTestsConfig, gpull *github.PullRequest, ref GithubRef,
 	log io.Writer) (*sync.Map, error) {
 	maxPendingTests := Conf.Concurrency.Test
 	if maxPendingTests < 1 {
@@ -647,22 +669,7 @@ func findBaseCoverage(repoPath string, tests map[string]goTestsConfig, gpull *gi
 	}
 	pendingTests := make(chan int, maxPendingTests)
 
-	var baseSHA strings.Builder
-	goBackN := strconv.Itoa(gpull.GetCommits())
-	io.WriteString(log, fmt.Sprintf("$ git rev-parse --verify HEAD~%s\n", goBackN))
-	cmd := exec.Command("git", "rev-parse", "--verify", "HEAD~"+goBackN)
-	cmd.Dir = repoPath
-	cmd.Stdout = &baseSHA
-	cmd.Stderr = log
-	err := cmd.Run()
-	if err != nil {
-		msg := fmt.Sprintf("Failed to rev-parse base SHA: %v\n", err)
-		LogError.Error(msg)
-		io.WriteString(log, msg)
-		return nil, err
-	}
-	io.WriteString(log, "Got base SHA: "+baseSHA.String()+"\n")
-	baseInfo, err := store.ListCommitsInfo(ref.owner, ref.repo, baseSHA.String())
+	baseInfo, err := store.ListCommitsInfo(ref.owner, ref.repo, baseSHA)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to load base info: %v\n", err)
 		LogError.Error(msg)
@@ -686,14 +693,14 @@ func findBaseCoverage(repoPath string, tests map[string]goTestsConfig, gpull *gi
 	var wg sync.WaitGroup
 	var baseCoverage sync.Map
 	if len(testsNotInTheBase) > 0 {
-		io.WriteString(log, fmt.Sprintf("$ git reset --hard HEAD~%s\n", goBackN))
-		cmd := exec.Command("git", "reset", "--hard", "HEAD~"+goBackN)
+		io.WriteString(log, "$ git checkout -f "+baseSHA+"\n")
+		cmd := exec.Command("git", "checkout", "-f", baseSHA)
 		cmd.Dir = repoPath
 		cmd.Stdout = log
 		cmd.Stderr = log
 		err = cmd.Run()
 		if err != nil {
-			msg := "Failed to reset to base.\n"
+			msg := fmt.Sprintf("Failed to checkout to base: %v\n", err)
 			LogError.Error(msg)
 			io.WriteString(log, msg)
 		} else {
