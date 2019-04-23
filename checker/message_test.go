@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/google/go-github/github"
@@ -126,11 +127,18 @@ func TestGetBaseCoverage(t *testing.T) {
 	cmd.Dir = repoPath
 	cmd.Run()
 
+	var baseSHA strings.Builder
+	cmd = exec.Command("git", "rev-parse", "--verify", "HEAD")
+	cmd.Dir = repoPath
+	cmd.Stdout = &baseSHA
+	err = cmd.Run()
+	require.NoError(err)
+
 	tests, err := getTests(repoPath)
 	require.NoError(err)
 
 	author := "author"
-	baseCoverage, err := findBaseCoverage(repoPath, tests, &github.PullRequest{
+	baseCoverage, err := findBaseCoverage(repoPath, strings.TrimSpace(baseSHA.String()), tests, &github.PullRequest{
 		Head: &github.PullRequestBranch{
 			User: &github.User{
 				Login: &author,
@@ -140,7 +148,7 @@ func TestGetBaseCoverage(t *testing.T) {
 		owner: "owner",
 		repo:  "repo",
 		Sha:   "sha",
-	}, ioutil.Discard)
+	}, os.Stdout)
 	require.NoError(err)
 	value, _ := baseCoverage.Load("go")
 	coverage, _ := value.(string)

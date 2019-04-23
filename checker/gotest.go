@@ -41,7 +41,7 @@ func carry(ctx context.Context, p *shellwords.Parser, repo, cmd string) (string,
 }
 
 // ReportTestResults reports the test results to github
-func ReportTestResults(repo string, cmds []string, coveragePattern string, client *github.Client, gpull *github.PullRequest,
+func ReportTestResults(repoPath string, cmds []string, coveragePattern string, client *github.Client, gpull *github.PullRequest,
 	testName string, ref GithubRef, targetURL string) (string, error) {
 	outputTitle := testName + " test"
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
@@ -56,7 +56,7 @@ func ReportTestResults(repo string, cmds []string, coveragePattern string, clien
 	}
 	checkRunID := checkRun.GetID()
 
-	conclusion, reportMessage, outputSummary := launchCommands(ctx, testName, repo, cmds, coveragePattern, gpull, ref, false)
+	conclusion, reportMessage, outputSummary := launchCommands(ctx, testName, repoPath, cmds, coveragePattern, gpull, ref, false)
 	err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, "coverage: "+reportMessage, "```\n"+outputSummary+"\n```", nil)
 	if err != nil {
 		LogError.Errorf("report test results to github failed: %v", err)
