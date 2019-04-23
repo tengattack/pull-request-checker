@@ -144,4 +144,6 @@ func TestGetBaseCoverage(t *testing.T) {
 	value, _ := baseCoverage.Load("go")
 	coverage, _ := value.(string)
 	assert.Regexp(percentageRegexp, coverage)
+
+	os.RemoveAll(path.Join(repoPath, ".git/"))
 }

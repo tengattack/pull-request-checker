@@ -110,7 +110,7 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 		newName = d.NewName
 	}
 	if !strings.HasPrefix(newName, "b/") {
-		log.WriteString("No need to process " + newName + "\n")
+		log.WriteString("No need to process " + newName + "\n\n")
 		return nil
 	}
 	fileName := newName[2:]
@@ -609,6 +609,12 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 
 	// compare test coverage with base
 	baseCoverage, _ := findBaseCoverage(repoPath, tests, gpull, ref, log)
+	testMsg = diffCoverage(&headCoverage, baseCoverage)
+	return
+}
+
+func diffCoverage(headCoverage, baseCoverage *sync.Map) string {
+	var testMsg string
 	headCoverage.Range(func(key, value interface{}) bool {
 		testName, _ := key.(string)
 		currentResult, _ := value.(string)
@@ -630,7 +636,7 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 		testMsg += "\n```"
 		return true
 	})
-	return
+	return testMsg
 }
 
 func findBaseCoverage(repoPath string, tests map[string]goTestsConfig, gpull *github.PullRequest, ref GithubRef,
