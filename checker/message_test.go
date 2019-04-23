@@ -112,6 +112,7 @@ func TestGetBaseCoverage(t *testing.T) {
 	cmd := exec.Command("git", "init")
 	cmd.Dir = repoPath
 	cmd.Run()
+	defer os.RemoveAll(path.Join(repoPath, ".git/"))
 
 	cmd = exec.Command("git", "add", ".gitignore")
 	cmd.Dir = repoPath
@@ -144,6 +145,4 @@ func TestGetBaseCoverage(t *testing.T) {
 	value, _ := baseCoverage.Load("go")
 	coverage, _ := value.(string)
 	assert.Regexp(percentageRegexp, coverage)
-
-	os.RemoveAll(path.Join(repoPath, ".git/"))
 }
