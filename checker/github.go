@@ -321,7 +321,7 @@ func HasLintStatuses(client *github.Client, ref *GithubRef) (bool, error) {
 	return lint > 0, nil
 }
 
-func WatchLocalRepo() error {
+func WatchLocalRepo(ctx context.Context) error {
 	var err error
 	for {
 		files, err := ioutil.ReadDir(Conf.Core.WorkDir)
@@ -329,6 +329,12 @@ func WatchLocalRepo() error {
 			return err
 		}
 		for _, file := range files {
+			select {
+			case <-ctx.Done():
+				LogAccess.Info("WatchLocalRepo canceled.")
+				return nil
+			default:
+			}
 			isDir := file.IsDir()
 			path := filepath.Join(Conf.Core.WorkDir, file.Name())
 			if !isDir && file.Mode()&os.ModeSymlink == os.ModeSymlink {
@@ -355,6 +361,12 @@ func WatchLocalRepo() error {
 					continue
 				}
 				for _, subfile := range subfiles {
+					select {
+					case <-ctx.Done():
+						LogAccess.Info("WatchLocalRepo canceled.")
+						return nil
+					default:
+					}
 					isDir := subfile.IsDir()
 					if !isDir && subfile.Mode()&os.ModeSymlink == os.ModeSymlink {
 						realPath, err := os.Readlink(filepath.Join(path, subfile.Name()))
@@ -376,6 +388,12 @@ func WatchLocalRepo() error {
 							continue
 						}
 						for _, pull := range pulls {
+							select {
+							case <-ctx.Done():
+								LogAccess.Info("WatchLocalRepo canceled.")
+								return nil
+							default:
+							}
 							ref := GithubRef{
 								owner: file.Name(),
 								repo:  subfile.Name(),
@@ -410,7 +428,12 @@ func WatchLocalRepo() error {
 				}
 			}
 		}
-		time.Sleep(120 * time.Second)
+		select {
+		case <-ctx.Done():
+			LogAccess.Info("WatchLocalRepo canceled.")
+			return nil
+		case <-time.After(120 * time.Second):
+		}
 	}
 	if err != nil {
 		LogAccess.Error("Local repo watcher error: " + err.Error())

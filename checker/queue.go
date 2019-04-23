@@ -1,6 +1,7 @@
 package checker
 
 import (
+	"context"
 	"errors"
 	"math"
 	"time"
@@ -29,18 +30,27 @@ func InitMessageQueue() error {
 }
 
 // StartMessageSubscription for main message subscription and process message
-func StartMessageSubscription() {
+func StartMessageSubscription(ctx context.Context) {
 	LogAccess.Info("Start Message Subscription")
 
 	for {
-		LogAccess.Info("Waiting for message...")
+		select {
+		case <-ctx.Done():
+			LogAccess.Info("StartMessageSubscription canceled.")
+			return
+		default:
+		}
 		message, err := MQ.Subscribe()
 		if err != nil {
 			LogError.Error("mq subscribe error: " + err.Error())
+			continue
+		}
+		if message == "" {
+			continue
 		}
 		LogAccess.Info("Got message: " + message)
 
-		err = HandleMessage(message)
+		err = HandleMessage(ctx, message)
 		if err != nil {
 			LogError.Error("handle message error: " + err.Error())
 			err = MQ.Error(message)
@@ -58,7 +68,7 @@ func StartMessageSubscription() {
 }
 
 // RetryErrorMessages helps retry error messages
-func RetryErrorMessages() {
+func RetryErrorMessages(ctx context.Context) {
 	// move pending message to error channel
 	count, _ := MQ.MoveAllPendingToError()
 	if count > 0 {
@@ -66,7 +76,12 @@ func RetryErrorMessages() {
 	}
 
 	for {
-		time.Sleep(60 * time.Second)
+		select {
+		case <-ctx.Done():
+			LogAccess.Info("RetryErrorMessages canceled.")
+			return
+		case <-time.After(60 * time.Second):
+		}
 		s, err := MQ.MoveErrorToPending()
 		if err != nil || len(s) <= 0 {
 			continue

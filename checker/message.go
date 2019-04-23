@@ -264,7 +264,7 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 }
 
 // HandleMessage handles message
-func HandleMessage(message string) error {
+func HandleMessage(ctx context.Context, message string) error {
 	s := strings.Split(message, "/")
 	if len(s) != 6 || s[2] != "pull" || s[4] != "commits" {
 		LogAccess.Warnf("malformed message: %s", message)
@@ -335,13 +335,12 @@ func HandleMessage(message string) error {
 			LogAccess.Infof("Finish message: %s", message)
 		}
 		if err != nil && checkRunID != 0 {
-			ctx := context.Background()
 			UpdateCheckRunWithError(ctx, client, gpull, checkRunID, "linter", "linter", err)
 		}
 		log.Close()
 	}()
 
-	exist, err := util.SearchGithubPR(context.Background(), client, repository, commitSha)
+	exist, err := util.SearchGithubPR(ctx, client, repository, commitSha)
 	if err != nil {
 		LogAccess.Errorf("searchGithubPR error: %v", err)
 		return err
@@ -364,7 +363,6 @@ func HandleMessage(message string) error {
 	}
 
 	t := github.Timestamp{Time: time.Now()}
-	ctx := context.Background()
 	outputTitle := "linter"
 	checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
 	if err != nil {
@@ -391,7 +389,7 @@ func HandleMessage(message string) error {
 		return err
 	}
 
-	installationToken, _, err := util.JWTClient.Apps.CreateInstallationToken(context.Background(), int64(installationID))
+	installationToken, _, err := util.JWTClient.Apps.CreateInstallationToken(ctx, int64(installationID))
 	if err != nil {
 		return err
 	}
@@ -458,7 +456,7 @@ func HandleMessage(message string) error {
 	}
 
 	noTest := true
-	failedTests, passedTests, errTests, testMsg := checkTests(repoPath, client, gpull, ref, targetURL, log)
+	failedTests, passedTests, errTests, testMsg := checkTests(ctx, repoPath, client, gpull, ref, targetURL, log)
 	if failedTests+passedTests+errTests > 0 {
 		noTest = false
 	}
@@ -525,20 +523,20 @@ func HandleMessage(message string) error {
 	return err
 }
 
-func checkTests(repoPath string, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string,
+func checkTests(ctx context.Context, repoPath string, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string,
 	log *os.File) (failedTests, passedTests, errTests int, testMsg string) {
 	tests, err := getTests(repoPath)
 	if err != nil {
 		// Can not get tests from config: report action_required instead.
 		outputTitle := "wrong tests config"
-		checkRun, err := CreateCheckRun(context.TODO(), client, gpull, outputTitle, ref, targetURL)
+		checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
 		if err != nil {
 			msg := fmt.Sprintf("github create check run '%s' failed: %v\n", outputTitle, err)
 			LogError.Error(msg)
 			log.WriteString(msg)
 			return
 		}
-		UpdateCheckRunWithError(context.TODO(), client, gpull, checkRun.GetID(), outputTitle, outputTitle, err)
+		UpdateCheckRunWithError(ctx, client, gpull, checkRun.GetID(), outputTitle, outputTitle, err)
 		return
 	}
 
