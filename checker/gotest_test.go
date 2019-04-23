@@ -31,7 +31,6 @@ func TestCoverRegex(t *testing.T) {
 
 	var result string
 	var output string
-	var pct float64
 	for _, cmd := range test.Cmds {
 		out, errCmd := carry(context.Background(), parser, repo, cmd)
 		assert.NoError(errCmd)
@@ -39,9 +38,8 @@ func TestCoverRegex(t *testing.T) {
 	}
 
 	if test.Coverage != "" {
-		result, pct, err = parseCoverage(test.Coverage, output)
+		result, _, err = parseCoverage(test.Coverage, output)
 		assert.NoError(err)
 	}
-	assert.Equal("42.9%", result)
-	assert.Equal(0.429, pct)
+	assert.Regexp(percentageRegexp, result)
 }

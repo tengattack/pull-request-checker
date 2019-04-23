@@ -3,13 +3,16 @@ package checker
 import (
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path"
 	"runtime"
 	"testing"
 
+	"github.com/google/go-github/github"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tengattack/unified-ci/config"
+	"github.com/tengattack/unified-ci/store"
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
@@ -89,4 +92,56 @@ func TestGenerateComments(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetBaseCoverage(t *testing.T) {
+	require := require.New(t)
+	assert := assert.New(t)
+
+	Conf = config.BuildDefaultConf()
+	err := InitLog()
+	require.NoError(err)
+
+	err = store.Init(":memory:")
+	require.NoError(err)
+	defer store.Deinit()
+
+	_, filename, _, _ := runtime.Caller(0)
+	repoPath := path.Join(path.Dir(filename), "/../testdata/go")
+
+	cmd := exec.Command("git", "init")
+	cmd.Dir = repoPath
+	cmd.Run()
+
+	cmd = exec.Command("git", "add", ".gitignore")
+	cmd.Dir = repoPath
+	cmd.Run()
+
+	cmd = exec.Command("git", "add", "-A")
+	cmd.Dir = repoPath
+	cmd.Run()
+
+	cmd = exec.Command("git", "commit", "-am", "init")
+	cmd.Dir = repoPath
+	cmd.Run()
+
+	tests, err := getTests(repoPath)
+	require.NoError(err)
+
+	author := "author"
+	baseCoverage, err := findBaseCoverage(repoPath, tests, &github.PullRequest{
+		Head: &github.PullRequestBranch{
+			User: &github.User{
+				Login: &author,
+			},
+		},
+	}, GithubRef{
+		owner: "owner",
+		repo:  "repo",
+		Sha:   "sha",
+	}, ioutil.Discard)
+	require.NoError(err)
+	value, _ := baseCoverage.Load("go")
+	coverage, _ := value.(string)
+	assert.Regexp(percentageRegexp, coverage)
 }

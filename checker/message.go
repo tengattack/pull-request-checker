@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -109,7 +110,7 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 		newName = d.NewName
 	}
 	if !strings.HasPrefix(newName, "b/") {
-		log.WriteString("No need to process " + newName)
+		log.WriteString("No need to process " + newName + "\n")
 		return nil
 	}
 	fileName := newName[2:]
@@ -633,7 +634,7 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 }
 
 func findBaseCoverage(repoPath string, tests map[string]goTestsConfig, gpull *github.PullRequest, ref GithubRef,
-	log *os.File) (*sync.Map, error) {
+	log io.Writer) (*sync.Map, error) {
 	maxPendingTests := Conf.Concurrency.Test
 	if maxPendingTests < 1 {
 		maxPendingTests = 1
@@ -642,7 +643,7 @@ func findBaseCoverage(repoPath string, tests map[string]goTestsConfig, gpull *gi
 
 	var baseSHA strings.Builder
 	goBackN := strconv.Itoa(gpull.GetCommits())
-	log.WriteString(fmt.Sprintf("$ git rev-parse --verify HEAD~%s\n", goBackN))
+	io.WriteString(log, fmt.Sprintf("$ git rev-parse --verify HEAD~%s\n", goBackN))
 	cmd := exec.Command("git", "rev-parse", "--verify", "HEAD~"+goBackN)
 	cmd.Dir = repoPath
 	cmd.Stdout = &baseSHA
@@ -651,15 +652,15 @@ func findBaseCoverage(repoPath string, tests map[string]goTestsConfig, gpull *gi
 	if err != nil {
 		msg := fmt.Sprintf("Failed to rev-parse base SHA: %v\n", err)
 		LogError.Error(msg)
-		log.WriteString(msg)
+		io.WriteString(log, msg)
 		return nil, err
 	}
-	log.WriteString("Got base SHA: " + baseSHA.String() + "\n")
+	io.WriteString(log, "Got base SHA: "+baseSHA.String()+"\n")
 	baseInfo, err := store.ListCommitsInfo(ref.owner, ref.repo, baseSHA.String())
 	if err != nil {
 		msg := fmt.Sprintf("Failed to load base info: %v\n", err)
 		LogError.Error(msg)
-		log.WriteString(msg)
+		io.WriteString(log, msg)
 		// PASS
 	}
 
@@ -679,7 +680,7 @@ func findBaseCoverage(repoPath string, tests map[string]goTestsConfig, gpull *gi
 	var wg sync.WaitGroup
 	var baseCoverage sync.Map
 	if len(testsNotInTheBase) > 0 {
-		log.WriteString(fmt.Sprintf("$ git reset --hard HEAD~%s\n", goBackN))
+		io.WriteString(log, fmt.Sprintf("$ git reset --hard HEAD~%s\n", goBackN))
 		cmd := exec.Command("git", "reset", "--hard", "HEAD~"+goBackN)
 		cmd.Dir = repoPath
 		cmd.Stdout = log
@@ -688,7 +689,7 @@ func findBaseCoverage(repoPath string, tests map[string]goTestsConfig, gpull *gi
 		if err != nil {
 			msg := "Failed to reset to base.\n"
 			LogError.Error(msg)
-			log.WriteString(msg)
+			io.WriteString(log, msg)
 		} else {
 			for k, v := range testsNotInTheBase {
 				testName := k
