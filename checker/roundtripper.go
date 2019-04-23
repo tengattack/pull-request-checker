@@ -49,9 +49,10 @@ func (j *jwtRoundTripper) GetToken() (string, error) {
 	defer j.mu.Unlock()
 
 	if j.jwt == nil || j.exp.Add(-time.Minute).Before(time.Now()) {
-		exp := time.Now().Add(10 * time.Minute)
+		now := time.Now()
+		exp := now.Add(10 * time.Minute)
 		token := jwt.NewWithClaims(jwt.SigningMethodRS256, jwt.MapClaims{
-			"iat": int32(time.Now().Unix()),
+			"iat": int32(now.Unix()),
 			"exp": int32(exp.Unix()),
 			"iss": j.iss,
 		})
