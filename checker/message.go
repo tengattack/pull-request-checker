@@ -594,7 +594,7 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 				<-pendingTests
 			}()
 			percentage, err := ReportTestResults(repoPath, testCfg.Cmds, testCfg.Coverage, client, gpull,
-				testName, ref, targetURL)
+				testName, ref, targetURL, log)
 			headCoverage.Store(testName, percentage)
 			errReports <- err
 		}()
@@ -610,7 +610,7 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 	// compare test coverage with base
 	baseSHA, err := util.GetBaseSHA(client, ref.owner, ref.repo, gpull.GetNumber())
 	if err != nil {
-		msg := fmt.Sprintf("Cannot get BaseSHA: %v", err)
+		msg := fmt.Sprintf("Cannot get BaseSHA: %v\n", err)
 		LogError.Error(msg)
 		log.WriteString(msg)
 		return
@@ -629,6 +629,7 @@ func findBaseCoverage(repoPath string, baseSHA string, tests map[string]goTestsC
 	pendingTests := make(chan int, maxPendingTests)
 
 	baseInfo, err := store.ListCommitsInfo(ref.owner, ref.repo, baseSHA)
+	io.WriteString(log, fmt.Sprintf("store.ListCommitsInfo: %d, owner: %s, repo: %s, sha: %s", len(baseInfo), ref.owner, ref.repo, baseSHA))
 	if err != nil {
 		msg := fmt.Sprintf("Failed to load base info: %v\n", err)
 		LogError.Error(msg)
@@ -676,7 +677,7 @@ func findBaseCoverage(repoPath string, baseSHA string, tests map[string]goTestsC
 					}()
 
 					_, reportMessage, _ := launchCommands(context.TODO(), testName, repoPath,
-						testCfg.Cmds, testCfg.Coverage, gpull, ref, false)
+						testCfg.Cmds, testCfg.Coverage, gpull, ref, false, log)
 					baseCoverage.Store(testName, reportMessage)
 				}()
 			}
