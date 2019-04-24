@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/go-github/github"
+	"github.com/tengattack/unified-ci/util"
 	githubhook "gopkg.in/rjz/githubhook.v0"
 )
 
@@ -239,7 +240,7 @@ func webhookHandler(c *gin.Context) {
 		if len(payload.CheckRun.PullRequests) > 0 {
 			prNum = *payload.CheckRun.PullRequests[0].Number
 		} else {
-			prNum, err = searchGithubPR(context.Background(), client, payload.Repository.FullName, *payload.CheckRun.HeadSHA)
+			prNum, err = util.SearchGithubPR(context.Background(), client, payload.Repository.FullName, *payload.CheckRun.HeadSHA)
 			if err != nil {
 				LogAccess.Errorf("searchGithubPR error: %v", err)
 				abortWithError(c, 404, "Could not get the PR number")

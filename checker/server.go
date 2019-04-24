@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	// "github.com/gin-gonic/gin/binding"
+	"github.com/tengattack/unified-ci/log"
 	api "gopkg.in/appleboy/gin-status-api.v1"
 )
 
@@ -42,7 +42,7 @@ func routerEngine() *gin.Engine {
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 	r.Use(VersionMiddleware())
-	r.Use(LogMiddleware())
+	r.Use(log.LogMiddleware(Conf.Log.Format))
 	r.Use(StatMiddleware())
 
 	r.GET("/api/stat/go", api.StatusHandler)

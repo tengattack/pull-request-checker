@@ -177,22 +177,6 @@ func getTests(cwd string) (map[string]goTestsConfig, error) {
 	return config.Tests, nil
 }
 
-func searchGithubPR(ctx context.Context, client *github.Client, repo, sha string) (int, error) {
-	if sha == "" {
-		return 0, errors.New("SHA is empty")
-	}
-	q := fmt.Sprintf("is:pr repo:%s SHA:%s", repo, sha)
-	opts := &github.SearchOptions{Sort: "created", Order: "asc"}
-	result, _, err := client.Search.Issues(ctx, q, opts)
-	if err != nil {
-		return 0, err
-	}
-	if len(result.Issues) == 0 {
-		return 0, nil
-	}
-	return result.Issues[0].GetNumber(), nil
-}
-
 func getDefaultAPIClient(owner string) (*github.Client, error) {
 	var client *github.Client
 	installationID, ok := Conf.GitHub.Installations[owner]
