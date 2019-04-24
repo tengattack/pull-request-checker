@@ -138,17 +138,17 @@ func TestGetBaseCoverage(t *testing.T) {
 	require.NoError(err)
 
 	author := "author"
+	ref := GithubRef{
+		owner: "owner",
+		repo:  "repo",
+	}
 	baseCoverage, err := findBaseCoverage(repoPath, strings.TrimSpace(baseSHA.String()), tests, &github.PullRequest{
 		Head: &github.PullRequestBranch{
 			User: &github.User{
 				Login: &author,
 			},
 		},
-	}, GithubRef{
-		owner: "owner",
-		repo:  "repo",
-		Sha:   "sha",
-	}, os.Stdout)
+	}, ref, os.Stdout)
 	require.NoError(err)
 	value, _ := baseCoverage.Load("go")
 	coverage, _ := value.(string)
