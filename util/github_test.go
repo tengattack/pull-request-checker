@@ -3,7 +3,6 @@ package util
 import (
 	"context"
 	"regexp"
-	"strings"
 	"sync"
 	"testing"
 
@@ -50,5 +49,5 @@ func TestGetBaseSHA(t *testing.T) {
 	client := github.NewClient(nil)
 	sha, err := GetBaseSHA(client, "tengattack", "unified-ci", 30)
 	require.NoError(err)
-	assert.Equal("94a32a63aa2a618a127a00954bb9965bff8939df", strings.TrimSpace(sha))
+	assert.Equal("94a32a63aa2a618a127a00954bb9965bff8939df", sha)
 }

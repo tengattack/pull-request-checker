@@ -23,8 +23,8 @@ var (
 	reset   = string([]byte{27, 91, 48, 109})
 )
 
-// LogReq is http request log
-type LogReq struct {
+// Req is http request log
+type Req struct {
 	URI         string `json:"uri"`
 	Method      string `json:"method"`
 	IP          string `json:"ip"`
@@ -32,8 +32,8 @@ type LogReq struct {
 	Agent       string `json:"agent"`
 }
 
-// LogMessage is message log
-type LogMessage struct {
+// Message is message log
+type Message struct {
 	Type string
 	ID   int64
 }
@@ -122,10 +122,10 @@ func SetLogLevel(log *logrus.Logger, levelString string) error {
 	return nil
 }
 
-// LogRequest record http request
-func LogRequest(uri string, method string, ip string, contentType string, agent string, format string) {
+// Request record http request
+func Request(uri string, method string, ip string, contentType string, agent string, format string) {
 	var output string
-	log := &LogReq{
+	log := &Req{
 		URI:         uri,
 		Method:      method,
 		IP:          ip,
@@ -159,10 +159,10 @@ func LogRequest(uri string, method string, ip string, contentType string, agent 
 	LogAccess.Info(output)
 }
 
-// LogMiddleware provide gin router handler.
-func LogMiddleware(format string) gin.HandlerFunc {
+// Middleware provide gin router handler.
+func Middleware(format string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		LogRequest(c.Request.URL.Path, c.Request.Method, c.ClientIP(), c.ContentType(), c.Request.Header.Get("User-Agent"),
+		Request(c.Request.URL.Path, c.Request.Method, c.ClientIP(), c.ContentType(), c.Request.Header.Get("User-Agent"),
 			format)
 		c.Next()
 	}

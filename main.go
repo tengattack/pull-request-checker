@@ -52,7 +52,7 @@ func main() {
 	// set default parameters.
 	checker.Conf = conf
 
-	if err = checker.InitLog(); err != nil {
+	if err = checker.InitLog(conf); err != nil {
 		log.Fatalf("error: %v", err)
 	}
 

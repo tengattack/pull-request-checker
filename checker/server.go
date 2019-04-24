@@ -42,7 +42,7 @@ func routerEngine() *gin.Engine {
 	r.Use(gin.Logger())
 	r.Use(gin.Recovery())
 	r.Use(VersionMiddleware())
-	r.Use(log.LogMiddleware(Conf.Log.Format))
+	r.Use(log.Middleware(Conf.Log.Format))
 	r.Use(StatMiddleware())
 
 	r.GET("/api/stat/go", api.StatusHandler)

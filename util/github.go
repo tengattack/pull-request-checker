@@ -10,7 +10,7 @@ import (
 	"github.com/google/go-github/github"
 )
 
-// SearchGithubPR
+// SearchGithubPR searches for the PR number of one commit
 func SearchGithubPR(ctx context.Context, client *github.Client, repo, sha string) (int, error) {
 	if sha == "" {
 		return 0, errors.New("SHA is empty")
@@ -27,6 +27,7 @@ func SearchGithubPR(ctx context.Context, client *github.Client, repo, sha string
 	return result.Issues[0].GetNumber(), nil
 }
 
+// DiffCoverage generates a diff-format message to show the test coverage's difference between head and base.
 func DiffCoverage(headCoverage, baseCoverage *sync.Map) string {
 	var output strings.Builder
 	output.WriteString("```diff\n")
@@ -57,6 +58,7 @@ func DiffCoverage(headCoverage, baseCoverage *sync.Map) string {
 	return output.String()
 }
 
+// GetBaseSHA gets the SHA string of the commit which the pull request is based on
 func GetBaseSHA(client *github.Client, owner, repo string, prNum int) (string, error) {
 	opt := &github.ListOptions{Page: 1, PerPage: 1}
 	commits, _, err := client.PullRequests.ListCommits(context.Background(), owner, repo, prNum, opt)

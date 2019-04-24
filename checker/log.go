@@ -1,8 +1,12 @@
 package checker
 
-import "github.com/tengattack/unified-ci/log"
+import (
+	"github.com/tengattack/unified-ci/config"
+	"github.com/tengattack/unified-ci/log"
+)
 
-func InitLog() (err error) {
-	LogAccess, LogError, err = log.InitLog(Conf)
+// InitLog inits the logger in this package
+func InitLog(conf config.Config) (err error) {
+	LogAccess, LogError, err = log.InitLog(conf)
 	return err
 }

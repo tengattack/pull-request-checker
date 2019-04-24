@@ -242,7 +242,7 @@ func webhookHandler(c *gin.Context) {
 		} else {
 			prNum, err = util.SearchGithubPR(context.Background(), client, payload.Repository.FullName, *payload.CheckRun.HeadSHA)
 			if err != nil {
-				LogAccess.Errorf("searchGithubPR error: %v", err)
+				LogAccess.Errorf("SearchGithubPR error: %v", err)
 				abortWithError(c, 404, "Could not get the PR number")
 				return
 			}
