@@ -9,6 +9,18 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// Warn warning
+type Warn struct {
+	Warn string
+}
+
+func (w *Warn) Error() string {
+	if w == nil {
+		return ""
+	}
+	return w.Warn
+}
+
 // CommitsInfo struct
 type CommitsInfo struct {
 	Owner    string   `db:"owner"`
@@ -60,10 +72,14 @@ func Deinit() {
 func (c *CommitsInfo) Save() error {
 	rwCommitsInfo.Lock()
 	defer rwCommitsInfo.Unlock()
-	_, err := db.Exec("INSERT OR REPLACE INTO commits_tests (owner, repo, sha, author, test, coverage) VALUES (?, ?, ?, ?, ?, ?)",
+	r, err := db.Exec("INSERT OR REPLACE INTO commits_tests (owner, repo, sha, author, test, coverage) VALUES (?, ?, ?, ?, ?, ?)",
 		c.Owner, c.Repo, c.Sha, c.Author, c.Test, c.Coverage)
 	if err != nil {
 		return err
+	}
+	affect, _ := r.RowsAffected()
+	if affect == 0 {
+		return &Warn{"0 row(s) affected"}
 	}
 	return nil
 }

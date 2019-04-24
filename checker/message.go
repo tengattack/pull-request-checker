@@ -629,7 +629,7 @@ func findBaseCoverage(repoPath string, baseSHA string, tests map[string]goTestsC
 	pendingTests := make(chan int, maxPendingTests)
 
 	baseInfo, err := store.ListCommitsInfo(ref.owner, ref.repo, baseSHA)
-	io.WriteString(log, fmt.Sprintf("store.ListCommitsInfo: %d, owner: %s, repo: %s, sha: %s", len(baseInfo), ref.owner, ref.repo, baseSHA))
+	io.WriteString(log, fmt.Sprintf("store.ListCommitsInfo: %d, owner: %s, repo: %s, sha: %s\n", len(baseInfo), ref.owner, ref.repo, baseSHA))
 	if err != nil {
 		msg := fmt.Sprintf("Failed to load base info: %v\n", err)
 		LogError.Error(msg)

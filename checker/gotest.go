@@ -110,6 +110,8 @@ func launchCommands(ctx context.Context, testName, repo string, cmds []string, c
 		}
 	}
 	io.WriteString(log, "\n")
+	io.WriteString(log, fmt.Sprintf("coveragePattern: %s, breakOnFails: %v, conclusion: %s, owner: %s, repo: %s, sha: %s\n",
+		coveragePattern, breakOnFails, conclusion, ref.owner, ref.repo, ref.Sha))
 	// get test coverage even if the conclusion is failure when ignoring the failed tests
 	if coveragePattern != "" && (!breakOnFails || conclusion == "success") {
 		percentage, pct, err := parseCoverage(coveragePattern, outputSummary)
