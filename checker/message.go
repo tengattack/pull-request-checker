@@ -278,6 +278,7 @@ func HandleMessage(message string) error {
 	}
 	LogAccess.Infof("Start handling %s/pull/%s", repository, pull)
 
+	// ref to be checked in the owner/repo
 	ref := GithubRef{
 		owner: s[0],
 		repo:  s[1],
@@ -675,8 +676,8 @@ func findBaseCoverage(repoPath string, baseSHA string, tests map[string]goTestsC
 						<-pendingTests
 					}()
 
-					_, reportMessage, _ := launchCommands(context.TODO(), testName, repoPath,
-						testCfg.Cmds, testCfg.Coverage, gpull, ref, false)
+					_, reportMessage, _ := launchCommands(context.TODO(), ref.owner, ref.repo, baseSHA,
+						testName, testCfg.Cmds, testCfg.Coverage, repoPath, gpull, false)
 					baseCoverage.Store(testName, reportMessage)
 				}()
 			}

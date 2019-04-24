@@ -56,7 +56,8 @@ func ReportTestResults(repoPath string, cmds []string, coveragePattern string, c
 	}
 	checkRunID := checkRun.GetID()
 
-	conclusion, reportMessage, outputSummary := launchCommands(ctx, testName, repoPath, cmds, coveragePattern, gpull, ref, false)
+	conclusion, reportMessage, outputSummary := launchCommands(ctx, ref.owner, ref.repo, ref.Sha, testName, cmds,
+		coveragePattern, repoPath, gpull, false)
 	err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, "coverage: "+reportMessage, "```\n"+outputSummary+"\n```", nil)
 	if err != nil {
 		LogError.Errorf("report test results to github failed: %v", err)
@@ -86,17 +87,17 @@ func parseCoverage(pattern, output string) (string, float64, error) {
 	return coverage, pct, nil
 }
 
-func launchCommands(ctx context.Context, testName, repo string, cmds []string, coveragePattern string, gpull *github.PullRequest,
-	ref GithubRef, breakOnFails bool) (conclusion, reportMessage, outputSummary string) {
+func launchCommands(ctx context.Context, owner, repo, sha string, testName string, cmds []string, coveragePattern string,
+	repoPath string, gpull *github.PullRequest, breakOnFails bool) (conclusion, reportMessage, outputSummary string) {
 	parser := shellwords.NewParser()
 	parser.ParseEnv = true
 	parser.ParseBacktick = true
-	parser.Dir = repo
+	parser.Dir = repoPath
 
 	conclusion = "success"
 	for _, cmd := range cmds {
 		if cmd != "" {
-			out, errCmd := carry(ctx, parser, repo, cmd)
+			out, errCmd := carry(ctx, parser, repoPath, cmd)
 			outputSummary += ("\n" + out)
 			if errCmd != nil {
 				conclusion = "failure"
@@ -111,9 +112,9 @@ func launchCommands(ctx context.Context, testName, repo string, cmds []string, c
 		percentage, pct, err := parseCoverage(coveragePattern, outputSummary)
 		if err == nil {
 			c := store.CommitsInfo{
-				Owner:    ref.owner,
-				Repo:     ref.repo,
-				Sha:      ref.Sha,
+				Owner:    owner,
+				Repo:     repo,
+				Sha:      sha,
 				Author:   gpull.GetHead().GetUser().GetLogin(),
 				Test:     testName,
 				Coverage: &pct,
