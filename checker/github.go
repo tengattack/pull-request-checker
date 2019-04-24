@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -324,21 +325,50 @@ func WatchLocalRepo() error {
 	for {
 		files, err := ioutil.ReadDir(Conf.Core.WorkDir)
 		if err != nil {
-			break
+			return err
 		}
 		for _, file := range files {
-			if file.IsDir() {
-				path := filepath.Join(Conf.Core.WorkDir, file.Name())
+			isDir := file.IsDir()
+			path := filepath.Join(Conf.Core.WorkDir, file.Name())
+			if !isDir && file.Mode()&os.ModeSymlink == os.ModeSymlink {
+				realPath, err := os.Readlink(path)
+				if err != nil {
+					continue
+				}
+				st, err := os.Stat(realPath)
+				if err != nil {
+					continue
+				}
+				if st.IsDir() {
+					isDir = true
+					path = realPath
+				}
+			}
+			if isDir {
 				subfiles, err := ioutil.ReadDir(path)
 				if err != nil {
-					break
+					continue
 				}
 				client, err := getDefaultAPIClient(file.Name())
 				if err != nil {
-					break
+					continue
 				}
 				for _, subfile := range subfiles {
-					if subfile.IsDir() {
+					isDir := subfile.IsDir()
+					if !isDir && subfile.Mode()&os.ModeSymlink == os.ModeSymlink {
+						realPath, err := os.Readlink(filepath.Join(path, subfile.Name()))
+						if err != nil {
+							continue
+						}
+						st, err := os.Stat(realPath)
+						if err != nil {
+							continue
+						}
+						if st.IsDir() {
+							isDir = true
+						}
+					}
+					if isDir {
 						pulls, err := GetGithubPulls(client, file.Name(), subfile.Name())
 						if err != nil {
 							LogError.Errorf("WatchLocalRepo:GetGithubPulls: %v", err)
