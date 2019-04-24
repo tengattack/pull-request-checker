@@ -50,7 +50,7 @@ var dataSet = []TestsData{
 func TestGenerateComments(t *testing.T) {
 	Conf = config.BuildDefaultConf()
 
-	err := InitLog()
+	err := InitLog(Conf)
 	require.Nil(t, err)
 
 	_, filename, _, ok := runtime.Caller(0)
@@ -100,7 +100,7 @@ func TestGetBaseCoverage(t *testing.T) {
 	assert := assert.New(t)
 
 	Conf = config.BuildDefaultConf()
-	err := InitLog()
+	err := InitLog(Conf)
 	require.NoError(err)
 
 	err = store.Init(":memory:")

@@ -339,7 +339,7 @@ func HandleMessage(message string) error {
 		log.Close()
 	}()
 
-	exist, err := searchGithubPR(context.Background(), client, repository, commitSha)
+	exist, err := util.SearchGithubPR(context.Background(), client, repository, commitSha)
 	if err != nil {
 		LogAccess.Errorf("searchGithubPR error: %v", err)
 		return err
@@ -608,7 +608,7 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 	<-done
 
 	// compare test coverage with base
-	baseSHA, err := getBaseSHA(client, ref.owner, ref.repo, gpull.GetNumber())
+	baseSHA, err := util.GetBaseSHA(client, ref.owner, ref.repo, gpull.GetNumber())
 	if err != nil {
 		msg := fmt.Sprintf("Cannot get BaseSHA: %v", err)
 		LogError.Error(msg)
@@ -616,49 +616,8 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 		return
 	}
 	baseCoverage, _ := findBaseCoverage(repoPath, baseSHA, tests, gpull, ref, log)
-	testMsg = diffCoverage(&headCoverage, baseCoverage)
+	testMsg = util.DiffCoverage(&headCoverage, baseCoverage)
 	return
-}
-
-func diffCoverage(headCoverage, baseCoverage *sync.Map) string {
-	var testMsg string
-	headCoverage.Range(func(key, value interface{}) bool {
-		testName, _ := key.(string)
-		currentResult, _ := value.(string)
-
-		interfaceValue, _ := baseCoverage.Load(testName)
-		baseResult, _ := interfaceValue.(string)
-
-		currentPercentage, _ := util.ParseFloatPercent(currentResult, 64)
-		basePercentage, _ := util.ParseFloatPercent(baseResult, 64)
-		testMsg = "```diff\n"
-		if currentPercentage > basePercentage {
-			testMsg += "+ "
-		} else if currentPercentage < basePercentage {
-			testMsg += "- "
-		} else {
-			testMsg += "  "
-		}
-		testMsg += (testName + " test coverage: " + baseResult + " -> " + currentResult)
-		testMsg += "\n```"
-		return true
-	})
-	return testMsg
-}
-
-func getBaseSHA(client *github.Client, owner, repo string, prNum int) (string, error) {
-	opt := &github.ListOptions{Page: 1, PerPage: 1}
-	commits, _, err := client.PullRequests.ListCommits(context.Background(), owner, repo, prNum, opt)
-	if err != nil {
-		return "", err
-	}
-	var baseSHA string
-	if len(commits) > 0 {
-		if length := len(commits[0].Parents); length > 0 {
-			baseSHA = commits[0].Parents[length-1].GetSHA()
-		}
-	}
-	return baseSHA, nil
 }
 
 func findBaseCoverage(repoPath string, baseSHA string, tests map[string]goTestsConfig, gpull *github.PullRequest, ref GithubRef,
