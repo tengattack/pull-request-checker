@@ -56,7 +56,7 @@ func ReportTestResults(testName string, repoPath string, cmds []string, coverage
 	}
 	checkRunID := checkRun.GetID()
 
-	conclusion, reportMessage, outputSummary := launchCommands(ctx, ref.owner, ref.repo, ref.Sha, testName, cmds,
+	conclusion, reportMessage, outputSummary := testAndSaveCoverage(ctx, ref.owner, ref.repo, ref.Sha, testName, cmds,
 		coveragePattern, repoPath, gpull, false)
 	err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, "coverage: "+reportMessage, "```\n"+outputSummary+"\n```", nil)
 	if err != nil {
@@ -87,7 +87,7 @@ func parseCoverage(pattern, output string) (string, float64, error) {
 	return coverage, pct, nil
 }
 
-func launchCommands(ctx context.Context, owner, repo, sha string, testName string, cmds []string, coveragePattern string,
+func testAndSaveCoverage(ctx context.Context, owner, repo, sha string, testName string, cmds []string, coveragePattern string,
 	repoPath string, gpull *github.PullRequest, breakOnFails bool) (conclusion, reportMessage, outputSummary string) {
 	parser := shellwords.NewParser()
 	parser.ParseEnv = true
@@ -108,7 +108,7 @@ func launchCommands(ctx context.Context, owner, repo, sha string, testName strin
 		}
 	}
 	// get test coverage even if the conclusion is failure when ignoring the failed tests
-	if coveragePattern != "" && (!breakOnFails || conclusion == "success") {
+	if coveragePattern != "" && (conclusion == "success" || !breakOnFails) {
 		percentage, pct, err := parseCoverage(coveragePattern, outputSummary)
 		if err == nil {
 			c := store.CommitsInfo{

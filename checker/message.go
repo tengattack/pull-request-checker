@@ -14,11 +14,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/github"
-	"github.com/tengattack/unified-ci/auth"
 	"github.com/tengattack/unified-ci/store"
 	"github.com/tengattack/unified-ci/util"
 	"golang.org/x/sync/errgroup"
@@ -391,7 +391,7 @@ func HandleMessage(message string) error {
 		return err
 	}
 
-	installationToken, _, err := auth.JWTClient.Apps.CreateInstallationToken(context.Background(), int64(installationID))
+	installationToken, _, err := util.JWTClient.Apps.CreateInstallationToken(context.Background(), int64(installationID))
 	if err != nil {
 		return err
 	}
@@ -458,13 +458,13 @@ func HandleMessage(message string) error {
 	}
 
 	noTest := true
-	failedTests, passedTests, errTests, testMsg := runTest(repoPath, client, gpull, ref, targetURL, log)
+	failedTests, passedTests, errTests, testMsg := checkTests(repoPath, client, gpull, ref, targetURL, log)
 	if failedTests+passedTests+errTests > 0 {
 		noTest = false
 	}
 
 	mark := '✔'
-	sumCount := failedLints + failedTests
+	sumCount := int64(failedLints) + failedTests
 	if sumCount > 0 {
 		mark = '✖'
 	}
@@ -525,8 +525,8 @@ func HandleMessage(message string) error {
 	return err
 }
 
-func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string,
-	log *os.File) (failedTests, passedTests, errTests int, testMsg string) {
+func checkTests(repoPath string, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string,
+	log *os.File) (failedTests, passedTests, errTests int64, testMsg string) {
 	tests, err := getTests(repoPath)
 	if err != nil {
 		// Can not get tests from config: report action_required instead.
@@ -542,69 +542,15 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 		return
 	}
 
-	maxPendingTests := Conf.Concurrency.Test
-	if maxPendingTests < 1 {
-		maxPendingTests = 1
+	t := &testReporter{
+		RepoPath:  repoPath,
+		Client:    client,
+		Pull:      gpull,
+		Ref:       ref,
+		TargetURL: targetURL,
 	}
-	pendingTests := make(chan int, maxPendingTests)
-
-	errReports := make(chan error, maxPendingTests)
-	done := make(chan struct{})
-	go func() {
-		// This goroutine is the only reader of the errReports channel.
-		// It is ready to quit when the errReports channel is closed and drained.
-		for errReport := range errReports {
-			if errReport != nil {
-				if _, ok := errReport.(*testNotPass); ok {
-					failedTests++
-				} else {
-					errTests++
-				}
-			} else {
-				passedTests++
-			}
-		}
-		close(done)
-	}()
-
-	var (
-		headCoverage sync.Map
-		wg           sync.WaitGroup
-	)
-
-	for k, v := range tests {
-		testName := k
-		testCfg := v
-
-		if emptyTest(testCfg.Cmds) {
-			continue
-		}
-
-		pendingTests <- 0
-		wg.Add(1)
-		go func() {
-			// This goroutine is a writer of the errReports channel
-			defer func() {
-				if info := recover(); info != nil {
-					errReports <- &panicError{Info: info}
-				}
-				wg.Done()
-				<-pendingTests
-			}()
-			percentage, err := ReportTestResults(testName, repoPath, testCfg.Cmds, testCfg.Coverage, client, gpull,
-				ref, targetURL)
-			headCoverage.Store(testName, percentage)
-			errReports <- err
-		}()
-	}
-
-	// We must wait for all writers to quit before we close the errReports channel. Otherwise it will panic.
-	wg.Wait()
-	// Tell the reader that it may quit
-	close(errReports)
-	// Wait for the reader to quit
-	<-done
-
+	var headCoverage sync.Map
+	failedTests, passedTests, errTests = runTests(tests, t, &headCoverage)
 	// compare test coverage with base
 	baseSHA, err := util.GetBaseSHA(client, ref.owner, ref.repo, gpull.GetNumber())
 	if err != nil {
@@ -617,6 +563,67 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 	var baseCoverage sync.Map
 	findBaseCoverage(baseSavedRecords, baseTestsNeedToRun, repoPath, baseSHA, gpull, ref, log, &baseCoverage)
 	testMsg = util.DiffCoverage(&headCoverage, &baseCoverage)
+	return
+}
+
+type testRunner interface {
+	Run(testName string, testConfig goTestsConfig) (string, error)
+}
+
+type testReporter struct {
+	RepoPath  string
+	Client    *github.Client
+	Pull      *github.PullRequest
+	Ref       GithubRef
+	TargetURL string
+}
+
+func (t *testReporter) Run(testName string, testConfig goTestsConfig) (string, error) {
+	return ReportTestResults(testName, t.RepoPath, testConfig.Cmds, testConfig.Coverage, t.Client, t.Pull,
+		t.Ref, t.TargetURL)
+}
+
+func runTests(tests map[string]goTestsConfig, t testRunner, coverageMap *sync.Map) (failedTests, passedTests, errTests int64) {
+	maxPendingTests := Conf.Concurrency.Test
+	if maxPendingTests < 1 {
+		maxPendingTests = 1
+	}
+	pendingTests := make(chan int, maxPendingTests)
+
+	var wg sync.WaitGroup
+	for k, v := range tests {
+		testName := k
+		testConfig := v
+
+		if isEmptyTest(testConfig.Cmds) {
+			continue
+		}
+
+		pendingTests <- 0
+		wg.Add(1)
+		go func() {
+			defer func() {
+				if info := recover(); info != nil {
+					atomic.AddInt64(&errTests, 1)
+				}
+				wg.Done()
+				<-pendingTests
+			}()
+			percentage, err := t.Run(testName, testConfig)
+			coverageMap.Store(testName, percentage)
+			if err != nil {
+				if _, ok := err.(*testNotPass); ok {
+					atomic.AddInt64(&failedTests, 1)
+				} else {
+					atomic.AddInt64(&errTests, 1)
+				}
+			} else {
+				atomic.AddInt64(&passedTests, 1)
+			}
+		}()
+	}
+
+	wg.Wait()
 	return
 }
 
@@ -648,51 +655,6 @@ func loadBaseFromStore(ref GithubRef, baseSHA string, tests map[string]goTestsCo
 
 func findBaseCoverage(baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun map[string]goTestsConfig, repoPath string,
 	baseSHA string, gpull *github.PullRequest, ref GithubRef, log io.Writer, baseCoverage *sync.Map) error {
-	maxPendingTests := Conf.Concurrency.Test
-	if maxPendingTests < 1 {
-		maxPendingTests = 1
-	}
-	pendingTests := make(chan int, maxPendingTests)
-
-	var (
-		wg  sync.WaitGroup
-		err error
-	)
-	if len(baseTestsNeedToRun) > 0 {
-		io.WriteString(log, "$ git checkout -f "+baseSHA+"\n")
-		cmd := exec.Command("git", "checkout", "-f", baseSHA)
-		cmd.Dir = repoPath
-		cmd.Stdout = log
-		cmd.Stderr = log
-		err = cmd.Run()
-		if err != nil {
-			msg := fmt.Sprintf("Failed to checkout to base: %v\n", err)
-			LogError.Error(msg)
-			io.WriteString(log, msg)
-		} else {
-			for k, v := range baseTestsNeedToRun {
-				testName := k
-				testCfg := v
-
-				if emptyTest(testCfg.Cmds) {
-					continue
-				}
-
-				pendingTests <- 0
-				wg.Add(1)
-				go func() {
-					defer func() {
-						wg.Done()
-						<-pendingTests
-					}()
-
-					_, reportMessage, _ := launchCommands(context.TODO(), ref.owner, ref.repo, baseSHA,
-						testName, testCfg.Cmds, testCfg.Coverage, repoPath, gpull, false)
-					baseCoverage.Store(testName, reportMessage)
-				}()
-			}
-		}
-	}
 	for _, v := range baseSavedRecords {
 		if v.Coverage == nil {
 			baseCoverage.Store(v.Test, "nil")
@@ -700,6 +662,41 @@ func findBaseCoverage(baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun m
 			baseCoverage.Store(v.Test, util.FormatFloatPercent(*v.Coverage))
 		}
 	}
-	wg.Wait()
-	return err
+
+	if len(baseTestsNeedToRun) > 0 {
+		io.WriteString(log, "$ git checkout -f "+baseSHA+"\n")
+		cmd := exec.Command("git", "checkout", "-f", baseSHA)
+		cmd.Dir = repoPath
+		cmd.Stdout = log
+		cmd.Stderr = log
+		err := cmd.Run()
+		if err != nil {
+			msg := fmt.Sprintf("Failed to checkout to base: %v\n", err)
+			LogError.Error(msg)
+			io.WriteString(log, msg)
+			return err
+		}
+
+		t := &testAndSave{
+			Ref:      ref,
+			BaseSHA:  baseSHA,
+			RepoPath: repoPath,
+			Pull:     gpull,
+		}
+		runTests(baseTestsNeedToRun, t, baseCoverage)
+	}
+	return nil
+}
+
+type testAndSave struct {
+	Ref      GithubRef
+	BaseSHA  string
+	RepoPath string
+	Pull     *github.PullRequest
+}
+
+func (t *testAndSave) Run(testName string, testConfig goTestsConfig) (string, error) {
+	_, reportMessage, _ := testAndSaveCoverage(context.TODO(), t.Ref.owner, t.Ref.repo, t.BaseSHA,
+		testName, testConfig.Cmds, testConfig.Coverage, t.RepoPath, t.Pull, false)
+	return reportMessage, nil
 }
