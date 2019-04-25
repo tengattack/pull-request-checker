@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/tengattack/unified-ci/auth"
 	"github.com/tengattack/unified-ci/checker"
 	"github.com/tengattack/unified-ci/config"
 	"github.com/tengattack/unified-ci/store"
@@ -56,7 +57,7 @@ func main() {
 		log.Fatalf("error: %v", err)
 	}
 
-	if err = checker.InitJWTClient(conf.GitHub.AppID, conf.GitHub.PrivateKey); err != nil {
+	if err = auth.InitJWTClient(conf.GitHub.AppID, conf.GitHub.PrivateKey); err != nil {
 		log.Fatalf("error: %v", err)
 	}
 

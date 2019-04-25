@@ -41,8 +41,8 @@ func carry(ctx context.Context, p *shellwords.Parser, repo, cmd string) (string,
 }
 
 // ReportTestResults reports the test results to github
-func ReportTestResults(repoPath string, cmds []string, coveragePattern string, client *github.Client, gpull *github.PullRequest,
-	testName string, ref GithubRef, targetURL string) (string, error) {
+func ReportTestResults(testName string, repoPath string, cmds []string, coveragePattern string, client *github.Client, gpull *github.PullRequest,
+	ref GithubRef, targetURL string) (string, error) {
 	outputTitle := testName + " test"
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
@@ -74,7 +74,7 @@ func parseCoverage(pattern, output string) (string, float64, error) {
 	coverage := "unknown"
 	r, err := regexp.Compile(pattern)
 	if err != nil {
-		return "", 0, err
+		return "error", 0, err
 	}
 	match := r.FindStringSubmatch(output)
 	if len(match) > 1 {
@@ -121,15 +121,16 @@ func launchCommands(ctx context.Context, owner, repo, sha string, testName strin
 			}
 			err := c.Save()
 			if err != nil {
-				percentage += fmt.Sprintf(" (Failed to save: %v)", err)
-				LogError.Errorf("Failed to save '%s': %v", c.Sha, err)
+				msg := fmt.Sprintf("\nError: %v. Failed to save %v", err, c)
+				outputSummary += msg
+				LogError.Errorf(msg)
 			}
 		} else {
 			LogError.Errorf("Failed to parse '%s': %v", percentage, err)
 			// PASS
 		}
 
-		outputSummary += ("\n" + "Test coverage: " + percentage)
+		outputSummary += ("\nTest coverage: " + percentage)
 		reportMessage = percentage
 	}
 	return

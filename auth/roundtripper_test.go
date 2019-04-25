@@ -1,4 +1,4 @@
-package checker
+package auth
 
 import (
 	"io/ioutil"

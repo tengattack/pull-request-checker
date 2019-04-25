@@ -1,4 +1,4 @@
-package checker
+package auth
 
 import (
 	"fmt"
@@ -12,7 +12,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-var jwtClient *github.Client
+// JWTClient is used for JWT authorization
+var JWTClient *github.Client
 
 // InitJWTClient initializes the jwtClient
 func InitJWTClient(id int, privateKeyFile string) error {
@@ -21,7 +22,7 @@ func InitJWTClient(id int, privateKeyFile string) error {
 		return fmt.Errorf("could not read private key: %s", err)
 	}
 	tr := newJWTRoundTripper(id, privateKey, http.DefaultTransport)
-	jwtClient = github.NewClient(&http.Client{Transport: tr})
+	JWTClient = github.NewClient(&http.Client{Transport: tr})
 	return nil
 }
 

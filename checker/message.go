@@ -18,6 +18,7 @@ import (
 
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/github"
+	"github.com/tengattack/unified-ci/auth"
 	"github.com/tengattack/unified-ci/store"
 	"github.com/tengattack/unified-ci/util"
 	"golang.org/x/sync/errgroup"
@@ -390,7 +391,7 @@ func HandleMessage(message string) error {
 		return err
 	}
 
-	installationToken, _, err := jwtClient.Apps.CreateInstallationToken(context.Background(), int64(installationID))
+	installationToken, _, err := auth.JWTClient.Apps.CreateInstallationToken(context.Background(), int64(installationID))
 	if err != nil {
 		return err
 	}
@@ -526,13 +527,6 @@ func HandleMessage(message string) error {
 
 func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string,
 	log *os.File) (failedTests, passedTests, errTests int, testMsg string) {
-	maxPendingTests := Conf.Concurrency.Test
-	if maxPendingTests < 1 {
-		maxPendingTests = 1
-	}
-	pendingTests := make(chan int, maxPendingTests)
-	errReports := make(chan error, maxPendingTests)
-
 	tests, err := getTests(repoPath)
 	if err != nil {
 		// Can not get tests from config: report action_required instead.
@@ -548,6 +542,13 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 		return
 	}
 
+	maxPendingTests := Conf.Concurrency.Test
+	if maxPendingTests < 1 {
+		maxPendingTests = 1
+	}
+	pendingTests := make(chan int, maxPendingTests)
+
+	errReports := make(chan error, maxPendingTests)
 	done := make(chan struct{})
 	go func() {
 		// This goroutine is the only reader of the errReports channel.
@@ -566,20 +567,16 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 		close(done)
 	}()
 
-	var wg sync.WaitGroup
-	var headCoverage sync.Map
+	var (
+		headCoverage sync.Map
+		wg           sync.WaitGroup
+	)
 
 	for k, v := range tests {
 		testName := k
 		testCfg := v
 
-		emptyCfg := true
-		for _, c := range testCfg.Cmds {
-			if c != "" {
-				emptyCfg = false
-			}
-		}
-		if emptyCfg {
+		if emptyTest(testCfg.Cmds) {
 			continue
 		}
 
@@ -594,8 +591,8 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 				wg.Done()
 				<-pendingTests
 			}()
-			percentage, err := ReportTestResults(repoPath, testCfg.Cmds, testCfg.Coverage, client, gpull,
-				testName, ref, targetURL)
+			percentage, err := ReportTestResults(testName, repoPath, testCfg.Cmds, testCfg.Coverage, client, gpull,
+				ref, targetURL)
 			headCoverage.Store(testName, percentage)
 			errReports <- err
 		}()
@@ -616,20 +613,16 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 		log.WriteString(msg)
 		return
 	}
-	baseCoverage, _ := findBaseCoverage(repoPath, baseSHA, tests, gpull, ref, log)
-	testMsg = util.DiffCoverage(&headCoverage, baseCoverage)
+	baseSavedRecords, baseTestsNeedToRun := loadBaseFromStore(ref, baseSHA, tests, log)
+	var baseCoverage sync.Map
+	findBaseCoverage(baseSavedRecords, baseTestsNeedToRun, repoPath, baseSHA, gpull, ref, log, &baseCoverage)
+	testMsg = util.DiffCoverage(&headCoverage, &baseCoverage)
 	return
 }
 
-func findBaseCoverage(repoPath string, baseSHA string, tests map[string]goTestsConfig, gpull *github.PullRequest, ref GithubRef,
-	log io.Writer) (*sync.Map, error) {
-	maxPendingTests := Conf.Concurrency.Test
-	if maxPendingTests < 1 {
-		maxPendingTests = 1
-	}
-	pendingTests := make(chan int, maxPendingTests)
-
-	baseInfo, err := store.ListCommitsInfo(ref.owner, ref.repo, baseSHA)
+func loadBaseFromStore(ref GithubRef, baseSHA string, tests map[string]goTestsConfig,
+	log io.Writer) ([]store.CommitsInfo, map[string]goTestsConfig) {
+	baseSavedRecords, err := store.ListCommitsInfo(ref.owner, ref.repo, baseSHA)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to load base info: %v\n", err)
 		LogError.Error(msg)
@@ -637,22 +630,35 @@ func findBaseCoverage(repoPath string, baseSHA string, tests map[string]goTestsC
 		// PASS
 	}
 
-	testsNotInTheBase := make(map[string]goTestsConfig)
+	baseTestsNeedToRun := make(map[string]goTestsConfig)
 	for testName, testCfg := range tests {
 		found := false
-		for _, v := range baseInfo {
+		for _, v := range baseSavedRecords {
 			if testName == v.Test {
 				found = true
 				break
 			}
 		}
 		if !found {
-			testsNotInTheBase[testName] = testCfg
+			baseTestsNeedToRun[testName] = testCfg
 		}
 	}
-	var wg sync.WaitGroup
-	var baseCoverage sync.Map
-	if len(testsNotInTheBase) > 0 {
+	return baseSavedRecords, baseTestsNeedToRun
+}
+
+func findBaseCoverage(baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun map[string]goTestsConfig, repoPath string,
+	baseSHA string, gpull *github.PullRequest, ref GithubRef, log io.Writer, baseCoverage *sync.Map) error {
+	maxPendingTests := Conf.Concurrency.Test
+	if maxPendingTests < 1 {
+		maxPendingTests = 1
+	}
+	pendingTests := make(chan int, maxPendingTests)
+
+	var (
+		wg  sync.WaitGroup
+		err error
+	)
+	if len(baseTestsNeedToRun) > 0 {
 		io.WriteString(log, "$ git checkout -f "+baseSHA+"\n")
 		cmd := exec.Command("git", "checkout", "-f", baseSHA)
 		cmd.Dir = repoPath
@@ -664,9 +670,13 @@ func findBaseCoverage(repoPath string, baseSHA string, tests map[string]goTestsC
 			LogError.Error(msg)
 			io.WriteString(log, msg)
 		} else {
-			for k, v := range testsNotInTheBase {
+			for k, v := range baseTestsNeedToRun {
 				testName := k
 				testCfg := v
+
+				if emptyTest(testCfg.Cmds) {
+					continue
+				}
 
 				pendingTests <- 0
 				wg.Add(1)
@@ -683,13 +693,13 @@ func findBaseCoverage(repoPath string, baseSHA string, tests map[string]goTestsC
 			}
 		}
 	}
-	for _, v := range baseInfo {
+	for _, v := range baseSavedRecords {
 		if v.Coverage == nil {
-			baseCoverage.Store(v.Test, "")
+			baseCoverage.Store(v.Test, "nil")
 		} else {
 			baseCoverage.Store(v.Test, util.FormatFloatPercent(*v.Coverage))
 		}
 	}
 	wg.Wait()
-	return &baseCoverage, nil
+	return err
 }

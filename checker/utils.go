@@ -149,6 +149,16 @@ type goTestsConfig struct {
 	Cmds     []string `yaml:"cmds"`
 }
 
+func emptyTest(cmds []string) bool {
+	empty := true
+	for _, c := range cmds {
+		if c != "" {
+			empty = false
+		}
+	}
+	return empty
+}
+
 func getTests(cwd string) (map[string]goTestsConfig, error) {
 	content, err := ioutil.ReadFile(filepath.Join(cwd, projectTestsConfigFile))
 	if err != nil {
