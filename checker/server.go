@@ -85,7 +85,7 @@ func RunHTTPServer() (err error) {
 		LogError.Errorf("HTTP server ListenAndServe: %v", err)
 		return err
 	}
-	LogAccess.Info("RunHTTPServer canceled.")
+	LogAccess.Warn("RunHTTPServer canceled.")
 	return nil
 }
 

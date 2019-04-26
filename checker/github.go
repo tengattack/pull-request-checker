@@ -331,7 +331,7 @@ func WatchLocalRepo(ctx context.Context) error {
 		for _, file := range files {
 			select {
 			case <-ctx.Done():
-				LogAccess.Info("WatchLocalRepo canceled.")
+				LogAccess.Warn("WatchLocalRepo canceled.")
 				return nil
 			default:
 			}
@@ -363,7 +363,7 @@ func WatchLocalRepo(ctx context.Context) error {
 				for _, subfile := range subfiles {
 					select {
 					case <-ctx.Done():
-						LogAccess.Info("WatchLocalRepo canceled.")
+						LogAccess.Warn("WatchLocalRepo canceled.")
 						return nil
 					default:
 					}
@@ -390,7 +390,7 @@ func WatchLocalRepo(ctx context.Context) error {
 						for _, pull := range pulls {
 							select {
 							case <-ctx.Done():
-								LogAccess.Info("WatchLocalRepo canceled.")
+								LogAccess.Warn("WatchLocalRepo canceled.")
 								return nil
 							default:
 							}
@@ -430,7 +430,7 @@ func WatchLocalRepo(ctx context.Context) error {
 		}
 		select {
 		case <-ctx.Done():
-			LogAccess.Info("WatchLocalRepo canceled.")
+			LogAccess.Warn("WatchLocalRepo canceled.")
 			return nil
 		case <-time.After(120 * time.Second):
 		}

@@ -36,7 +36,7 @@ func StartMessageSubscription(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			LogAccess.Info("StartMessageSubscription canceled.")
+			LogAccess.Warn("StartMessageSubscription canceled.")
 			return
 		default:
 		}
@@ -78,7 +78,7 @@ func RetryErrorMessages(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			LogAccess.Info("RetryErrorMessages canceled.")
+			LogAccess.Warn("RetryErrorMessages canceled.")
 			return
 		case <-time.After(60 * time.Second):
 		}
