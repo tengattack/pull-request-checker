@@ -468,7 +468,7 @@ func HandleMessage(message string) error {
 	if sumCount > 0 {
 		mark = '✖'
 	}
-	log.WriteString(fmt.Sprintf("\n%c %d problem(s) found.\n\n",
+	log.WriteString(fmt.Sprintf("%c %d problem(s) found.\n\n",
 		mark, sumCount))
 	log.WriteString("Updating status...\n")
 
@@ -542,8 +542,10 @@ func checkTests(repoPath string, client *github.Client, gpull *github.PullReques
 		return
 	}
 
+	var logLock sync.Mutex
 	t := &testReporter{
 		Log:       log,
+		lm:        &logLock,
 		RepoPath:  repoPath,
 		Client:    client,
 		Pull:      gpull,
@@ -573,7 +575,7 @@ type testRunner interface {
 
 type testReporter struct {
 	Log io.Writer
-	lm  sync.Mutex
+	lm  *sync.Mutex
 
 	RepoPath  string
 	Client    *github.Client
@@ -589,6 +591,7 @@ func (t *testReporter) Run(testName string, testConfig goTestsConfig) (string, e
 	t.lm.Lock()
 	defer t.lm.Unlock()
 	t.Log.Write(buf.Bytes())
+	io.WriteString(t.Log, "\n")
 	return reportMessage, err
 }
 
@@ -696,8 +699,11 @@ func findBaseCoverage(baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun m
 			return err
 		}
 
+		var logLock sync.Mutex
 		t := &testAndSave{
-			Log:      log,
+			Log: log,
+			lm:  &logLock,
+
 			Ref:      ref,
 			BaseSHA:  baseSHA,
 			RepoPath: repoPath,
@@ -710,7 +716,7 @@ func findBaseCoverage(baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun m
 
 type testAndSave struct {
 	Log io.Writer
-	lm  sync.Mutex
+	lm  *sync.Mutex
 
 	Ref      GithubRef
 	BaseSHA  string
@@ -725,5 +731,6 @@ func (t *testAndSave) Run(testName string, testConfig goTestsConfig) (string, er
 	t.lm.Lock()
 	defer t.lm.Unlock()
 	t.Log.Write(buf.Bytes())
+	io.WriteString(t.Log, "\n")
 	return reportMessage, nil
 }
