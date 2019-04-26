@@ -350,7 +350,7 @@ func HandleMessage(ctx context.Context, message string) error {
 		return nil
 	}
 
-	log.WriteString(UserAgent() + " " + time.Now().String() + "\n\n")
+	log.WriteString(UserAgent() + " Date: " + time.Now().String() + "\n\n")
 	log.WriteString(fmt.Sprintf("Start fetching %s/pull/%s\n", repository, pull))
 
 	gpull, err = GetGithubPull(client, ref.owner, ref.repo, prNum)
