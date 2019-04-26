@@ -1,5 +1,7 @@
 package mq
 
+import "context"
+
 const (
 	// SyncChannelKey is key name for sync message channel
 	SyncChannelKey = "checker:channel"
@@ -17,7 +19,7 @@ type MessageQueue interface {
 	Init() error
 	Reset()
 	Push(message string) error
-	Subscribe() (string, error)
+	Subscribe(ctx context.Context) (string, error)
 	Finish(message string) error
 	Error(message string) error
 	MoveAllPendingToError() (int, error)
