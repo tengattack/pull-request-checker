@@ -7,6 +7,7 @@ import (
 	"path"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/google/go-github/github"
@@ -127,10 +128,10 @@ func TestGetBaseCoverage(t *testing.T) {
 	cmd.Dir = repoPath
 	cmd.Run()
 
-	var baseSHA strings.Builder
+	var sha strings.Builder
 	cmd = exec.Command("git", "rev-parse", "--verify", "HEAD")
 	cmd.Dir = repoPath
-	cmd.Stdout = &baseSHA
+	cmd.Stdout = &sha
 	err = cmd.Run()
 	require.NoError(err)
 
@@ -142,15 +143,27 @@ func TestGetBaseCoverage(t *testing.T) {
 		owner: "owner",
 		repo:  "repo",
 	}
-	baseCoverage, err := findBaseCoverage(repoPath, strings.TrimSpace(baseSHA.String()), tests, &github.PullRequest{
-		Head: &github.PullRequestBranch{
-			User: &github.User{
-				Login: &author,
+	baseSHA := strings.TrimSpace(sha.String())
+	baseSavedRecords, baseTestsNeedToRun := loadBaseFromStore(ref, baseSHA, tests, os.Stdout)
+	assert.Empty(baseSavedRecords)
+	assert.Equal(len(tests), len(baseTestsNeedToRun))
+	var baseCoverage sync.Map
+	err = findBaseCoverage(baseSavedRecords, baseTestsNeedToRun, repoPath, baseSHA,
+		&github.PullRequest{
+			Head: &github.PullRequestBranch{
+				User: &github.User{
+					Login: &author,
+				},
 			},
-		},
-	}, ref, os.Stdout)
+		}, ref, os.Stdout, &baseCoverage)
 	require.NoError(err)
+
 	value, _ := baseCoverage.Load("go")
 	coverage, _ := value.(string)
 	assert.Regexp(percentageRegexp, coverage)
+
+	baseSavedRecords, baseTestsNeedToRun = loadBaseFromStore(ref, baseSHA, tests, os.Stdout)
+	assert.Empty(baseTestsNeedToRun)
+	assert.True(len(baseSavedRecords) == 1)
+	assert.True(*baseSavedRecords[0].Coverage > 0)
 }

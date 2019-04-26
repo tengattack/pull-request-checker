@@ -136,7 +136,6 @@ func CreateCheckRun(ctx context.Context, client *github.Client, gpull *github.Pu
 	repo := gpull.GetBase().GetRepo().GetName()
 	checkRun, _, err := client.Checks.CreateCheckRun(ctx, owner, repo, github.CreateCheckRunOptions{
 		Name:       checkName,
-		HeadBranch: gpull.GetBase().GetRef(),
 		HeadSHA:    ref.Sha,
 		DetailsURL: &targetURL,
 		Status:     &checkRunStatus,
@@ -147,6 +146,16 @@ func CreateCheckRun(ctx context.Context, client *github.Client, gpull *github.Pu
 type goTestsConfig struct {
 	Coverage string   `yaml:"coverage"`
 	Cmds     []string `yaml:"cmds"`
+}
+
+func isEmptyTest(cmds []string) bool {
+	empty := true
+	for _, c := range cmds {
+		if c != "" {
+			empty = false
+		}
+	}
+	return empty
 }
 
 func getTests(cwd string) (map[string]goTestsConfig, error) {

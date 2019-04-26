@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/bradleyfalzon/ghinstallation"
@@ -390,7 +391,7 @@ func HandleMessage(message string) error {
 		return err
 	}
 
-	installationToken, _, err := jwtClient.Apps.CreateInstallationToken(context.Background(), int64(installationID))
+	installationToken, _, err := util.JWTClient.Apps.CreateInstallationToken(context.Background(), int64(installationID))
 	if err != nil {
 		return err
 	}
@@ -457,7 +458,7 @@ func HandleMessage(message string) error {
 	}
 
 	noTest := true
-	failedTests, passedTests, errTests, testMsg := runTest(repoPath, client, gpull, ref, targetURL, log)
+	failedTests, passedTests, errTests, testMsg := checkTests(repoPath, client, gpull, ref, targetURL, log)
 	if failedTests+passedTests+errTests > 0 {
 		noTest = false
 	}
@@ -524,15 +525,8 @@ func HandleMessage(message string) error {
 	return err
 }
 
-func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string,
+func checkTests(repoPath string, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string,
 	log *os.File) (failedTests, passedTests, errTests int, testMsg string) {
-	maxPendingTests := Conf.Concurrency.Test
-	if maxPendingTests < 1 {
-		maxPendingTests = 1
-	}
-	pendingTests := make(chan int, maxPendingTests)
-	errReports := make(chan error, maxPendingTests)
-
 	tests, err := getTests(repoPath)
 	if err != nil {
 		// Can not get tests from config: report action_required instead.
@@ -548,66 +542,15 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 		return
 	}
 
-	done := make(chan struct{})
-	go func() {
-		// This goroutine is the only reader of the errReports channel.
-		// It is ready to quit when the errReports channel is closed and drained.
-		for errReport := range errReports {
-			if errReport != nil {
-				if _, ok := errReport.(*testNotPass); ok {
-					failedTests++
-				} else {
-					errTests++
-				}
-			} else {
-				passedTests++
-			}
-		}
-		close(done)
-	}()
-
-	var wg sync.WaitGroup
-	var headCoverage sync.Map
-
-	for k, v := range tests {
-		testName := k
-		testCfg := v
-
-		emptyCfg := true
-		for _, c := range testCfg.Cmds {
-			if c != "" {
-				emptyCfg = false
-			}
-		}
-		if emptyCfg {
-			continue
-		}
-
-		pendingTests <- 0
-		wg.Add(1)
-		go func() {
-			// This goroutine is a writer of the errReports channel
-			defer func() {
-				if info := recover(); info != nil {
-					errReports <- &panicError{Info: info}
-				}
-				wg.Done()
-				<-pendingTests
-			}()
-			percentage, err := ReportTestResults(repoPath, testCfg.Cmds, testCfg.Coverage, client, gpull,
-				testName, ref, targetURL)
-			headCoverage.Store(testName, percentage)
-			errReports <- err
-		}()
+	t := &testReporter{
+		RepoPath:  repoPath,
+		Client:    client,
+		Pull:      gpull,
+		Ref:       ref,
+		TargetURL: targetURL,
 	}
-
-	// We must wait for all writers to quit before we close the errReports channel. Otherwise it will panic.
-	wg.Wait()
-	// Tell the reader that it may quit
-	close(errReports)
-	// Wait for the reader to quit
-	<-done
-
+	var headCoverage sync.Map
+	failedTests, passedTests, errTests = runTests(tests, t, &headCoverage)
 	// compare test coverage with base
 	baseSHA, err := util.GetBaseSHA(client, ref.owner, ref.repo, gpull.GetNumber())
 	if err != nil {
@@ -616,20 +559,85 @@ func runTest(repoPath string, client *github.Client, gpull *github.PullRequest, 
 		log.WriteString(msg)
 		return
 	}
-	baseCoverage, _ := findBaseCoverage(repoPath, baseSHA, tests, gpull, ref, log)
-	testMsg = util.DiffCoverage(&headCoverage, baseCoverage)
+	baseSavedRecords, baseTestsNeedToRun := loadBaseFromStore(ref, baseSHA, tests, log)
+	var baseCoverage sync.Map
+	findBaseCoverage(baseSavedRecords, baseTestsNeedToRun, repoPath, baseSHA, gpull, ref, log, &baseCoverage)
+	testMsg = util.DiffCoverage(&headCoverage, &baseCoverage)
 	return
 }
 
-func findBaseCoverage(repoPath string, baseSHA string, tests map[string]goTestsConfig, gpull *github.PullRequest, ref GithubRef,
-	log io.Writer) (*sync.Map, error) {
+type testRunner interface {
+	Run(testName string, testConfig goTestsConfig) (string, error)
+}
+
+type testReporter struct {
+	RepoPath  string
+	Client    *github.Client
+	Pull      *github.PullRequest
+	Ref       GithubRef
+	TargetURL string
+}
+
+func (t *testReporter) Run(testName string, testConfig goTestsConfig) (string, error) {
+	return ReportTestResults(testName, t.RepoPath, testConfig.Cmds, testConfig.Coverage, t.Client, t.Pull,
+		t.Ref, t.TargetURL)
+}
+
+func runTests(tests map[string]goTestsConfig, t testRunner, coverageMap *sync.Map) (failedTests, passedTests, errTests int) {
 	maxPendingTests := Conf.Concurrency.Test
 	if maxPendingTests < 1 {
 		maxPendingTests = 1
 	}
 	pendingTests := make(chan int, maxPendingTests)
 
-	baseInfo, err := store.ListCommitsInfo(ref.owner, ref.repo, baseSHA)
+	var (
+		wg          sync.WaitGroup
+		errCount    int64
+		failedCount int64
+		passedCount int64
+	)
+	for k, v := range tests {
+		testName := k
+		testConfig := v
+
+		if isEmptyTest(testConfig.Cmds) {
+			continue
+		}
+
+		pendingTests <- 0
+		wg.Add(1)
+		go func() {
+			defer func() {
+				if info := recover(); info != nil {
+					atomic.AddInt64(&errCount, 1)
+				}
+				wg.Done()
+				<-pendingTests
+			}()
+			percentage, err := t.Run(testName, testConfig)
+			coverageMap.Store(testName, percentage)
+			if err != nil {
+				if _, ok := err.(*testNotPass); ok {
+					atomic.AddInt64(&failedCount, 1)
+				} else {
+					atomic.AddInt64(&errCount, 1)
+				}
+			} else {
+				atomic.AddInt64(&passedCount, 1)
+			}
+		}()
+	}
+
+	wg.Wait()
+	failedTests = int(failedCount)
+	passedTests = int(passedCount)
+	errTests = int(errCount)
+	return
+}
+
+func loadBaseFromStore(ref GithubRef, baseSHA string, tests map[string]goTestsConfig,
+	log io.Writer) ([]store.CommitsInfo, map[string]goTestsConfig) {
+	baseSavedRecords, err := store.ListCommitsInfo(ref.owner, ref.repo, baseSHA)
 	if err != nil {
 		msg := fmt.Sprintf("Failed to load base info: %v\n", err)
 		LogError.Error(msg)
@@ -637,59 +645,66 @@ func findBaseCoverage(repoPath string, baseSHA string, tests map[string]goTestsC
 		// PASS
 	}
 
-	testsNotInTheBase := make(map[string]goTestsConfig)
+	baseTestsNeedToRun := make(map[string]goTestsConfig)
 	for testName, testCfg := range tests {
 		found := false
-		for _, v := range baseInfo {
+		for _, v := range baseSavedRecords {
 			if testName == v.Test {
 				found = true
 				break
 			}
 		}
 		if !found {
-			testsNotInTheBase[testName] = testCfg
+			baseTestsNeedToRun[testName] = testCfg
 		}
 	}
-	var wg sync.WaitGroup
-	var baseCoverage sync.Map
-	if len(testsNotInTheBase) > 0 {
+	return baseSavedRecords, baseTestsNeedToRun
+}
+
+func findBaseCoverage(baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun map[string]goTestsConfig, repoPath string,
+	baseSHA string, gpull *github.PullRequest, ref GithubRef, log io.Writer, baseCoverage *sync.Map) error {
+	for _, v := range baseSavedRecords {
+		if v.Coverage == nil {
+			baseCoverage.Store(v.Test, "nil")
+		} else {
+			baseCoverage.Store(v.Test, util.FormatFloatPercent(*v.Coverage))
+		}
+	}
+
+	if len(baseTestsNeedToRun) > 0 {
 		io.WriteString(log, "$ git checkout -f "+baseSHA+"\n")
 		cmd := exec.Command("git", "checkout", "-f", baseSHA)
 		cmd.Dir = repoPath
 		cmd.Stdout = log
 		cmd.Stderr = log
-		err = cmd.Run()
+		err := cmd.Run()
 		if err != nil {
 			msg := fmt.Sprintf("Failed to checkout to base: %v\n", err)
 			LogError.Error(msg)
 			io.WriteString(log, msg)
-		} else {
-			for k, v := range testsNotInTheBase {
-				testName := k
-				testCfg := v
-
-				pendingTests <- 0
-				wg.Add(1)
-				go func() {
-					defer func() {
-						wg.Done()
-						<-pendingTests
-					}()
-
-					_, reportMessage, _ := launchCommands(context.TODO(), ref.owner, ref.repo, baseSHA,
-						testName, testCfg.Cmds, testCfg.Coverage, repoPath, gpull, false)
-					baseCoverage.Store(testName, reportMessage)
-				}()
-			}
+			return err
 		}
-	}
-	for _, v := range baseInfo {
-		if v.Coverage == nil {
-			baseCoverage.Store(v.Test, "")
-		} else {
-			baseCoverage.Store(v.Test, util.FormatFloatPercent(*v.Coverage))
+
+		t := &testAndSave{
+			Ref:      ref,
+			BaseSHA:  baseSHA,
+			RepoPath: repoPath,
+			Pull:     gpull,
 		}
+		runTests(baseTestsNeedToRun, t, baseCoverage)
 	}
-	wg.Wait()
-	return &baseCoverage, nil
+	return nil
+}
+
+type testAndSave struct {
+	Ref      GithubRef
+	BaseSHA  string
+	RepoPath string
+	Pull     *github.PullRequest
+}
+
+func (t *testAndSave) Run(testName string, testConfig goTestsConfig) (string, error) {
+	_, reportMessage, _ := testAndSaveCoverage(context.TODO(), t.Ref.owner, t.Ref.repo, t.BaseSHA,
+		testName, testConfig.Cmds, testConfig.Coverage, t.RepoPath, t.Pull, false)
+	return reportMessage, nil
 }
