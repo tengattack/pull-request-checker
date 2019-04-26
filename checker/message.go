@@ -542,10 +542,9 @@ func checkTests(repoPath string, client *github.Client, gpull *github.PullReques
 		return
 	}
 
-	var logLock sync.Mutex
 	t := &testReporter{
 		Log:       log,
-		lm:        &logLock,
+		lm:        new(sync.Mutex),
 		RepoPath:  repoPath,
 		Client:    client,
 		Pull:      gpull,
@@ -699,10 +698,9 @@ func findBaseCoverage(baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun m
 			return err
 		}
 
-		var logLock sync.Mutex
 		t := &testAndSave{
 			Log: log,
-			lm:  &logLock,
+			lm:  new(sync.Mutex),
 
 			Ref:      ref,
 			BaseSHA:  baseSHA,
