@@ -464,7 +464,7 @@ func HandleMessage(message string) error {
 	}
 
 	mark := '✔'
-	sumCount := int64(failedLints) + failedTests
+	sumCount := failedLints + failedTests
 	if sumCount > 0 {
 		mark = '✖'
 	}
@@ -526,7 +526,7 @@ func HandleMessage(message string) error {
 }
 
 func checkTests(repoPath string, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string,
-	log *os.File) (failedTests, passedTests, errTests int64, testMsg string) {
+	log *os.File) (failedTests, passedTests, errTests int, testMsg string) {
 	tests, err := getTests(repoPath)
 	if err != nil {
 		// Can not get tests from config: report action_required instead.
@@ -583,14 +583,19 @@ func (t *testReporter) Run(testName string, testConfig goTestsConfig) (string, e
 		t.Ref, t.TargetURL)
 }
 
-func runTests(tests map[string]goTestsConfig, t testRunner, coverageMap *sync.Map) (failedTests, passedTests, errTests int64) {
+func runTests(tests map[string]goTestsConfig, t testRunner, coverageMap *sync.Map) (failedTests, passedTests, errTests int) {
 	maxPendingTests := Conf.Concurrency.Test
 	if maxPendingTests < 1 {
 		maxPendingTests = 1
 	}
 	pendingTests := make(chan int, maxPendingTests)
 
-	var wg sync.WaitGroup
+	var (
+		wg          sync.WaitGroup
+		errCount    int64
+		failedCount int64
+		passedCount int64
+	)
 	for k, v := range tests {
 		testName := k
 		testConfig := v
@@ -604,7 +609,7 @@ func runTests(tests map[string]goTestsConfig, t testRunner, coverageMap *sync.Ma
 		go func() {
 			defer func() {
 				if info := recover(); info != nil {
-					atomic.AddInt64(&errTests, 1)
+					atomic.AddInt64(&errCount, 1)
 				}
 				wg.Done()
 				<-pendingTests
@@ -613,17 +618,20 @@ func runTests(tests map[string]goTestsConfig, t testRunner, coverageMap *sync.Ma
 			coverageMap.Store(testName, percentage)
 			if err != nil {
 				if _, ok := err.(*testNotPass); ok {
-					atomic.AddInt64(&failedTests, 1)
+					atomic.AddInt64(&failedCount, 1)
 				} else {
-					atomic.AddInt64(&errTests, 1)
+					atomic.AddInt64(&errCount, 1)
 				}
 			} else {
-				atomic.AddInt64(&passedTests, 1)
+				atomic.AddInt64(&passedCount, 1)
 			}
 		}()
 	}
 
 	wg.Wait()
+	failedTests = int(failedCount)
+	passedTests = int(passedCount)
+	errTests = int(errCount)
 	return
 }
 
