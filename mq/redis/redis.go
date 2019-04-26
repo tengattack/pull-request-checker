@@ -1,6 +1,8 @@
 package redis
 
 import (
+	"context"
+	"errors"
 	"log"
 	"strconv"
 	"time"
@@ -65,14 +67,23 @@ func (s *MessageQueue) Push(message string) error {
 }
 
 // Subscribe message from queue.
-func (s *MessageQueue) Subscribe() (string, error) {
-	msg, err := redisClient.BRPopLPush(mq.SyncChannelKey, mq.SyncPendingChannelKey, 5*time.Second).Result()
-	// If timeout is reached, a redis.Nil will be returned
-	if err == redis.Nil {
-		msg = ""
-		err = nil
+func (s *MessageQueue) Subscribe(ctx context.Context) (string, error) {
+	for {
+		select {
+		case <-ctx.Done():
+			return "", errors.New("canceled context")
+		default:
+		}
+		msg, err := redisClient.BRPopLPush(mq.SyncChannelKey, mq.SyncPendingChannelKey, 5*time.Second).Result()
+		// If timeout is reached, a redis.Nil will be returned
+		if err == redis.Nil {
+			continue
+		}
+		if err != nil {
+			return "", err
+		}
+		return msg, nil
 	}
-	return msg, err
 }
 
 // Finish message processing
