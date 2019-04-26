@@ -623,7 +623,9 @@ func runTests(tests map[string]goTestsConfig, t testRunner, coverageMap *sync.Ma
 				<-pendingTests
 			}()
 			percentage, err := t.Run(testName, testConfig)
-			coverageMap.Store(testName, percentage)
+			if testConfig.Coverage != "" {
+				coverageMap.Store(testName, percentage)
+			}
 			if err != nil {
 				if _, ok := err.(*testNotPass); ok {
 					atomic.AddInt64(&failedCount, 1)
