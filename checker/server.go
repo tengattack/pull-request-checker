@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pkg/errors"
 	"github.com/tengattack/unified-ci/log"
 	api "gopkg.in/appleboy/gin-status-api.v1"
 )
@@ -91,9 +90,6 @@ func RunHTTPServer() (err error) {
 
 // ShutdownHTTPServer shuts down the http server
 func ShutdownHTTPServer(timeout time.Duration) error {
-	if httpSrv == nil {
-		return errors.New("httpSrv is nil")
-	}
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	return httpSrv.Shutdown(ctx)
