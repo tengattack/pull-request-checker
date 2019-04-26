@@ -350,7 +350,7 @@ func HandleMessage(ctx context.Context, message string) error {
 		return nil
 	}
 
-	log.WriteString(UserAgent() + "\n\n")
+	log.WriteString(UserAgent() + " " + time.Now().String() + "\n\n")
 	log.WriteString(fmt.Sprintf("Start fetching %s/pull/%s\n", repository, pull))
 
 	gpull, err = GetGithubPull(client, ref.owner, ref.repo, prNum)
@@ -588,7 +588,6 @@ func (t *testReporter) Run(testName string, testConfig goTestsConfig) (string, e
 	t.lm.Lock()
 	defer t.lm.Unlock()
 	t.Log.Write(buf.Bytes())
-	io.WriteString(t.Log, "\n")
 	return reportMessage, err
 }
 
@@ -668,7 +667,7 @@ func loadBaseFromStore(ref GithubRef, baseSHA string, tests map[string]goTestsCo
 		}
 	}
 	io.WriteString(log,
-		fmt.Sprintf("baseSavedRecords: %d, baseTestsNeedToRun: %d", len(baseSavedRecords), len(baseTestsNeedToRun)))
+		fmt.Sprintf("baseSavedRecords: %d, baseTestsNeedToRun: %d\n", len(baseSavedRecords), len(baseTestsNeedToRun)))
 	return baseSavedRecords, baseTestsNeedToRun
 }
 
@@ -727,6 +726,5 @@ func (t *testAndSave) Run(testName string, testConfig goTestsConfig) (string, er
 	t.lm.Lock()
 	defer t.lm.Unlock()
 	t.Log.Write(buf.Bytes())
-	io.WriteString(t.Log, "\n")
 	return reportMessage, nil
 }

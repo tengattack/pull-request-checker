@@ -95,6 +95,7 @@ func testAndSaveCoverage(ctx context.Context, owner, repo, sha string, testName 
 	parser.ParseBacktick = true
 	parser.Dir = repoPath
 
+	io.WriteString(log, fmt.Sprintf("Testing '%s'\n", testName))
 	conclusion = "success"
 	for _, cmd := range cmds {
 		if cmd != "" {
@@ -139,5 +140,6 @@ func testAndSaveCoverage(ctx context.Context, owner, repo, sha string, testName 
 		outputSummary += ("Test coverage: " + percentage + "\n")
 		reportMessage = percentage
 	}
+	io.WriteString(log, "\n")
 	return
 }
