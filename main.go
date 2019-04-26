@@ -119,12 +119,12 @@ func main() {
 	cancel()
 	err = checker.ShutdownHTTPServer(60 * time.Second)
 	if err != nil {
-		log.Printf("Error in ShutdownHTTPServer: %v\n", err)
+		checker.LogError.Errorf("Error in ShutdownHTTPServer: %v\n", err)
 	}
 
 	select {
 	case <-leave:
 	case <-time.After(60 * time.Second):
-		log.Println("Waiting for leave times out.")
+		checker.LogAccess.Info("Waiting for leave times out.")
 	}
 }

@@ -67,6 +67,7 @@ func (s *MessageQueue) Push(message string) error {
 // Subscribe message from queue.
 func (s *MessageQueue) Subscribe() (string, error) {
 	msg, err := redisClient.BRPopLPush(mq.SyncChannelKey, mq.SyncPendingChannelKey, 5*time.Second).Result()
+	// If timeout is reached, a redis.Nil will be returned
 	if err == redis.Nil {
 		msg = ""
 		err = nil
