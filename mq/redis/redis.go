@@ -3,9 +3,9 @@ package redis
 import (
 	"log"
 	"strconv"
+	"time"
 
 	"github.com/tengattack/unified-ci/mq"
-
 	"gopkg.in/redis.v5"
 )
 
@@ -66,7 +66,13 @@ func (s *MessageQueue) Push(message string) error {
 
 // Subscribe message from queue.
 func (s *MessageQueue) Subscribe() (string, error) {
-	return redisClient.BRPopLPush(mq.SyncChannelKey, mq.SyncPendingChannelKey, 0).Result()
+	msg, err := redisClient.BRPopLPush(mq.SyncChannelKey, mq.SyncPendingChannelKey, 5*time.Second).Result()
+	// If timeout is reached, a redis.Nil will be returned
+	if err == redis.Nil {
+		msg = ""
+		err = nil
+	}
+	return msg, err
 }
 
 // Finish message processing

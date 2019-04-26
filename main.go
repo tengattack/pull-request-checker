@@ -1,10 +1,14 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/tengattack/unified-ci/checker"
 	"github.com/tengattack/unified-ci/config"
@@ -70,33 +74,57 @@ func main() {
 		return
 	}
 
-	var g errgroup.Group
+	parent, cancel := context.WithCancel(context.Background())
+	g, ctx := errgroup.WithContext(parent)
 
-	if checker.Conf.Core.EnableRetries {
+	leave := make(chan struct{})
+	go func() {
+		if checker.Conf.Core.EnableRetries {
+			g.Go(func() error {
+				// Start error message retries
+				checker.RetryErrorMessages(ctx)
+				return nil
+			})
+		}
+
 		g.Go(func() error {
-			// Start error message retries
-			checker.RetryErrorMessages()
+			// Start message subscription
+			checker.StartMessageSubscription(ctx)
 			return nil
 		})
+
+		g.Go(func() error {
+			// Run httpd server
+			return checker.RunHTTPServer()
+		})
+
+		g.Go(func() error {
+			// Run local repo watcher
+			return checker.WatchLocalRepo(ctx)
+		})
+
+		if err = g.Wait(); err != nil {
+			checker.LogError.Error(err)
+		}
+		close(leave)
+	}()
+
+	shutdown := make(chan os.Signal, 1)
+	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
+	select {
+	case <-shutdown:
+	case <-ctx.Done():
 	}
 
-	g.Go(func() error {
-		// Start message subscription
-		checker.StartMessageSubscription()
-		return nil
-	})
+	cancel()
+	err = checker.ShutdownHTTPServer(60 * time.Second)
+	if err != nil {
+		checker.LogError.Errorf("Error in ShutdownHTTPServer: %v\n", err)
+	}
 
-	g.Go(func() error {
-		// Run httpd server
-		return checker.RunHTTPServer()
-	})
-
-	g.Go(func() error {
-		// Run local repo watcher
-		return checker.WatchLocalRepo()
-	})
-
-	if err = g.Wait(); err != nil {
-		checker.LogError.Fatal(err)
+	select {
+	case <-leave:
+	case <-time.After(60 * time.Second):
+		checker.LogAccess.Info("Waiting for leave times out.")
 	}
 }
