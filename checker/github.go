@@ -321,6 +321,7 @@ func HasLintStatuses(client *github.Client, ref *GithubRef) (bool, error) {
 	return lint > 0, nil
 }
 
+// WatchLocalRepo scans local repo periodically and sends a checking request if a opened PR hasn't any checks
 func WatchLocalRepo(ctx context.Context) error {
 	var err error
 	for {
