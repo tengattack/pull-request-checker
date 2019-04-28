@@ -669,7 +669,7 @@ func loadBaseFromStore(ref GithubRef, baseSHA string, tests map[string]goTestsCo
 		}
 	}
 	io.WriteString(log,
-		fmt.Sprintf("baseSavedRecords: %d, baseTestsNeedToRun: %d\n", len(baseSavedRecords), len(baseTestsNeedToRun)))
+		fmt.Sprintf("baseSavedRecords: %d, baseTestsNeedToRun: %d\n\n", len(baseSavedRecords), len(baseTestsNeedToRun)))
 	return baseSavedRecords, baseTestsNeedToRun
 }
 
