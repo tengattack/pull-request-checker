@@ -12,5 +12,5 @@ func TestFloatPercent(t *testing.T) {
 	require.NoError(t, err)
 	assert.InDelta(t, 0.012, pct, 0.0001)
 
-	assert.Equal(t, "58.8%", FormatFloatPercent(.5878))
+	assert.Equal(t, "58.78%", FormatFloatPercent(.5878))
 }

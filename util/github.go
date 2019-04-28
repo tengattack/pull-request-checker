@@ -30,7 +30,6 @@ func SearchGithubPR(ctx context.Context, client *github.Client, repo, sha string
 // DiffCoverage generates a diff-format message to show the test coverage's difference between head and base.
 func DiffCoverage(headCoverage, baseCoverage *sync.Map) string {
 	var output strings.Builder
-	output.WriteString("```diff\n")
 	headCoverage.Range(func(key, value interface{}) bool {
 		testName, _ := key.(string)
 		currentResult, _ := value.(string)
@@ -40,22 +39,28 @@ func DiffCoverage(headCoverage, baseCoverage *sync.Map) string {
 
 		currentPercentage, err1 := ParseFloatPercent(currentResult, 64)
 		basePercentage, err2 := ParseFloatPercent(baseResult, 64)
-		var testMsg string
 		if err1 != nil || err2 != nil {
-			testMsg += "  "
+			output.WriteString("  ")
 		} else if currentPercentage > basePercentage {
-			testMsg += "+ "
+			output.WriteString("+ ")
 		} else if currentPercentage < basePercentage {
-			testMsg += "- "
+			output.WriteString("- ")
 		} else {
-			testMsg += "  "
+			output.WriteString("  ")
 		}
-		testMsg += (testName + " test coverage: " + baseResult + " -> " + currentResult + "\n")
-		output.WriteString(testMsg)
+		output.WriteString(testName)
+		output.WriteString(" test coverage: ")
+		output.WriteString(baseResult)
+		output.WriteString(" -> ")
+		output.WriteString(currentResult)
+		output.WriteRune('\n')
 		return true
 	})
-	output.WriteString("\n```")
-	return output.String()
+	if output.Len() > 0 {
+		output.WriteString("\n```")
+		return "```diff\n" + output.String()
+	}
+	return ""
 }
 
 // GetBaseSHA gets the SHA string of the commit which the pull request is based on

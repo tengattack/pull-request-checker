@@ -21,5 +21,5 @@ func ParseFloatPercent(s string, bitSize int) (f float64, err error) {
 
 // FormatFloatPercent converts f to percentages string
 func FormatFloatPercent(f float64) string {
-	return strconv.FormatFloat(f*100, 'f', 1, 64) + "%"
+	return strconv.FormatFloat(f*100, 'f', -1, 64) + "%"
 }
