@@ -2,7 +2,6 @@ package redis
 
 import (
 	"context"
-	"errors"
 	"log"
 	"strconv"
 	"time"
@@ -71,7 +70,7 @@ func (s *MessageQueue) Subscribe(ctx context.Context) (string, error) {
 	for {
 		select {
 		case <-ctx.Done():
-			return "", errors.New("canceled context")
+			return "", ctx.Err()
 		default:
 		}
 		msg, err := redisClient.BRPopLPush(mq.SyncChannelKey, mq.SyncPendingChannelKey, 5*time.Second).Result()

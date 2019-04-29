@@ -42,7 +42,7 @@ func StartMessageSubscription(ctx context.Context) {
 		default:
 		}
 		message, err := MQ.Subscribe(ctx)
-		if err != nil {
+		if err != nil && err != context.Canceled {
 			LogError.Error("mq subscribe error: " + err.Error())
 			continue
 		}
