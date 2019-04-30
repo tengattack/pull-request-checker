@@ -34,13 +34,13 @@ func StartMessageSubscription(ctx context.Context) {
 	LogAccess.Info("Start Message Subscription")
 
 	for {
-		LogAccess.Info("Waiting for message...")
 		select {
 		case <-ctx.Done():
 			LogAccess.Warn("StartMessageSubscription canceled.")
 			return
 		default:
 		}
+		LogAccess.Info("Waiting for message...")
 		message, err := MQ.Subscribe(ctx)
 		if err != nil && err != context.Canceled {
 			LogError.Error("mq subscribe error: " + err.Error())
