@@ -64,9 +64,9 @@ func DiffCoverage(headCoverage, baseCoverage *sync.Map) string {
 }
 
 // GetBaseSHA gets the SHA string of the commit which the pull request is based on
-func GetBaseSHA(client *github.Client, owner, repo string, prNum int) (string, error) {
+func GetBaseSHA(ctx context.Context, client *github.Client, owner, repo string, prNum int) (string, error) {
 	opt := &github.ListOptions{Page: 1, PerPage: 1}
-	commits, _, err := client.PullRequests.ListCommits(context.Background(), owner, repo, prNum, opt)
+	commits, _, err := client.PullRequests.ListCommits(ctx, owner, repo, prNum, opt)
 	if err != nil {
 		return "", err
 	}
