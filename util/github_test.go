@@ -47,7 +47,7 @@ func TestGetBaseSHA(t *testing.T) {
 	assert := assert.New(t)
 
 	client := github.NewClient(nil)
-	sha, err := GetBaseSHA(client, "tengattack", "unified-ci", 30)
+	sha, err := GetBaseSHA(context.Background(), client, "tengattack", "unified-ci", 30)
 	require.NoError(err)
 	assert.Equal("94a32a63aa2a618a127a00954bb9965bff8939df", sha)
 }
