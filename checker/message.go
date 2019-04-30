@@ -552,7 +552,7 @@ func checkTests(ctx context.Context, repoPath string, client *github.Client, gpu
 	var headCoverage sync.Map
 	failedTests, passedTests, errTests = runTests(tests, t, &headCoverage)
 	// compare test coverage with base
-	baseSHA, err := util.GetBaseSHA(client, ref.owner, ref.repo, gpull.GetNumber())
+	baseSHA, err := util.GetBaseSHA(ctx, client, ref.owner, ref.repo, gpull.GetNumber())
 	if err != nil {
 		msg := fmt.Sprintf("Cannot get BaseSHA: %v\n", err)
 		LogError.Error(msg)
