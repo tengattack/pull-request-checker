@@ -697,7 +697,7 @@ func findBaseCoverage(baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun m
 			return err
 		}
 
-		t := &testAndSave{
+		t := &baseTestAndSave{
 			Log: log,
 			lm:  new(sync.Mutex),
 
@@ -711,7 +711,7 @@ func findBaseCoverage(baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun m
 	return nil
 }
 
-type testAndSave struct {
+type baseTestAndSave struct {
 	Log io.Writer
 	lm  *sync.Mutex
 
@@ -721,10 +721,10 @@ type testAndSave struct {
 	Pull     *github.PullRequest
 }
 
-func (t *testAndSave) Run(testName string, testConfig goTestsConfig) (string, error) {
+func (t *baseTestAndSave) Run(testName string, testConfig goTestsConfig) (string, error) {
 	var buf bytes.Buffer
 	_, reportMessage, _ := testAndSaveCoverage(context.TODO(), t.Ref.owner, t.Ref.repo, t.BaseSHA,
-		testName, testConfig.Cmds, testConfig.Coverage, t.RepoPath, t.Pull, false, &buf)
+		testName, testConfig.Cmds, testConfig.Coverage, t.RepoPath, t.Pull, true, &buf)
 	t.lm.Lock()
 	defer t.lm.Unlock()
 	t.Log.Write(buf.Bytes())
