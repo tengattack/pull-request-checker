@@ -100,11 +100,11 @@ func testAndSaveCoverage(ctx context.Context, owner, repo, sha string, testName 
 	for _, cmd := range cmds {
 		if cmd != "" {
 			out, errCmd := carry(ctx, parser, repoPath, cmd)
-			msg := cmd + "\n"
+			msg := cmd + "\n" + out + "\n"
 			if errCmd != nil {
 				msg += errCmd.Error() + "\n"
 			}
-			msg += out + "\n"
+
 			io.WriteString(log, msg)
 			outputSummary += msg
 			if errCmd != nil {
