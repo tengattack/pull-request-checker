@@ -7,12 +7,14 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/go-github/github"
 	"github.com/tengattack/unified-ci/util"
 	githubhook "gopkg.in/rjz/githubhook.v0"
+	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
 const (
@@ -452,4 +454,78 @@ func markAsPending(client *github.Client, ref GithubRef) {
 	if err != nil {
 		LogAccess.Error("Update pull request status error: " + err.Error())
 	}
+}
+
+// SizeLabel for pre-defined labels
+type SizeLabel struct {
+	Name        string
+	Color       string
+	Description string
+	MaxLine     int
+}
+
+var sizeLabels = []*SizeLabel{
+	&SizeLabel{Name: "size/XS", Color: "009900", Description: "Denotes a PR that changes 0-9 lines, ignoring generated files.", MaxLine: 9},
+	&SizeLabel{Name: "size/S", Color: "77bb00", Description: "Denotes a PR that changes 10-29 lines, ignoring generated files.", MaxLine: 29},
+	&SizeLabel{Name: "size/M", Color: "eebb00", Description: "Denotes a PR that changes 30-99 lines, ignoring generated files.", MaxLine: 99},
+	&SizeLabel{Name: "size/L", Color: "ee9900", Description: "Denotes a PR that changes 100-499 lines, ignoring generated files.", MaxLine: 499},
+	&SizeLabel{Name: "size/XL", Color: "ee5500", Description: "Denotes a PR that changes 500-999 lines, ignoring generated files.", MaxLine: 999},
+	&SizeLabel{Name: "size/XXL", Color: "ee0000", Description: "Denotes a PR that changes 1000+ lines, ignoring generated files.", MaxLine: 0},
+}
+
+// LabelPRSize creates and labels PR with its size
+func LabelPRSize(ctx context.Context, client *github.Client, ref GithubRef, prNum int, diffs []*diff.FileDiff) error {
+	lines := 0
+	for _, d := range diffs {
+		for _, h := range d.Hunks {
+			s := h.Stat()
+			// REVIEW: changed needs to be doubled?
+			lines += int(s.Added + s.Changed + s.Deleted)
+		}
+	}
+	// LogAccess.Debugf("changed lines: %d", lines)
+
+	sizeLabel := sizeLabels[0]
+	for i := len(sizeLabels) - 1; i > 0; i-- {
+		if lines > sizeLabels[i-1].MaxLine {
+			sizeLabel = sizeLabels[i]
+			break
+		}
+	}
+
+	opts := &github.ListOptions{}
+	// check whether exists
+	for {
+		ls, resp, err := client.Issues.ListLabelsByIssue(ctx, ref.owner, ref.repo, prNum, opts)
+		if err != nil {
+			return err
+		}
+		if resp.NextPage == 0 {
+			break
+		}
+		for _, l := range ls {
+			if strings.HasPrefix(*l.Name, "size/") {
+				// already exists
+				return nil
+			}
+		}
+		opts.Page = resp.NextPage
+	}
+
+	labels, _, err := client.Issues.AddLabelsToIssue(ctx, ref.owner, ref.repo, prNum, []string{sizeLabel.Name})
+	for _, l := range labels {
+		if *l.Name == sizeLabel.Name {
+			if l.Color == nil || l.Description == nil || *l.Color != sizeLabel.Color || *l.Description != sizeLabel.Description {
+				l.Color = &sizeLabel.Color
+				l.Description = &sizeLabel.Description
+				_, _, err2 := client.Issues.EditLabel(ctx, ref.owner, ref.repo, *l.Name, l)
+				if err2 != nil {
+					LogError.Errorf("edit label error: %v", err2)
+					// PASS
+				}
+			}
+			break
+		}
+	}
+	return err
 }

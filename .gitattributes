@@ -3,3 +3,4 @@
 *.md text eol=lf
 *.yml text eol=lf
 *.diff text eol=lf
+*.pem text eol=lf
