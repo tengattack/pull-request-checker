@@ -17,6 +17,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/MiaoSiLa/missevan-go/logger"
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/github"
 	"github.com/tengattack/unified-ci/store"
@@ -446,6 +447,12 @@ func HandleMessage(ctx context.Context, message string) error {
 	diffs, err := diff.ParseMultiFileDiff(out)
 	if err != nil {
 		return err
+	}
+
+	err = LabelPRSize(ctx, client, ref, prNum, diffs)
+	if err != nil {
+		logger.Errorf("label PR error: %v", err)
+		// PASS
 	}
 
 	lintEnabled := LintEnabled{}
