@@ -46,7 +46,7 @@ func TestLabelPRSize(t *testing.T) {
 
 	client = github.NewClient(&http.Client{Transport: tr})
 
-	testDiffFile := path.Join(currentDir, "../testdata/test1.go.diff")
+	testDiffFile := path.Join(currentDir, "../testdata/sillycode.cpp.diff")
 	out, err := ioutil.ReadFile(testDiffFile)
 	require.NoError(err)
 
@@ -55,7 +55,21 @@ func TestLabelPRSize(t *testing.T) {
 
 	ctx := context.Background()
 	ref := GithubRef{owner: "tengattack", repo: "playground"}
-	// TODO: check more conditions
+
 	err = LabelPRSize(ctx, client, ref, 1, diffs)
 	assert.NoError(err)
+
+	testDiffFile = path.Join(currentDir, "../testdata/test1.go.diff")
+	out, err = ioutil.ReadFile(testDiffFile)
+	require.NoError(err)
+
+	diffs, err = diff.ParseMultiFileDiff(out)
+	require.NoError(err)
+	err = LabelPRSize(ctx, client, ref, 1, diffs)
+	assert.NoError(err)
+
+	// TODO: check more conditions
+
+	// cleanup
+	_, _ = client.Issues.RemoveLabelsForIssue(ctx, ref.owner, ref.repo, 1)
 }

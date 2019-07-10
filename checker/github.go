@@ -494,22 +494,39 @@ func LabelPRSize(ctx context.Context, client *github.Client, ref GithubRef, prNu
 	}
 
 	opts := &github.ListOptions{}
+	var labelsToBeRemoved []string
+	hasExpectedLabel := false
 	// check whether exists
 	for {
 		ls, resp, err := client.Issues.ListLabelsByIssue(ctx, ref.owner, ref.repo, prNum, opts)
 		if err != nil {
 			return err
 		}
-		if resp.NextPage == 0 {
-			break
-		}
 		for _, l := range ls {
 			if strings.HasPrefix(*l.Name, "size/") {
 				// already exists
-				return nil
+				if sizeLabel.Name == *l.Name {
+					hasExpectedLabel = true
+				} else {
+					labelsToBeRemoved = append(labelsToBeRemoved, *l.Name)
+				}
 			}
 		}
+		if resp.NextPage == 0 {
+			break
+		}
 		opts.Page = resp.NextPage
+	}
+
+	for _, s := range labelsToBeRemoved {
+		_, err := client.Issues.RemoveLabelForIssue(ctx, ref.owner, ref.repo, prNum, s)
+		if err != nil {
+			LogError.Errorf("remove label %s error: %v", s, err)
+			// PASS
+		}
+	}
+	if hasExpectedLabel {
+		return nil
 	}
 
 	labels, _, err := client.Issues.AddLabelsToIssue(ctx, ref.owner, ref.repo, prNum, []string{sizeLabel.Name})
