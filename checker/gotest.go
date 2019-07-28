@@ -62,7 +62,7 @@ func ReportTestResults(testName string, repoPath string, cmds []string, coverage
 	err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, "coverage: "+reportMessage, "```\n"+outputSummary+"\n```", nil)
 	if err != nil {
 		LogError.Errorf("report test results to github failed: %v", err)
-		return reportMessage, err
+		// PASS
 	}
 	if conclusion == "failure" {
 		err = &testNotPass{Title: outputTitle}
