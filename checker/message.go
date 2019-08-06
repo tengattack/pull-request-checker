@@ -65,7 +65,83 @@ func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, annotations
 }
 
 // GenerateAnnotations generate github annotations from github diffs and lint option
-func GenerateAnnotations(repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled, log *os.File) ([]*github.CheckRunAnnotation, int, error) {
+func GenerateAnnotations(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled, log *os.File) (
+	annotations []*github.CheckRunAnnotation, problems int, err error) {
+	var (
+		annotations1, annotations2 []*github.CheckRunAnnotation
+		problems1, problems2       int
+		buf1, buf2                 strings.Builder
+		err1, err2                 error
+	)
+
+	var eg errgroup.Group
+	eg.Go(func() error {
+		annotations1, problems1, err1 = lintRepo(ctx, repoPath, diffs, &buf1)
+		return err1
+	})
+	eg.Go(func() error {
+		annotations2, problems2, err2 = lintIndividually(repoPath, diffs, lintEnabled, &buf2)
+		return err2
+	})
+	err = eg.Wait()
+
+	annotations = append(annotations, annotations1...)
+	annotations = append(annotations, annotations2...)
+	problems += problems1
+	problems += problems2
+	log.WriteString(buf1.String())
+	log.WriteString(buf2.String())
+
+	return
+}
+
+func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, log io.StringWriter) (annotations []*github.CheckRunAnnotation,
+	problems int, err error) {
+	annotationLevel := "warning" // TODO: from lint.Severity
+
+	golangci := false
+	if _, err = os.Stat(filepath.Join(repoPath, ".golangci.yml")); err == nil {
+		golangci = true
+	}
+
+	if golangci {
+		lints, _, err := GolangCILint(ctx, repoPath)
+		if err != nil {
+			log.WriteString(fmt.Sprintf("GolangCILint error: %v", err))
+			return nil, 0, err
+		}
+		for _, d := range diffs {
+			newName, err := strconv.Unquote(d.NewName)
+			if err != nil {
+				newName = d.NewName
+			}
+			if !strings.HasPrefix(newName, "b/") {
+				log.WriteString("No need to process " + newName + "\n\n")
+				continue
+			}
+			fileName := newName[2:]
+
+			for _, v := range lints {
+				if fileName == v.Location.Path {
+					startLine := v.Location.Lines.Begin
+					comment := fmt.Sprintf("%s:%d  %s",
+						fileName, startLine, v.Description)
+					annotations = append(annotations, &github.CheckRunAnnotation{
+						Path:            &fileName,
+						Message:         &comment,
+						StartLine:       &startLine,
+						EndLine:         &startLine,
+						AnnotationLevel: &annotationLevel,
+					})
+					problems++
+				}
+			}
+		}
+	}
+	return
+}
+
+func lintIndividually(repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled, log io.Writer) ([]*github.CheckRunAnnotation, int, error) {
 	annotationLevel := "warning" // TODO: from lint.Severity
 	maxPending := Conf.Concurrency.Lint
 	if maxPending < 1 {
@@ -142,8 +218,6 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 			return err
 		}
 		pickDiffLintMessages(lintsGoreturns, d, annotations, problems, log, fileName)
-		log.WriteString(fmt.Sprintf("Golint '%s'\n", fileName))
-		lints, lintErr = Golint(filepath.Join(repoPath, fileName), repoPath)
 	} else if lintEnabled.PHP && strings.HasSuffix(fileName, ".php") {
 		log.WriteString(fmt.Sprintf("PHPLint '%s'\n", fileName))
 		var errlog string
@@ -359,7 +433,7 @@ func HandleMessage(ctx context.Context, message string) error {
 		return err
 	}
 	if gpull.GetState() != "open" {
-		log.WriteString("PR " + gpull.GetState() + ".")
+		log.WriteString("PR " + gpull.GetState() + ".\n")
 		return nil
 	}
 
@@ -457,7 +531,7 @@ func HandleMessage(ctx context.Context, message string) error {
 
 	lintEnabled := LintEnabled{}
 	lintEnabled.Init(repoPath)
-	annotations, failedLints, err := GenerateAnnotations(repoPath, diffs, lintEnabled, log)
+	annotations, failedLints, err := GenerateAnnotations(ctx, repoPath, diffs, lintEnabled, log)
 	if err != nil {
 		return err
 	}
