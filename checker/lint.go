@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -17,7 +18,6 @@ import (
 
 	"github.com/martinlindhe/go-difflib/difflib"
 	shellwords "github.com/mattn/go-shellwords"
-	"github.com/pkg/errors"
 	"github.com/sqs/goreturns/returns"
 	"golang.org/x/lint"
 	"golang.org/x/tools/imports"
@@ -378,8 +378,8 @@ func SCSSLint(fileName, cwd string) ([]LintMessage, string, error) {
 	return messages, stderr.String(), nil
 }
 
-// codeClimate --out-format code-climate
-type codeClimate struct {
+// CodeClimate --out-format code-climate
+type CodeClimate struct {
 	Description string `json:"description"`
 	Location    struct {
 		Path  string `json:"path"`
@@ -390,7 +390,7 @@ type codeClimate struct {
 }
 
 // GolangCILint runs `golangci-lint run --out-format code-climate`
-func GolangCILint(ctx context.Context, cwd string) ([]codeClimate, string, error) {
+func GolangCILint(ctx context.Context, cwd string) ([]CodeClimate, string, error) {
 	words, err := shellwords.Parse(Conf.Core.GolangCILint)
 	if err == nil && len(words) < 1 {
 		err = errors.New("GolangCILint command is not configured")
@@ -411,7 +411,7 @@ func GolangCILint(ctx context.Context, cwd string) ([]codeClimate, string, error
 
 	LogAccess.Debugf("GolangCILint Output:\n%s", out)
 
-	var suggestions []codeClimate
+	var suggestions []CodeClimate
 	err = json.Unmarshal(out, &suggestions)
 	if err != nil {
 		LogError.Error("GolangCILint: " + err.Error())
