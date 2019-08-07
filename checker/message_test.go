@@ -188,7 +188,7 @@ func TestLintRepo(t *testing.T) {
 
 	lintEnabled := LintEnabled{}
 	lintEnabled.Init(repoDir)
-	Conf.Core.GolangCILint = "golangci-lint run --out-format code-climate"
+	Conf.Core.GolangCILint = "golangci-lint"
 
 	var buf strings.Builder
 	annotations, problems, err := lintRepo(context.TODO(), repoDir, diffs, lintEnabled, &buf)
