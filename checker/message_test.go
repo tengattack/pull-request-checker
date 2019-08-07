@@ -1,6 +1,7 @@
 package checker
 
 import (
+	"context"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -82,7 +83,7 @@ func TestGenerateComments(t *testing.T) {
 			lintEnabled := LintEnabled{}
 			lintEnabled.Init(testRepoPath)
 
-			annotations, problems, err := GenerateAnnotations(testRepoPath, diffs, lintEnabled, log)
+			annotations, problems, err := lintIndividually(testRepoPath, diffs, lintEnabled, log)
 			require.NoError(err)
 			require.Equal(len(v.Annotations), problems)
 			for i, check := range v.Annotations {
@@ -166,4 +167,32 @@ func TestGetBaseCoverage(t *testing.T) {
 	assert.Empty(baseTestsNeedToRun)
 	assert.True(len(baseSavedRecords) == 1)
 	assert.True(*baseSavedRecords[0].Coverage > 0)
+}
+
+func TestLintRepo(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	_, filename, _, ok := runtime.Caller(0)
+	require.True(ok)
+
+	currentDir := path.Dir(filename)
+	repoDir := path.Join(currentDir, "../testdata/go")
+
+	fileName := "check.go"
+	out, err := ioutil.ReadFile(path.Join(repoDir, fileName+".diff"))
+	require.NoError(err)
+
+	diffs, err := diff.ParseMultiFileDiff(out)
+	require.NoError(err)
+
+	lintEnabled := LintEnabled{}
+	lintEnabled.Init(repoDir)
+	Conf.Core.GolangCILint = "golangci-lint"
+
+	var buf strings.Builder
+	annotations, problems, err := lintRepo(context.TODO(), repoDir, diffs, lintEnabled, &buf)
+	require.NoError(err)
+	assert.NotEmpty(annotations)
+	assert.NotZero(problems)
 }

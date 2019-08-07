@@ -25,6 +25,7 @@ type SectionCore struct {
 	WorkDir       string `yaml:"work_dir"`
 	LogsDir       string `yaml:"logs_dir"`
 	CheckLogURI   string `yaml:"check_log_uri"`
+	GolangCILint  string `yaml:"golangcilint"`
 	RemarkLint    string `yaml:"remarklint"`
 	CPPLint       string `yaml:"cpplint"`
 	PHPLint       string `yaml:"phplint"`

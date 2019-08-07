@@ -2,15 +2,19 @@ package checker
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/martinlindhe/go-difflib/difflib"
 	shellwords "github.com/mattn/go-shellwords"
@@ -105,7 +109,7 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 
 	// reset to defaults
 	lintEnabled.CPP = false
-	lintEnabled.Go = true
+	lintEnabled.Go = false
 	lintEnabled.PHP = true
 	lintEnabled.TypeScript = false
 	lintEnabled.SCSS = false
@@ -113,6 +117,9 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 	lintEnabled.ES = ""
 	lintEnabled.MD = false
 
+	if _, err := os.Stat(filepath.Join(cwd, ".golangci.yml")); err == nil {
+		lintEnabled.Go = true
+	}
 	if _, err := os.Stat(filepath.Join(cwd, "CPPLINT.cfg")); err == nil {
 		lintEnabled.CPP = true
 	}
@@ -372,6 +379,55 @@ func SCSSLint(fileName, cwd string) ([]LintMessage, string, error) {
 		break
 	}
 	return messages, stderr.String(), nil
+}
+
+// CodeClimate --out-format code-climate
+type CodeClimate struct {
+	Description string `json:"description"`
+	Location    struct {
+		Path  string `json:"path"`
+		Lines struct {
+			Begin int `json:"begin"`
+		} `json:"lines"`
+	} `json:"location"`
+}
+
+// GolangCILint runs `golangci-lint run --out-format code-climate`
+func GolangCILint(ctx context.Context, cwd string) ([]CodeClimate, string, error) {
+	words, err := shellwords.Parse(Conf.Core.GolangCILint)
+	if err == nil && len(words) < 1 {
+		err = errors.New("GolangCILint command is not configured")
+	}
+	words = append(words, "run", "--out-format", "code-climate")
+
+	if err != nil {
+		LogError.Error("GolangCILint: " + err.Error())
+		return nil, "", err
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+
+	var stderr bytes.Buffer
+	cmd := exec.CommandContext(ctx, words[0], words[1:]...)
+	cmd.Stderr = &stderr
+	cmd.Dir = cwd
+	out, _ := cmd.Output()
+
+	LogAccess.Debugf("GolangCILint Output:\n%s", out)
+
+	var suggestions []CodeClimate
+	err = json.Unmarshal(out, &suggestions)
+	if err != nil {
+		LogError.Error("GolangCILint: " + err.Error())
+		return nil, stderr.String(), err
+	}
+	if runtime.GOOS == "windows" {
+		for i, v := range suggestions {
+			suggestions[i].Location.Path = filepath.ToSlash(v.Location.Path)
+		}
+	}
+	return suggestions, stderr.String(), nil
 }
 
 // Goreturns formats the go code
