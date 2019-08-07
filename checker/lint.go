@@ -398,6 +398,8 @@ func GolangCILint(ctx context.Context, cwd string) ([]CodeClimate, string, error
 	if err == nil && len(words) < 1 {
 		err = errors.New("GolangCILint command is not configured")
 	}
+	words = append(words, "run", "--out-format", "code-climate")
+
 	if err != nil {
 		LogError.Error("GolangCILint: " + err.Error())
 		return nil, "", err
