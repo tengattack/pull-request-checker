@@ -76,7 +76,7 @@ func GenerateAnnotations(ctx context.Context, repoPath string, diffs []*diff.Fil
 
 	var eg errgroup.Group
 	eg.Go(func() error {
-		annotations1, problems1, err1 = lintRepo(ctx, repoPath, diffs, &buf1)
+		annotations1, problems1, err1 = lintRepo(ctx, repoPath, diffs, lintEnabled, &buf1)
 		return err1
 	})
 	eg.Go(func() error {
@@ -95,16 +95,11 @@ func GenerateAnnotations(ctx context.Context, repoPath string, diffs []*diff.Fil
 	return
 }
 
-func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, log io.StringWriter) (annotations []*github.CheckRunAnnotation,
+func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled, log io.StringWriter) (annotations []*github.CheckRunAnnotation,
 	problems int, err error) {
 	annotationLevel := "warning" // TODO: from lint.Severity
 
-	golangci := false
-	if _, err = os.Stat(filepath.Join(repoPath, ".golangci.yml")); err == nil {
-		golangci = true
-	}
-
-	if golangci {
+	if lintEnabled.Go {
 		lints, _, err := GolangCILint(ctx, repoPath)
 		if err != nil {
 			log.WriteString(fmt.Sprintf("GolangCILint error: %v", err))
@@ -211,13 +206,15 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 	} else if lintEnabled.CPP && isCPP(fileName) {
 		log.WriteString(fmt.Sprintf("CPPLint '%s'\n", fileName))
 		lints, lintErr = CPPLint(fileName, repoPath)
-	} else if lintEnabled.Go && strings.HasSuffix(fileName, ".go") {
+	} else if strings.HasSuffix(fileName, ".go") {
 		log.WriteString(fmt.Sprintf("Goreturns '%s'\n", fileName))
 		lintsGoreturns, err := Goreturns(filepath.Join(repoPath, fileName), repoPath)
 		if err != nil {
 			return err
 		}
 		pickDiffLintMessages(lintsGoreturns, d, annotations, problems, log, fileName)
+		log.WriteString(fmt.Sprintf("Golint '%s'\n", fileName))
+		lints, lintErr = Golint(filepath.Join(repoPath, fileName), repoPath)
 	} else if lintEnabled.PHP && strings.HasSuffix(fileName, ".php") {
 		log.WriteString(fmt.Sprintf("PHPLint '%s'\n", fileName))
 		var errlog string

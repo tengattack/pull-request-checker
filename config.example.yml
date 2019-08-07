@@ -7,7 +7,7 @@ core:
   work_dir: 'tmp'
   logs_dir: 'logs'
   check_log_uri: 'http://example.com/checker/logs/'
-  golangci_lint: 'golangci-lint run --out-format code-climate'
+  golangcilint: 'golangci-lint run --out-format code-climate'
   remarklint: 'remark'
   cpplint: 'cpplint'
   phplint: 'phplint'

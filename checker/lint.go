@@ -109,7 +109,7 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 
 	// reset to defaults
 	lintEnabled.CPP = false
-	lintEnabled.Go = true
+	lintEnabled.Go = false
 	lintEnabled.PHP = true
 	lintEnabled.TypeScript = false
 	lintEnabled.SCSS = false
@@ -117,6 +117,9 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 	lintEnabled.ES = ""
 	lintEnabled.MD = false
 
+	if _, err := os.Stat(filepath.Join(cwd, ".golangci.yml")); err == nil {
+		lintEnabled.Go = true
+	}
 	if _, err := os.Stat(filepath.Join(cwd, "CPPLINT.cfg")); err == nil {
 		lintEnabled.CPP = true
 	}

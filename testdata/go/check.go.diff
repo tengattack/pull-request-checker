@@ -1,0 +1,11 @@
+diff --git a/check.go b/check.go
+new file mode 100644
+index 0000000..8c68089
+--- /dev/null
++++ b/check.go
+@@ -0,0 +1,5 @@
++package sample
++
++func deadCode(s string) string {
++	return "unused " + s
++}
