@@ -24,3 +24,18 @@ func TestGetTests(t *testing.T) {
 	require.NoError(err)
 	assert.True(len(tests) > 0)
 }
+
+func TestNewShellParser(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	_, filename, _, _ := runtime.Caller(0)
+	currentDir := path.Dir(filename)
+
+	parser := NewShellParser(currentDir)
+	require.NotNil(parser)
+
+	words, err := parser.Parse("echo $PWD $PROJECT_NAME")
+	require.NoError(err)
+	assert.Equal([]string{"echo", currentDir, "checker"}, words)
+}

@@ -14,6 +14,7 @@ import (
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/github"
 	"github.com/pkg/errors"
+	shellwords "github.com/tengattack/go-shellwords"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -200,4 +201,26 @@ func getDefaultAPIClient(owner string) (*github.Client, error) {
 		return client, nil
 	}
 	return nil, errors.New("InstallationID not found, owner: " + owner)
+}
+
+// NewShellParser returns a shell parser
+func NewShellParser(repoPath string) *shellwords.Parser {
+	parser := shellwords.NewParser()
+	parser.ParseEnv = true
+	parser.ParseBacktick = true
+	parser.Dir = repoPath
+
+	projectName := filepath.Base(repoPath)
+
+	parser.Getenv = func(key string) string {
+		switch key {
+		case "PWD":
+			return repoPath
+		case "PROJECT_NAME":
+			return projectName
+		}
+		return os.Getenv(key)
+	}
+
+	return parser
 }

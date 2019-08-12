@@ -99,10 +99,16 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 	problems int, err error) {
 	annotationLevel := "warning" // TODO: from lint.Severity
 
+	if lintEnabled.APIDoc {
+		err := APIDoc(ctx, repoPath)
+		if err != nil {
+			log.WriteString(fmt.Sprintf("APIDoc error: %v\n\n", err))
+		}
+	}
 	if lintEnabled.Go {
 		lints, _, err := GolangCILint(ctx, repoPath)
 		if err != nil {
-			log.WriteString(fmt.Sprintf("GolangCILint error: %v", err))
+			log.WriteString(fmt.Sprintf("GolangCILint error: %v\n\n", err))
 			return nil, 0, err
 		}
 		for _, d := range diffs {

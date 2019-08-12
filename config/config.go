@@ -32,6 +32,7 @@ type SectionCore struct {
 	ESLint        string `yaml:"eslint"`
 	TSLint        string `yaml:"tslint"`
 	SCSSLint      string `yaml:"scsslint"`
+	APIDoc        string `yaml:"apidoc"`
 }
 
 // SectionAPI is a sub section of config.
@@ -89,6 +90,7 @@ func BuildDefaultConf() Config {
 	conf.Core.ESLint = ""
 	conf.Core.TSLint = ""
 	conf.Core.SCSSLint = ""
+	conf.Core.APIDoc = "apidoc"
 
 	// API
 	conf.API.Enabled = true

@@ -90,10 +90,7 @@ func parseCoverage(pattern, output string) (string, float64, error) {
 
 func testAndSaveCoverage(ctx context.Context, owner, repo, sha string, testName string, cmds []string, coveragePattern string,
 	repoPath string, gpull *github.PullRequest, breakOnFails bool, log io.Writer) (conclusion, reportMessage, outputSummary string) {
-	parser := shellwords.NewParser()
-	parser.ParseEnv = true
-	parser.ParseBacktick = true
-	parser.Dir = repoPath
+	parser := NewShellParser(repoPath)
 
 	io.WriteString(log, fmt.Sprintf("Testing '%s'\n", testName))
 	conclusion = "success"

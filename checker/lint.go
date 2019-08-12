@@ -17,7 +17,6 @@ import (
 	"time"
 
 	"github.com/martinlindhe/go-difflib/difflib"
-	shellwords "github.com/mattn/go-shellwords"
 	"github.com/sqs/goreturns/returns"
 	"golang.org/x/lint"
 	"golang.org/x/tools/imports"
@@ -48,6 +47,7 @@ type LintEnabled struct {
 	JS         string
 	ES         string
 	MD         bool
+	APIDoc     bool
 }
 
 // LintMessage is a single lint message for PHPLint
@@ -116,6 +116,7 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 	lintEnabled.JS = ""
 	lintEnabled.ES = ""
 	lintEnabled.MD = false
+	lintEnabled.APIDoc = false
 
 	if _, err := os.Stat(filepath.Join(cwd, ".golangci.yml")); err == nil {
 		lintEnabled.Go = true
@@ -145,11 +146,15 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 	} else {
 		lintEnabled.JS = lintEnabled.ES
 	}
+	if _, err := os.Stat(filepath.Join(cwd, "apidoc.json")); err == nil {
+		lintEnabled.APIDoc = true
+	}
 }
 
 // CPPLint lints the cpp language files using github.com/cpplint/cpplint
 func CPPLint(filePath string, repoPath string) (lints []LintMessage, err error) {
-	words, err := shellwords.Parse(Conf.Core.CPPLint)
+	parser := NewShellParser(repoPath)
+	words, err := parser.Parse(Conf.Core.CPPLint)
 	if err != nil {
 		LogError.Error("CPPLint: " + err.Error())
 		return nil, err
@@ -210,7 +215,8 @@ func CPPLint(filePath string, repoPath string) (lints []LintMessage, err error) 
 func PHPLint(fileName, cwd string) ([]LintMessage, string, error) {
 	var stderr bytes.Buffer
 
-	words, err := shellwords.Parse(Conf.Core.PHPLint)
+	parser := NewShellParser(cwd)
+	words, err := parser.Parse(Conf.Core.PHPLint)
 	if err != nil {
 		LogError.Error("PHPLint: " + err.Error())
 		return nil, stderr.String(), err
@@ -242,7 +248,8 @@ func PHPLint(fileName, cwd string) ([]LintMessage, string, error) {
 func ESLint(fileName, cwd, eslintrc string) ([]LintMessage, string, error) {
 	var stderr bytes.Buffer
 
-	words, err := shellwords.Parse(Conf.Core.ESLint)
+	parser := NewShellParser(cwd)
+	words, err := parser.Parse(Conf.Core.ESLint)
 	if err != nil {
 		LogError.Error("ESLint: " + err.Error())
 		return nil, stderr.String(), err
@@ -280,7 +287,8 @@ func ESLint(fileName, cwd, eslintrc string) ([]LintMessage, string, error) {
 func TSLint(fileName, cwd string) ([]LintMessage, string, error) {
 	var stderr bytes.Buffer
 
-	words, err := shellwords.Parse(Conf.Core.TSLint)
+	parser := NewShellParser(cwd)
+	words, err := parser.Parse(Conf.Core.TSLint)
 	if err != nil {
 		LogError.Error("TSLint: " + err.Error())
 		return nil, stderr.String(), err
@@ -331,7 +339,8 @@ func TSLint(fileName, cwd string) ([]LintMessage, string, error) {
 func SCSSLint(fileName, cwd string) ([]LintMessage, string, error) {
 	var stderr bytes.Buffer
 
-	words, err := shellwords.Parse(Conf.Core.SCSSLint)
+	parser := NewShellParser(cwd)
+	words, err := parser.Parse(Conf.Core.SCSSLint)
 	if err != nil {
 		LogError.Error("SCSSLint: " + err.Error())
 		return nil, stderr.String(), err
@@ -394,7 +403,8 @@ type CodeClimate struct {
 
 // GolangCILint runs `golangci-lint run --out-format code-climate`
 func GolangCILint(ctx context.Context, cwd string) ([]CodeClimate, string, error) {
-	words, err := shellwords.Parse(Conf.Core.GolangCILint)
+	parser := NewShellParser(cwd)
+	words, err := parser.Parse(Conf.Core.GolangCILint)
 	if err == nil && len(words) < 1 {
 		err = errors.New("GolangCILint command is not configured")
 	}
@@ -560,7 +570,8 @@ type remarkMessage struct {
 }
 
 func remark(fileName string, repoPath string) (reports []remarkReport, out []byte, err error) {
-	words, err := shellwords.Parse(Conf.Core.RemarkLint)
+	parser := NewShellParser(repoPath)
+	words, err := parser.Parse(Conf.Core.RemarkLint)
 	if err != nil {
 		LogError.Error("RemarkLint: " + err.Error())
 		return nil, nil, err
@@ -640,4 +651,42 @@ func MDFormattedLint(filePath string, result []byte) (lints []LintMessage, err e
 	}
 	lints = getLintsFromDiff(fileDiff, lints, ruleID)
 	return lints, nil
+}
+
+// APIDoc generates apidoc
+func APIDoc(ctx context.Context, repoPath string) error {
+	parser := NewShellParser(repoPath)
+	words, err := parser.Parse(Conf.Core.APIDoc)
+	if err != nil {
+		LogError.Error("APIDoc: " + err.Error())
+		return err
+	}
+	cmd := exec.Command(words[0], words[1:]...)
+	cmd.Dir = repoPath
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return err
+	}
+
+	err = cmd.Start()
+	if err != nil {
+		return err
+	}
+
+	stdoutStr, err := ioutil.ReadAll(stdout)
+	LogAccess.Debugf("APIDoc Stdout:\n%s", stdoutStr)
+	if err != nil {
+		return err
+	}
+	stderrStr, err := ioutil.ReadAll(stderr)
+	LogAccess.Debugf("APIDoc Stderr:\n%s", stderrStr)
+	if err != nil {
+		return err
+	}
+
+	return cmd.Wait()
 }
