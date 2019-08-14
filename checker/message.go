@@ -99,6 +99,7 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 	problems int, err error) {
 	annotationLevel := "warning" // TODO: from lint.Severity
 
+	// disable 'xxx' lint check if no 'xxx' files are changed
 	disableUnnecessaryLints := func(diffs []*diff.FileDiff, lintEnabled *LintEnabled) {
 		goCheck := false
 		for _, d := range diffs {
@@ -115,13 +116,14 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 	disableUnnecessaryLints(diffs, &lintEnabled)
 
 	if lintEnabled.APIDoc {
+		log.WriteString(fmt.Sprintf("APIDoc '%s'\n", repoPath))
 		err := APIDoc(ctx, repoPath)
 		if err != nil {
 			log.WriteString(fmt.Sprintf("APIDoc error: %v\n\n", err))
 		}
 	}
 	if lintEnabled.Go {
-		log.WriteString("GolangCILint:\n")
+		log.WriteString(fmt.Sprintf("GolangCILint '%s'\n", repoPath))
 		lints, _, err := GolangCILint(ctx, repoPath)
 		if err != nil {
 			log.WriteString(fmt.Sprintf("GolangCILint error: %v\n\n", err))
@@ -158,7 +160,6 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 				}
 			}
 		}
-		log.WriteString("\n")
 	}
 	return
 }
