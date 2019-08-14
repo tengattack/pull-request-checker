@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -653,40 +654,59 @@ func MDFormattedLint(filePath string, result []byte) (lints []LintMessage, err e
 	return lints, nil
 }
 
+type apiDocJSON struct {
+	FileFilters    string `json:"file-filters"`
+	ExcludeFilters string `json:"exclude-filters"`
+	Input          string `json:"input"`
+}
+
 // APIDoc generates apidoc
-func APIDoc(ctx context.Context, repoPath string) error {
+func APIDoc(ctx context.Context, repoPath string) (string, error) {
+	var args apiDocJSON
+	config, _ := ioutil.ReadFile(path.Join(repoPath, "apidoc.json"))
+	json.Unmarshal(config, &args)
+
 	parser := NewShellParser(repoPath)
 	words, err := parser.Parse(Conf.Core.APIDoc)
 	if err != nil {
 		LogError.Error("APIDoc: " + err.Error())
-		return err
+		return "", err
 	}
+	switch {
+	case args.FileFilters != "":
+		words = append(words, "-f", args.FileFilters)
+	case args.ExcludeFilters != "":
+		words = append(words, "-e", args.ExcludeFilters)
+	case args.Input != "":
+		words = append(words, "-i", args.Input)
+	}
+
 	cmd := exec.Command(words[0], words[1:]...)
 	cmd.Dir = repoPath
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return err
+		return "", err
 	}
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	err = cmd.Start()
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	stdoutStr, err := ioutil.ReadAll(stdout)
 	LogAccess.Debugf("APIDoc Stdout:\n%s", stdoutStr)
 	if err != nil {
-		return err
+		return "", err
 	}
 	stderrStr, err := ioutil.ReadAll(stderr)
 	LogAccess.Debugf("APIDoc Stderr:\n%s", stderrStr)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return cmd.Wait()
+	return string(stderrStr), cmd.Wait()
 }
