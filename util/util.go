@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -31,4 +32,13 @@ func Unquote(input string) string {
 		newName = input
 	}
 	return newName
+}
+
+// FileExists returns true if filename exists and is not a directory
+func FileExists(filename string) bool {
+	info, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false
+	}
+	return !info.IsDir()
 }

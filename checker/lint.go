@@ -19,6 +19,7 @@ import (
 
 	"github.com/martinlindhe/go-difflib/difflib"
 	"github.com/sqs/goreturns/returns"
+	"github.com/tengattack/unified-ci/util"
 	"golang.org/x/lint"
 	"golang.org/x/tools/imports"
 	"sourcegraph.com/sourcegraph/go-diff/diff"
@@ -663,8 +664,19 @@ type apiDocJSON struct {
 // APIDoc generates apidoc
 func APIDoc(ctx context.Context, repoPath string) (string, error) {
 	var args apiDocJSON
-	config, _ := ioutil.ReadFile(path.Join(repoPath, "apidoc.json"))
-	json.Unmarshal(config, &args)
+
+	fileName := path.Join(repoPath, "apidoc.json")
+	if util.FileExists(fileName) {
+		config, err := ioutil.ReadFile(fileName)
+		if err != nil {
+			LogError.Errorf("Can not read %s: %v", fileName, err)
+		} else {
+			err = json.Unmarshal(config, &args)
+			if err != nil {
+				LogError.Errorf("Can not parse json: %s", fileName)
+			}
+		}
+	}
 
 	parser := NewShellParser(repoPath)
 	words, err := parser.Parse(Conf.Core.APIDoc)
@@ -708,5 +720,5 @@ func APIDoc(ctx context.Context, repoPath string) (string, error) {
 		return "", err
 	}
 
-	return string(stderrStr), cmd.Wait()
+	return string(stderrStr) + "\n", cmd.Wait()
 }

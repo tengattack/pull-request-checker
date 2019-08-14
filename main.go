@@ -19,7 +19,7 @@ import (
 
 const (
 	// Version is the version of unified-ci
-	Version = "0.1.2"
+	Version = "0.1.3"
 )
 
 func main() {

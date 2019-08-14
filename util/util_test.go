@@ -20,3 +20,10 @@ func TestUnquote(t *testing.T) {
 	assert.Equal(`hello ☺`, Unquote(`"hello \342\230\272"`))
 	assert.Equal(`hello world`, Unquote(`hello world`))
 }
+
+func TestFileExist(t *testing.T) {
+	assert := assert.New(t)
+
+	assert.False(FileExists("../testdata"))
+	assert.True(FileExists("./util_test.go"))
+}
