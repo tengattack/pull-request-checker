@@ -99,42 +99,64 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 	problems int, err error) {
 	annotationLevel := "warning" // TODO: from lint.Severity
 
+	// disable 'xxx' lint check if no 'xxx' files are changed
+	disableUnnecessaryLints := func(diffs []*diff.FileDiff, lintEnabled *LintEnabled) {
+		goCheck := false
+		for _, d := range diffs {
+			newName := util.Unquote(d.NewName)
+			if strings.HasSuffix(newName, ".go") {
+				goCheck = true
+				break
+			}
+		}
+		if lintEnabled.Go {
+			lintEnabled.Go = goCheck
+		}
+	}
+	disableUnnecessaryLints(diffs, &lintEnabled)
+
 	if lintEnabled.APIDoc {
+		log.WriteString(fmt.Sprintf("APIDoc '%s'\n", repoPath))
 		err := APIDoc(ctx, repoPath)
 		if err != nil {
 			log.WriteString(fmt.Sprintf("APIDoc error: %v\n\n", err))
 		}
 	}
 	if lintEnabled.Go {
+		log.WriteString(fmt.Sprintf("GolangCILint '%s'\n", repoPath))
 		lints, _, err := GolangCILint(ctx, repoPath)
 		if err != nil {
 			log.WriteString(fmt.Sprintf("GolangCILint error: %v\n\n", err))
 			return nil, 0, err
 		}
 		for _, d := range diffs {
-			newName, err := strconv.Unquote(d.NewName)
-			if err != nil {
-				newName = d.NewName
-			}
+			newName := util.Unquote(d.NewName)
 			if !strings.HasPrefix(newName, "b/") {
 				log.WriteString("No need to process " + newName + "\n\n")
 				continue
 			}
 			fileName := newName[2:]
-
+			if !strings.HasSuffix(fileName, ".go") {
+				continue
+			}
 			for _, v := range lints {
 				if fileName == v.Location.Path {
 					startLine := v.Location.Lines.Begin
-					comment := fmt.Sprintf("%s:%d  %s",
-						fileName, startLine, v.Description)
-					annotations = append(annotations, &github.CheckRunAnnotation{
-						Path:            &fileName,
-						Message:         &comment,
-						StartLine:       &startLine,
-						EndLine:         &startLine,
-						AnnotationLevel: &annotationLevel,
-					})
-					problems++
+					for _, hunk := range d.Hunks {
+						if int32(startLine) >= hunk.NewStartLine && int32(startLine) < hunk.NewStartLine+hunk.NewLines {
+							comment := fmt.Sprintf("%s:%d  %s",
+								fileName, startLine, v.Description)
+							annotations = append(annotations, &github.CheckRunAnnotation{
+								Path:            &fileName,
+								Message:         &comment,
+								StartLine:       &startLine,
+								EndLine:         &startLine,
+								AnnotationLevel: &annotationLevel,
+							})
+							problems++
+							break
+						}
+					}
 				}
 			}
 		}
@@ -184,10 +206,7 @@ func lintIndividually(repoPath string, diffs []*diff.FileDiff, lintEnabled LintE
 }
 
 func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled, annotationLevel string, log *bytes.Buffer, annotations *[]*github.CheckRunAnnotation, problems *int) error {
-	newName, err := strconv.Unquote(d.NewName)
-	if err != nil {
-		newName = d.NewName
-	}
+	newName := util.Unquote(d.NewName)
 	if !strings.HasPrefix(newName, "b/") {
 		log.WriteString("No need to process " + newName + "\n\n")
 		return nil

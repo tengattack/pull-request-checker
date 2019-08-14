@@ -14,3 +14,9 @@ func TestFloatPercent(t *testing.T) {
 
 	assert.Equal(t, "58.78%", FormatFloatPercent(.5878))
 }
+
+func TestUnquote(t *testing.T) {
+	assert := assert.New(t)
+	assert.Equal(`hello ☺`, Unquote(`"hello \342\230\272"`))
+	assert.Equal(`hello world`, Unquote(`hello world`))
+}
