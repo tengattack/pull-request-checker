@@ -427,6 +427,7 @@ func GolangCILint(ctx context.Context, cwd string) ([]CodeClimate, string, error
 	out, _ := cmd.Output()
 
 	LogAccess.Debugf("GolangCILint Output:\n%s", out)
+	LogAccess.Debugf("GolangCILint Errput:\n%s", stderr.String())
 
 	var suggestions []CodeClimate
 	err = json.Unmarshal(out, &suggestions)

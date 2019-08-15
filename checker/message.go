@@ -629,7 +629,7 @@ func HandleMessage(ctx context.Context, message string) error {
 		var conclusion string
 		if failedLints > 0 {
 			conclusion = "failure"
-			outputSummary = fmt.Sprintf("The lint check failed! %d problem(s) found.\n", failedLints) + notes
+			outputSummary = fmt.Sprintf("The lint check failed! %d problem(s) found.\n", failedLints) + "```\n" + notes + "\n```"
 		} else {
 			conclusion = "success"
 			outputSummary = "The lint check succeed!"
