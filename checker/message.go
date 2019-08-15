@@ -118,15 +118,18 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 	disableUnnecessaryLints(diffs, &lintEnabled)
 
 	if lintEnabled.APIDoc {
-		log.WriteString(fmt.Sprintf("APIDoc '%s'\n", repoPath))
-		errorInfo, err := APIDoc(ctx, repoPath)
+		title := fmt.Sprintf("APIDoc '%s'\n", repoPath)
+		log.WriteString(title)
+		outputSummaries.WriteString(title)
+		var apiDocOutput string
+		apiDocOutput, err = APIDoc(ctx, repoPath)
 		if err != nil {
-			log.WriteString(fmt.Sprintf("APIDoc error: %v\n", err))
+			apiDocOutput = fmt.Sprintf("APIDoc error: %v\n", err) + apiDocOutput
 			problems++
 			err = nil
 		}
-		log.WriteString(errorInfo + "\n")
-		outputSummaries.WriteString(errorInfo)
+		log.WriteString(apiDocOutput + "\n") // Add an additional '\n'
+		outputSummaries.WriteString(apiDocOutput)
 	}
 	if lintEnabled.Go {
 		log.WriteString(fmt.Sprintf("GolangCILint '%s'\n", repoPath))
@@ -596,7 +599,7 @@ func HandleMessage(ctx context.Context, message string) error {
 			LogError.Errorf("create review failed: %v", err)
 		}
 		outputSummary = fmt.Sprintf("The check failed! %d problem(s) found.\n", sumCount)
-		err = ref.UpdateState(client, AppName, "error", targetURL, outputSummary+notes)
+		err = ref.UpdateState(client, AppName, "error", targetURL, outputSummary)
 	} else {
 		comment := "**check**: no problems found.\n"
 		if !noTest {
@@ -625,7 +628,7 @@ func HandleMessage(ctx context.Context, message string) error {
 		var conclusion string
 		if failedLints > 0 {
 			conclusion = "failure"
-			outputSummary = fmt.Sprintf("The lint check failed! %d problem(s) found.\n", failedLints)+notes
+			outputSummary = fmt.Sprintf("The lint check failed! %d problem(s) found.\n", failedLints) + notes
 		} else {
 			conclusion = "success"
 			outputSummary = "The lint check succeed!"

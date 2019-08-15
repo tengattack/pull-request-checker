@@ -695,30 +695,6 @@ func APIDoc(ctx context.Context, repoPath string) (string, error) {
 
 	cmd := exec.Command(words[0], words[1:]...)
 	cmd.Dir = repoPath
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return "", err
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return "", err
-	}
-
-	err = cmd.Start()
-	if err != nil {
-		return "", err
-	}
-
-	stdoutStr, err := ioutil.ReadAll(stdout)
-	LogAccess.Debugf("APIDoc Stdout:\n%s", stdoutStr)
-	if err != nil {
-		return "", err
-	}
-	stderrStr, err := ioutil.ReadAll(stderr)
-	LogAccess.Debugf("APIDoc Stderr:\n%s", stderrStr)
-	if err != nil {
-		return "", err
-	}
-
-	return string(stderrStr) + "\n", cmd.Wait()
+	output, err := cmd.CombinedOutput()
+	return string(output) + "\n", err
 }
