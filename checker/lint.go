@@ -680,6 +680,9 @@ func APIDoc(ctx context.Context, repoPath string) (string, error) {
 
 	parser := NewShellParser(repoPath)
 	words, err := parser.Parse(Conf.Core.APIDoc)
+	if err == nil && len(words) < 1 {
+		err = errors.New("APIDoc command is not configured")
+	}
 	if err != nil {
 		LogError.Error("APIDoc: " + err.Error())
 		return "", err
