@@ -66,7 +66,7 @@ func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, annotations
 
 // GenerateAnnotations generate github annotations from github diffs and lint option
 func GenerateAnnotations(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled, log *os.File) (
-	annotations []*github.CheckRunAnnotation, problems int, err error) {
+	outputSummary string, annotations []*github.CheckRunAnnotation, problems int, err error) {
 	var (
 		annotations1, annotations2 []*github.CheckRunAnnotation
 		problems1, problems2       int
@@ -76,7 +76,7 @@ func GenerateAnnotations(ctx context.Context, repoPath string, diffs []*diff.Fil
 
 	var eg errgroup.Group
 	eg.Go(func() error {
-		annotations1, problems1, err1 = lintRepo(ctx, repoPath, diffs, lintEnabled, &buf1)
+		outputSummary, annotations1, problems1, err1 = lintRepo(ctx, repoPath, diffs, lintEnabled, &buf1)
 		return err1
 	})
 	eg.Go(func() error {
@@ -95,9 +95,11 @@ func GenerateAnnotations(ctx context.Context, repoPath string, diffs []*diff.Fil
 	return
 }
 
-func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled, log io.StringWriter) (annotations []*github.CheckRunAnnotation,
+func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled,
+	log io.StringWriter) (outputSummary string, annotations []*github.CheckRunAnnotation,
 	problems int, err error) {
 	annotationLevel := "warning" // TODO: from lint.Severity
+	var outputSummaries strings.Builder
 
 	// disable 'xxx' lint check if no 'xxx' files are changed
 	disableUnnecessaryLints := func(diffs []*diff.FileDiff, lintEnabled *LintEnabled) {
@@ -116,23 +118,30 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 	disableUnnecessaryLints(diffs, &lintEnabled)
 
 	if lintEnabled.APIDoc {
-		log.WriteString(fmt.Sprintf("APIDoc '%s'\n", repoPath))
-		err := APIDoc(ctx, repoPath)
+		title := fmt.Sprintf("APIDoc '%s'\n", repoPath)
+		log.WriteString(title)
+		outputSummaries.WriteString(title)
+		var apiDocOutput string
+		apiDocOutput, err = APIDoc(ctx, repoPath)
 		if err != nil {
-			log.WriteString(fmt.Sprintf("APIDoc error: %v\n\n", err))
+			apiDocOutput = fmt.Sprintf("APIDoc error: %v\n", err) + apiDocOutput
+			problems++
+			err = nil
 		}
+		log.WriteString(apiDocOutput + "\n") // Add an additional '\n'
+		outputSummaries.WriteString(apiDocOutput)
 	}
 	if lintEnabled.Go {
 		log.WriteString(fmt.Sprintf("GolangCILint '%s'\n", repoPath))
 		lints, _, err := GolangCILint(ctx, repoPath)
 		if err != nil {
-			log.WriteString(fmt.Sprintf("GolangCILint error: %v\n\n", err))
-			return nil, 0, err
+			log.WriteString(fmt.Sprintf("GolangCILint error: %v\n", err))
+			return "", nil, 0, err
 		}
 		for _, d := range diffs {
 			newName := util.Unquote(d.NewName)
 			if !strings.HasPrefix(newName, "b/") {
-				log.WriteString("No need to process " + newName + "\n\n")
+				log.WriteString("No need to process " + newName + "\n")
 				continue
 			}
 			fileName := newName[2:]
@@ -160,7 +169,10 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 				}
 			}
 		}
+		log.WriteString("\n")
 	}
+
+	outputSummary = outputSummaries.String()
 	return
 }
 
@@ -553,7 +565,7 @@ func HandleMessage(ctx context.Context, message string) error {
 
 	lintEnabled := LintEnabled{}
 	lintEnabled.Init(repoPath)
-	annotations, failedLints, err := GenerateAnnotations(ctx, repoPath, diffs, lintEnabled, log)
+	notes, annotations, failedLints, err := GenerateAnnotations(ctx, repoPath, diffs, lintEnabled, log)
 	if err != nil {
 		return err
 	}
@@ -574,6 +586,7 @@ func HandleMessage(ctx context.Context, message string) error {
 	log.WriteString("Updating status...\n")
 
 	var outputSummary string
+	// UpdateState: description has a limit of 140 characters
 	if sumCount > 0 {
 		comment := fmt.Sprintf("**lint**: %d problem(s) found.\n", failedLints)
 		if !noTest {
@@ -586,7 +599,7 @@ func HandleMessage(ctx context.Context, message string) error {
 			log.WriteString("error: " + err.Error() + "\n")
 			LogError.Errorf("create review failed: %v", err)
 		}
-		outputSummary = fmt.Sprintf("The check failed! %d problem(s) found.", sumCount)
+		outputSummary = fmt.Sprintf("The check failed! %d problem(s) found.\n", sumCount)
 		err = ref.UpdateState(client, AppName, "error", targetURL, outputSummary)
 	} else {
 		comment := "**check**: no problems found.\n"
@@ -616,7 +629,7 @@ func HandleMessage(ctx context.Context, message string) error {
 		var conclusion string
 		if failedLints > 0 {
 			conclusion = "failure"
-			outputSummary = fmt.Sprintf("The lint check failed! %d problem(s) found.", failedLints)
+			outputSummary = fmt.Sprintf("The lint check failed! %d problem(s) found.\n", failedLints) + "```\n" + notes + "\n```"
 		} else {
 			conclusion = "success"
 			outputSummary = "The lint check succeed!"

@@ -191,7 +191,7 @@ func TestLintRepo(t *testing.T) {
 	Conf.Core.GolangCILint = "golangci-lint"
 
 	var buf strings.Builder
-	annotations, problems, err := lintRepo(context.TODO(), repoDir, diffs, lintEnabled, &buf)
+	_, annotations, problems, err := lintRepo(context.TODO(), repoDir, diffs, lintEnabled, &buf)
 	require.NoError(err)
 	assert.NotEmpty(annotations)
 	assert.NotZero(problems)

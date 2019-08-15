@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/martinlindhe/go-difflib/difflib"
 	"github.com/sqs/goreturns/returns"
+	"github.com/tengattack/unified-ci/util"
 	"golang.org/x/lint"
 	"golang.org/x/tools/imports"
 	"sourcegraph.com/sourcegraph/go-diff/diff"
@@ -425,6 +427,7 @@ func GolangCILint(ctx context.Context, cwd string) ([]CodeClimate, string, error
 	out, _ := cmd.Output()
 
 	LogAccess.Debugf("GolangCILint Output:\n%s", out)
+	LogAccess.Debugf("GolangCILint Errput:\n%s", stderr.String())
 
 	var suggestions []CodeClimate
 	err = json.Unmarshal(out, &suggestions)
@@ -653,40 +656,49 @@ func MDFormattedLint(filePath string, result []byte) (lints []LintMessage, err e
 	return lints, nil
 }
 
+type apiDocJSON struct {
+	FileFilters    string `json:"file-filters"`
+	ExcludeFilters string `json:"exclude-filters"`
+	Input          string `json:"input"`
+}
+
 // APIDoc generates apidoc
-func APIDoc(ctx context.Context, repoPath string) error {
+func APIDoc(ctx context.Context, repoPath string) (string, error) {
+	var args apiDocJSON
+
+	fileName := path.Join(repoPath, "apidoc.json")
+	if util.FileExists(fileName) {
+		config, err := ioutil.ReadFile(fileName)
+		if err != nil {
+			LogError.Errorf("Can not read %s: %v", fileName, err)
+		} else {
+			err = json.Unmarshal(config, &args)
+			if err != nil {
+				LogError.Errorf("Can not parse json: %s", fileName)
+			}
+		}
+	}
+
 	parser := NewShellParser(repoPath)
 	words, err := parser.Parse(Conf.Core.APIDoc)
+	if err == nil && len(words) < 1 {
+		err = errors.New("APIDoc command is not configured")
+	}
 	if err != nil {
 		LogError.Error("APIDoc: " + err.Error())
-		return err
+		return "", err
 	}
+	switch {
+	case args.FileFilters != "":
+		words = append(words, "-f", args.FileFilters)
+	case args.ExcludeFilters != "":
+		words = append(words, "-e", args.ExcludeFilters)
+	case args.Input != "":
+		words = append(words, "-i", args.Input)
+	}
+
 	cmd := exec.Command(words[0], words[1:]...)
 	cmd.Dir = repoPath
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return err
-	}
-
-	err = cmd.Start()
-	if err != nil {
-		return err
-	}
-
-	stdoutStr, err := ioutil.ReadAll(stdout)
-	LogAccess.Debugf("APIDoc Stdout:\n%s", stdoutStr)
-	if err != nil {
-		return err
-	}
-	stderrStr, err := ioutil.ReadAll(stderr)
-	LogAccess.Debugf("APIDoc Stderr:\n%s", stderrStr)
-	if err != nil {
-		return err
-	}
-
-	return cmd.Wait()
+	output, err := cmd.CombinedOutput()
+	return string(output) + "\n", err
 }
