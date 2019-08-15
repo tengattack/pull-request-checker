@@ -21,7 +21,7 @@ func TestUnquote(t *testing.T) {
 	assert.Equal(`hello world`, Unquote(`hello world`))
 }
 
-func TestFileExist(t *testing.T) {
+func TestFileExists(t *testing.T) {
 	assert := assert.New(t)
 
 	assert.False(FileExists("../testdata"))

@@ -586,6 +586,7 @@ func HandleMessage(ctx context.Context, message string) error {
 	log.WriteString("Updating status...\n")
 
 	var outputSummary string
+	// UpdateState: description has a limit of 140 characters
 	if sumCount > 0 {
 		comment := fmt.Sprintf("**lint**: %d problem(s) found.\n", failedLints)
 		if !noTest {
