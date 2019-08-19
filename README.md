@@ -4,11 +4,12 @@ A unified continuous integration tool for coding style check.
 
 ## Dependencies
 
-* [android](https://developer.android.com/studio/write/lint)
+* [androidlint](https://developer.android.com/studio/write/lint)
 * [apidoc](http://apidocjs.com/)
 * [cpplint](https://github.com/cpplint/cpplint)
 * [eslint](https://github.com/eslint/eslint)
   - [eslint-plugin-html](https://github.com/BenoitZugmeyer/eslint-plugin-html)
+* [golangci](https://github.com/golangci/golangci-lint)
 * [phplint](https://github.com/tengattack/phplint)
 * [scss-lint](https://github.com/brigade/scss-lint)
 * [tslint](https://github.com/palantir/tslint)
@@ -39,7 +40,7 @@ It will read linter's configuration file from the root path of repository:
 
 ## Support Languages/Checks
 
-1. Android: [android](https://developer.android.com/studio/write/lint)
+1. Android: [androidlint](https://developer.android.com/studio/write/lint)
   - `.xml`, `.java`
 2. APIDoc: [apidoc](http://apidocjs.com/)
 
@@ -47,7 +48,7 @@ It will read linter's configuration file from the root path of repository:
   - `.cpp` ...
 4. CSS, SCSS: [scss-lint](https://github.com/brigade/scss-lint)
   - `.css`, `.scss`
-5. Golang: [golint](https://golang.org/x/lint/golint), [goreturns](https://github.com/sqs/goreturns)
+5. Golang: [golint](https://golang.org/x/lint/golint), [goreturns](https://github.com/sqs/goreturns), [golangci](https://github.com/golangci/golangci-lint)
   - `.go`
 6. HTML: [eslint-plugin-html](https://github.com/BenoitZugmeyer/eslint-plugin-html)
   - `.html`, `.php`
