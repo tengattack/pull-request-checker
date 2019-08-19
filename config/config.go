@@ -33,7 +33,7 @@ type SectionCore struct {
 	TSLint        string `yaml:"tslint"`
 	SCSSLint      string `yaml:"scsslint"`
 	APIDoc        string `yaml:"apidoc"`
-	AndroidLint   string `yaml:"android_lint"`
+	AndroidLint   string `yaml:"androidlint"`
 }
 
 // SectionAPI is a sub section of config.
