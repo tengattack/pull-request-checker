@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"encoding/xml"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -50,6 +51,7 @@ type LintEnabled struct {
 	ES         string
 	MD         bool
 	APIDoc     bool
+	Android    bool
 }
 
 // LintMessage is a single lint message for PHPLint
@@ -119,6 +121,7 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 	lintEnabled.ES = ""
 	lintEnabled.MD = false
 	lintEnabled.APIDoc = false
+	lintEnabled.Android = false
 
 	if _, err := os.Stat(filepath.Join(cwd, ".golangci.yml")); err == nil {
 		lintEnabled.Go = true
@@ -150,6 +153,9 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 	}
 	if _, err := os.Stat(filepath.Join(cwd, "apidoc.json")); err == nil {
 		lintEnabled.APIDoc = true
+	}
+	if _, err := os.Stat(filepath.Join(cwd, "build.gradle")); err == nil {
+		lintEnabled.Android = true
 	}
 }
 
@@ -701,4 +707,71 @@ func APIDoc(ctx context.Context, repoPath string) (string, error) {
 	cmd.Dir = repoPath
 	output, err := cmd.CombinedOutput()
 	return string(output) + "\n", err
+}
+
+type Issues struct {
+	XMLName xml.Name `xml:"issues"`
+
+	Issues []Issue `xml:"issue"`
+}
+
+type Issue struct {
+	XMLName xml.Name `xml:"issue"`
+
+	ID       string `xml:"id,attr"`
+	Severity string `xml:"severity,attr"`
+	Message  string `xml:"message,attr"`
+	Category string `xml:"category,attr"`
+
+	Location struct {
+		File string `xml:"file,attr"`
+		Line int    `xml:"line,attr"`
+	} `xml:"location"`
+}
+
+// AndroidLint Android (Gradle) Lint, returns either issues or message
+func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) {
+	parser := NewShellParser(repoPath)
+	words, err := parser.Parse(Conf.Core.AndroidLint)
+	if len(words) < 1 && err == nil {
+		err = errors.New("Android lint command is not configured")
+	}
+	if err != nil {
+		LogError.Error("Android lint: " + err.Error())
+		return nil, "", err
+	}
+	if runtime.GOOS == "windows" {
+		words[0] = path.Join(repoPath, words[0])
+	}
+	cmd := exec.Command(words[0], words[1:]...)
+	cmd.Dir = repoPath
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		LogError.Errorf("Android lint: %v\n%s", err, output)
+		return nil, "", err
+	}
+
+	var issues Issues
+	fileName := path.Join(repoPath, "app/build/reports/lint-results.xml")
+	if !util.FileExists(fileName) {
+		msg := fmt.Sprintf("Can not find %s\n", fileName)
+		LogError.Error(msg)
+		return nil, msg, nil
+	} else {
+		xmls, err := ioutil.ReadFile(fileName)
+		if err != nil {
+			msg := fmt.Sprintf("Can not read %s: %v\n", fileName, err)
+			LogError.Error(msg)
+			return nil, msg, nil
+		} else {
+			err = xml.Unmarshal(xmls, &issues)
+			if err != nil {
+				msg := fmt.Sprintf("Can not parse xml: %v\n", err)
+				LogError.Error(msg)
+				return nil, msg, nil
+			}
+		}
+	}
+
+	return &issues, "", nil
 }

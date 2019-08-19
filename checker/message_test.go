@@ -169,7 +169,7 @@ func TestGetBaseCoverage(t *testing.T) {
 	assert.True(*baseSavedRecords[0].Coverage > 0)
 }
 
-func TestLintRepo(t *testing.T) {
+func TestLintRepo1(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
@@ -189,6 +189,34 @@ func TestLintRepo(t *testing.T) {
 	lintEnabled := LintEnabled{}
 	lintEnabled.Init(repoDir)
 	Conf.Core.GolangCILint = "golangci-lint"
+
+	var buf strings.Builder
+	_, annotations, problems, err := lintRepo(context.TODO(), repoDir, diffs, lintEnabled, &buf)
+	require.NoError(err)
+	assert.NotEmpty(annotations)
+	assert.NotZero(problems)
+}
+
+func TestLintRepo2(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	_, filename, _, ok := runtime.Caller(0)
+	require.True(ok)
+
+	currentDir := path.Dir(filename)
+	repoDir := path.Join(currentDir, "../testdata/Android")
+
+	fileName := "app/src/main/AndroidManifest.xml"
+	out, err := ioutil.ReadFile(path.Join(repoDir, fileName+".diff"))
+	require.NoError(err)
+
+	diffs, err := diff.ParseMultiFileDiff(out)
+	require.NoError(err)
+
+	lintEnabled := LintEnabled{}
+	lintEnabled.Init(repoDir)
+	Conf.Core.AndroidLint = "gradlew lint"
 
 	var buf strings.Builder
 	_, annotations, problems, err := lintRepo(context.TODO(), repoDir, diffs, lintEnabled, &buf)
