@@ -1,0 +1,14 @@
+diff --git a/AndroidManifest.xml b/AndroidManifest.xml
+index 22076c1..95eb0d4 100644
+--- a/AndroidManifest.xml
++++ b/AndroidManifest.xml
+@@ -24,8 +24,7 @@
+         for the first time. -->
+     <meta-data android:name="fontProviderRequests" android:value="Noto Color Emoji Compat"/>
+ 
+-    <application
+-        android:allowBackup="true"
++    <application android:allowBackup="true"
+         android:icon="@mipmap/ic_launcher"
+         android:label="@string/app_name"
+         android:supportsRtl="true"

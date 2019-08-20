@@ -117,6 +117,47 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 	}
 	disableUnnecessaryLints(diffs, &lintEnabled)
 
+	if lintEnabled.Android {
+		issues, msg, err := AndroidLint(ctx, repoPath)
+		if err != nil {
+			log.WriteString(fmt.Sprintf("Android lint error: %v\n", err))
+			return "", nil, 0, err
+		}
+		if issues != nil {
+			for _, d := range diffs {
+				newName := util.Unquote(d.NewName)
+				if !strings.HasPrefix(newName, "b/") {
+					log.WriteString("No need to process " + newName + "\n")
+					continue
+				}
+				fileName := newName[2:]
+				for _, v := range issues.Issues {
+					if strings.Contains(v.Location.File, fileName) {
+						startLine := v.Location.Line
+						for _, hunk := range d.Hunks {
+							if int32(startLine) >= hunk.NewStartLine && int32(startLine) < hunk.NewStartLine+hunk.NewLines {
+								comment := fmt.Sprintf("%s:%d  %s",
+									fileName, startLine, v.Message)
+								annotations = append(annotations, &github.CheckRunAnnotation{
+									Path:            &v.Location.File,
+									Message:         &comment,
+									StartLine:       &startLine,
+									EndLine:         &startLine,
+									AnnotationLevel: &annotationLevel,
+								})
+								problems++
+								break
+							}
+						}
+					}
+				}
+			}
+		}
+		if issues == nil && msg != "" {
+			outputSummaries.WriteString("Android lint error: " + msg)
+		}
+		log.WriteString(msg + "\n")
+	}
 	if lintEnabled.APIDoc {
 		title := fmt.Sprintf("APIDoc '%s'\n", repoPath)
 		log.WriteString(title)
@@ -629,7 +670,10 @@ func HandleMessage(ctx context.Context, message string) error {
 		var conclusion string
 		if failedLints > 0 {
 			conclusion = "failure"
-			outputSummary = fmt.Sprintf("The lint check failed! %d problem(s) found.\n", failedLints) + "```\n" + notes + "\n```"
+			outputSummary = fmt.Sprintf("The lint check failed! %d problem(s) found.\n", failedLints)
+			if notes != "" {
+				outputSummary += "```\n" + notes + "\n```"
+			}
 		} else {
 			conclusion = "success"
 			outputSummary = "The lint check succeed!"

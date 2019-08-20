@@ -28,3 +28,9 @@ node_modules
 package-lock.json
 
 *.db
+
+# testdata
+testdata/go/doc/
+testdata/Android/.gradle/
+testdata/Android/build/
+testdata/Android/app/build/
