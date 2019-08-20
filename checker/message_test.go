@@ -216,7 +216,11 @@ func TestLintRepo2(t *testing.T) {
 
 	lintEnabled := LintEnabled{}
 	lintEnabled.Init(repoDir)
-	Conf.Core.AndroidLint = "gradlew lint"
+	if runtime.GOOS == "windows" {
+		Conf.Core.AndroidLint = "gradlew.bat lint"
+	}else{
+		Conf.Core.AndroidLint = "./gradlew lint"
+	}
 
 	var buf strings.Builder
 	_, annotations, problems, err := lintRepo(context.TODO(), repoDir, diffs, lintEnabled, &buf)
