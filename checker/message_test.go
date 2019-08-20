@@ -218,7 +218,7 @@ func TestLintRepo2(t *testing.T) {
 	lintEnabled.Init(repoDir)
 	if runtime.GOOS == "windows" {
 		Conf.Core.AndroidLint = "gradlew.bat lint"
-	}else{
+	} else {
 		Conf.Core.AndroidLint = "./gradlew lint"
 	}
 
