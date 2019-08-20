@@ -709,12 +709,14 @@ func APIDoc(ctx context.Context, repoPath string) (string, error) {
 	return string(output) + "\n", err
 }
 
+// Issues struct represents a list of Android lint issues
 type Issues struct {
 	XMLName xml.Name `xml:"issues"`
 
 	Issues []Issue `xml:"issue"`
 }
 
+// Issue struct represents a Android lint issue
 type Issue struct {
 	XMLName xml.Name `xml:"issue"`
 
@@ -757,20 +759,18 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 		msg := fmt.Sprintf("Can not find %s\n", fileName)
 		LogError.Error(msg)
 		return nil, msg, nil
-	} else {
-		xmls, err := ioutil.ReadFile(fileName)
-		if err != nil {
-			msg := fmt.Sprintf("Can not read %s: %v\n", fileName, err)
-			LogError.Error(msg)
-			return nil, msg, nil
-		} else {
-			err = xml.Unmarshal(xmls, &issues)
-			if err != nil {
-				msg := fmt.Sprintf("Can not parse xml: %v\n", err)
-				LogError.Error(msg)
-				return nil, msg, nil
-			}
-		}
+	}
+	xmls, err := ioutil.ReadFile(fileName)
+	if err != nil {
+		msg := fmt.Sprintf("Can not read %s: %v\n", fileName, err)
+		LogError.Error(msg)
+		return nil, msg, nil
+	}
+	err = xml.Unmarshal(xmls, &issues)
+	if err != nil {
+		msg := fmt.Sprintf("Can not parse xml: %v\n", err)
+		LogError.Error(msg)
+		return nil, msg, nil
 	}
 
 	return &issues, "", nil
