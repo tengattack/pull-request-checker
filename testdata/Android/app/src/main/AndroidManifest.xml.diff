@@ -1,7 +1,7 @@
 diff --git a/AndroidManifest.xml b/AndroidManifest.xml
 index 22076c1..95eb0d4 100644
---- a/AndroidManifest.xml
-+++ b/AndroidManifest.xml
+--- a/app/src/main/AndroidManifest.xml
++++ b/app/src/main/AndroidManifest.xml
 @@ -24,8 +24,7 @@
          for the first time. -->
      <meta-data android:name="fontProviderRequests" android:value="Noto Color Emoji Compat"/>
