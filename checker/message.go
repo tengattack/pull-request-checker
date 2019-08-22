@@ -121,7 +121,7 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 		issues, msg, err := AndroidLint(ctx, repoPath)
 		if err != nil {
 			log.WriteString(fmt.Sprintf("Android lint error: %v\n", err))
-			return "", nil, 0, err
+			return msg, nil, 0, err
 		}
 		if issues != nil {
 			for _, d := range diffs {

@@ -750,7 +750,7 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		LogError.Errorf("Android lint: %v\n%s", err, output)
-		return nil, "", err
+		return nil, string(output), err
 	}
 
 	var issues Issues
