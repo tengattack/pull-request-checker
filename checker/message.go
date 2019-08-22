@@ -121,7 +121,7 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 		issues, msg, err := AndroidLint(ctx, repoPath)
 		if err != nil {
 			log.WriteString(fmt.Sprintf("Android lint error: %v\n", err))
-			return "", nil, 0, err
+			return msg, nil, 0, err
 		}
 		if issues != nil {
 			for _, d := range diffs {
@@ -132,14 +132,14 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 				}
 				fileName := newName[2:]
 				for _, v := range issues.Issues {
-					if strings.Contains(v.Location.File, fileName) {
+					if v.Location.File == fileName {
 						startLine := v.Location.Line
 						for _, hunk := range d.Hunks {
 							if int32(startLine) >= hunk.NewStartLine && int32(startLine) < hunk.NewStartLine+hunk.NewLines {
 								comment := fmt.Sprintf("%s:%d  %s",
 									fileName, startLine, v.Message)
 								annotations = append(annotations, &github.CheckRunAnnotation{
-									Path:            &v.Location.File,
+									Path:            &fileName,
 									Message:         &comment,
 									StartLine:       &startLine,
 									EndLine:         &startLine,

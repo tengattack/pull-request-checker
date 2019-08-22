@@ -750,7 +750,7 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		LogError.Errorf("Android lint: %v\n%s", err, output)
-		return nil, "", err
+		return nil, string(output), err
 	}
 
 	var issues Issues
@@ -773,5 +773,23 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 		return nil, msg, nil
 	}
 
+	basePath, err := filepath.Abs(repoPath)
+	if err != nil {
+		msg := fmt.Sprintf("Can not get absolute repo path: %v\n", err)
+		LogError.Error(msg)
+		return nil, msg, nil
+	}
+	for i, v := range issues.Issues {
+		relativeFile, err := filepath.Rel(basePath, v.Location.File)
+		if err != nil {
+			msg := fmt.Sprintf("Can not get relative path: %v\n", err)
+			LogError.Error(msg)
+			return nil, msg, nil
+		}
+		if runtime.GOOS == "windows" {
+			relativeFile = filepath.ToSlash(relativeFile)
+		}
+		issues.Issues[i].Location.File = relativeFile
+	}
 	return &issues, "", nil
 }
