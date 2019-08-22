@@ -132,7 +132,7 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 				}
 				fileName := newName[2:]
 				for _, v := range issues.Issues {
-					if strings.Contains(v.Location.File, fileName) {
+					if v.Location.File == fileName {
 						startLine := v.Location.Line
 						for _, hunk := range d.Hunks {
 							if int32(startLine) >= hunk.NewStartLine && int32(startLine) < hunk.NewStartLine+hunk.NewLines {
