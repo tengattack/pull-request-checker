@@ -139,7 +139,7 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 								comment := fmt.Sprintf("%s:%d  %s",
 									fileName, startLine, v.Message)
 								annotations = append(annotations, &github.CheckRunAnnotation{
-									Path:            &v.Location.File,
+									Path:            &fileName,
 									Message:         &comment,
 									StartLine:       &startLine,
 									EndLine:         &startLine,
