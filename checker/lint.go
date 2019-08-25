@@ -749,13 +749,14 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 	cmd.Dir = repoPath
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		msg := fmt.Sprintf("Android lint: %v\n%s", err, output)
 		if e, ok := err.(*exec.ExitError); ok {
 			if e.ExitCode() == 1 {
-				return nil, string(output), nil
+				err = nil
 			}
 		}
-		LogError.Errorf("Android lint: %v\n%s", err, output)
-		return nil, string(output), err
+		LogError.Error(msg)
+		return nil, msg, err
 	}
 
 	var issues Issues

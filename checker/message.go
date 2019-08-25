@@ -117,6 +117,7 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 	disableUnnecessaryLints(diffs, &lintEnabled)
 
 	if lintEnabled.Android {
+		log.WriteString(fmt.Sprintf("AndroidLint '%s'\n", repoPath))
 		issues, msg, err := AndroidLint(ctx, repoPath)
 		if err != nil {
 			log.WriteString(fmt.Sprintf("Android lint error: %v\n", err))
