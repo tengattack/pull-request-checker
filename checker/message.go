@@ -154,22 +154,20 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 		}
 		if issues == nil && msg != "" {
 			outputSummaries.WriteString("Android lint error: " + msg)
+			problems++
 		}
 		log.WriteString(msg + "\n")
 	}
 	if lintEnabled.APIDoc {
-		title := fmt.Sprintf("APIDoc '%s'\n", repoPath)
-		log.WriteString(title)
-		outputSummaries.WriteString(title)
+		log.WriteString(fmt.Sprintf("APIDoc '%s'\n", repoPath))
 		var apiDocOutput string
 		apiDocOutput, err = APIDoc(ctx, repoPath)
 		if err != nil {
-			apiDocOutput = fmt.Sprintf("APIDoc error: %v\n", err) + apiDocOutput
+			outputSummaries.WriteString(fmt.Sprintf("APIDoc error: %v\n", err) + apiDocOutput)
 			problems++
 			err = nil
 		}
-		log.WriteString(apiDocOutput + "\n") // Add an additional '\n'
-		outputSummaries.WriteString(apiDocOutput)
+		log.WriteString("\n")
 	}
 	if lintEnabled.Go {
 		log.WriteString(fmt.Sprintf("GolangCILint '%s'\n", repoPath))
