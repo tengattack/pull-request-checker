@@ -123,7 +123,8 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 			log.WriteString(fmt.Sprintf("Android lint error: %v\n", err))
 			return msg, nil, 0, err
 		}
-		if issues != nil {
+		issuesFound := issues != nil && len(issues.Issues) > 0
+		if issuesFound {
 			for _, d := range diffs {
 				newName := util.Unquote(d.NewName)
 				if !strings.HasPrefix(newName, "b/") {
@@ -153,7 +154,8 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 				}
 			}
 		}
-		if issues == nil && msg != "" {
+		// If no issues can be found but a non-empty msg is returned, we need to report it as a general problem, e.g. build problem.
+		if !issuesFound && msg != "" {
 			outputSummaries.WriteString("Android lint error: " + msg)
 			problems++
 		}
