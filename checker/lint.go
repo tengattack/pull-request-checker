@@ -755,7 +755,6 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 				err = nil
 			}
 		}
-		LogError.Error(msg)
 		return nil, msg, err
 	}
 
