@@ -431,6 +431,9 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 
 // HandleMessage handles message
 func HandleMessage(ctx context.Context, message string) error {
+	ctx, cancel := context.WithTimeout(ctx, 120*time.Minute)
+	defer cancel()
+
 	s := strings.Split(message, "/")
 	if len(s) != 6 || s[2] != "pull" || s[4] != "commits" {
 		LogAccess.Warnf("malformed message: %s", message)
@@ -548,7 +551,7 @@ func HandleMessage(ctx context.Context, message string) error {
 	os.MkdirAll(repoPath, os.ModePerm)
 
 	log.WriteString("$ git init\n")
-	cmd := exec.Command("git", "init")
+	cmd := exec.CommandContext(ctx, "git", "init")
 	cmd.Dir = repoPath
 	err = cmd.Run()
 	if err != nil {
@@ -567,12 +570,13 @@ func HandleMessage(ctx context.Context, message string) error {
 	originURL.User = url.UserPassword("x-access-token", installationToken.GetToken())
 	fetchURL := originURL.String()
 
-	// git fetch -f https://x-access-token:token@github.com/octocat/Hello-World.git new-topic:pull-XX
 	branch := fmt.Sprintf("pull-%d", prNum)
+
+	// git fetch -f -u https://x-access-token:token@github.com/octocat/Hello-World.git pull/%d/head:pull-%d
 	// -u option can be used to bypass the restriction which prevents git from fetching into current branch:
 	// link: https://stackoverflow.com/a/32561463/4213218
 	log.WriteString("$ git fetch -f -u " + gpull.GetBase().GetRepo().GetCloneURL() + fmt.Sprintf(" pull/%d/head:%s\n", prNum, branch))
-	cmd = exec.Command("git", "fetch", "-f", "-u", fetchURL, fmt.Sprintf("pull/%d/head:%s", prNum, branch))
+	cmd = exec.CommandContext(ctx, "git", "fetch", "-f", "-u", fetchURL, fmt.Sprintf("pull/%d/head:%s", prNum, branch))
 	cmd.Dir = repoPath
 	cmd.Stdout = log
 	cmd.Stderr = log
@@ -583,7 +587,7 @@ func HandleMessage(ctx context.Context, message string) error {
 
 	// git checkout -f <commits>/<branch>
 	log.WriteString("$ git checkout -f " + ref.Sha + "\n")
-	cmd = exec.Command("git", "checkout", "-f", ref.Sha)
+	cmd = exec.CommandContext(ctx, "git", "checkout", "-f", ref.Sha)
 	cmd.Dir = repoPath
 	cmd.Stdout = log
 	cmd.Stderr = log
