@@ -154,7 +154,7 @@ type projectConfig struct {
 	Tests            map[string]goTestsConfig `yaml:"tests"`
 }
 
-type projectConfig0 struct {
+type projectConfigRaw struct {
 	LinterAfterTests bool                `yaml:"linterAfterTests"`
 	Tests            map[string][]string `yaml:"tests"`
 }
@@ -180,7 +180,7 @@ func readProjectConfig(cwd string) (config projectConfig, err error) {
 
 	err = yaml.Unmarshal(content, &config)
 	if err != nil {
-		var cfg projectConfig0
+		var cfg projectConfigRaw
 		err = yaml.Unmarshal(content, &cfg)
 		if err != nil {
 			return config, err

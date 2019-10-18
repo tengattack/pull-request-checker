@@ -1,4 +1,4 @@
-linterAfterTests: true
+linterAfterTests: false
 
 tests:
   go:
