@@ -9,20 +9,20 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestGetTests(t *testing.T) {
+func TestReadProjectConfig(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
 	_, filename, _, _ := runtime.Caller(0)
 	currentDir := path.Dir(filename)
 
-	tests, err := getTests(currentDir)
+	repoConf, err := readProjectConfig(currentDir)
 	require.NoError(err)
-	assert.Empty(tests)
+	assert.Empty(repoConf.Tests)
 
-	tests, err = getTests(currentDir + "/../")
+	repoConf, err = readProjectConfig(currentDir + "/../")
 	require.NoError(err)
-	assert.True(len(tests) > 0)
+	assert.True(len(repoConf.Tests) > 0)
 }
 
 func TestNewShellParser(t *testing.T) {

@@ -606,15 +606,53 @@ func HandleMessage(ctx context.Context, message string) error {
 
 	lintEnabled := LintEnabled{}
 	lintEnabled.Init(repoPath)
-	notes, annotations, failedLints, err := GenerateAnnotations(ctx, repoPath, diffs, lintEnabled, log)
+
+	repoConf, err := readProjectConfig(repoPath)
 	if err != nil {
+		// Can not get tests from config: report action_required instead.
+		outputTitle := "wrong tests config"
+		checkRun, erro := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
+		if erro != nil {
+			msg := fmt.Sprintf("github create check run '%s' failed: %v\n", outputTitle, erro)
+			LogError.Error(msg)
+			log.WriteString(msg)
+			return erro
+		}
+		UpdateCheckRunWithError(ctx, client, gpull, checkRun.GetID(), outputTitle, outputTitle, err)
 		return err
 	}
 
+	var (
+		notes       string
+		annotations []*github.CheckRunAnnotation
+		failedLints int
+
+		failedTests int
+		passedTests int
+		errTests    int
+		testMsg     string
+	)
 	noTest := true
-	failedTests, passedTests, errTests, testMsg := checkTests(ctx, repoPath, client, gpull, ref, targetURL, log)
-	if failedTests+passedTests+errTests > 0 {
-		noTest = false
+
+	if repoConf.LinterAfterTests {
+		failedTests, passedTests, errTests, testMsg = checkTests(ctx, repoPath, repoConf.Tests, client, gpull, ref, targetURL, log)
+		if failedTests+passedTests+errTests > 0 {
+			noTest = false
+		}
+		notes, annotations, failedLints, err = GenerateAnnotations(ctx, repoPath, diffs, lintEnabled, log)
+		if err != nil {
+			return err
+		}
+	} else {
+		notes, annotations, failedLints, err = GenerateAnnotations(ctx, repoPath, diffs, lintEnabled, log)
+		if err != nil {
+			return err
+		}
+
+		failedTests, passedTests, errTests, testMsg = checkTests(ctx, repoPath, repoConf.Tests, client, gpull, ref, targetURL, log)
+		if failedTests+passedTests+errTests > 0 {
+			noTest = false
+		}
 	}
 
 	mark := '✔'
@@ -683,22 +721,9 @@ func HandleMessage(ctx context.Context, message string) error {
 	return err
 }
 
-func checkTests(ctx context.Context, repoPath string, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string,
-	log *os.File) (failedTests, passedTests, errTests int, testMsg string) {
-	tests, err := getTests(repoPath)
-	if err != nil {
-		// Can not get tests from config: report action_required instead.
-		outputTitle := "wrong tests config"
-		checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
-		if err != nil {
-			msg := fmt.Sprintf("github create check run '%s' failed: %v\n", outputTitle, err)
-			LogError.Error(msg)
-			log.WriteString(msg)
-			return
-		}
-		UpdateCheckRunWithError(ctx, client, gpull, checkRun.GetID(), outputTitle, outputTitle, err)
-		return
-	}
+func checkTests(ctx context.Context, repoPath string, tests map[string]goTestsConfig,
+	client *github.Client, gpull *github.PullRequest, ref GithubRef,
+	targetURL string, log *os.File) (failedTests, passedTests, errTests int, testMsg string) {
 
 	t := &testReporter{
 		Log:       log,

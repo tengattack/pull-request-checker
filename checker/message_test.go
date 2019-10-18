@@ -136,7 +136,8 @@ func TestGetBaseCoverage(t *testing.T) {
 	err = cmd.Run()
 	require.NoError(err)
 
-	tests, err := getTests(repoPath)
+	repoConf, err := readProjectConfig(repoPath)
+	tests := repoConf.Tests
 	require.NoError(err)
 
 	author := "author"
