@@ -260,7 +260,7 @@ func OCLint(ctx context.Context, filePath string, cwd string) (lints []LintMessa
 	out, _ := cmd.Output()
 
 	LogAccess.Debugf("OCLint Output:\n%s", out)
-	LogAccess.Debugf("OCLint Errput:\n%s", stderr.String())
+	LogAccess.Debugf("OCLint Stderr:\n%s", stderr.String())
 
 	// parse xml
 	var violations oclintXML

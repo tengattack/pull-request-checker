@@ -42,7 +42,7 @@ func isOCLint(fileName string) bool {
 	}
 	ext := fileName[i:]
 	switch ext {
-	case ".m", ".mm", ".c", ".h", ".cpp", ".cc":
+	case ".c", ".cc", ".cpp", ".h", ".m", ".mm":
 		return true
 	default:
 		return false
@@ -299,7 +299,7 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 		lints, lintErr = CPPLint(fileName, repoPath)
 	} else if lintEnabled.OC && isOCLint(fileName) {
 		log.WriteString(fmt.Sprintf("OCLint '%s'\n", fileName))
-		lints, lintErr = OCLint(fileName, repoPath)
+		lints, lintErr = OCLint(context.TODO(), fileName, repoPath)
 	} else if lintEnabled.Go && strings.HasSuffix(fileName, ".go") {
 		log.WriteString(fmt.Sprintf("Goreturns '%s'\n", fileName))
 		lintsGoreturns, err := Goreturns(filepath.Join(repoPath, fileName), repoPath)
