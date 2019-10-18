@@ -149,6 +149,16 @@ type goTestsConfig struct {
 	Cmds     []string `yaml:"cmds"`
 }
 
+type projectConfig struct {
+	LinterAfterTests bool                     `yaml:"linterAfterTests"`
+	Tests            map[string]goTestsConfig `yaml:"tests"`
+}
+
+type projectConfig0 struct {
+	LinterAfterTests bool                `yaml:"linterAfterTests"`
+	Tests            map[string][]string `yaml:"tests"`
+}
+
 func isEmptyTest(cmds []string) bool {
 	empty := true
 	for _, c := range cmds {
@@ -159,32 +169,28 @@ func isEmptyTest(cmds []string) bool {
 	return empty
 }
 
-func getTests(cwd string) (map[string]goTestsConfig, error) {
+func readProjectConfig(cwd string) (config projectConfig, err error) {
 	content, err := ioutil.ReadFile(filepath.Join(cwd, projectTestsConfigFile))
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return config, nil
 		}
-		return nil, err
+		return config, err
 	}
-	var config struct {
-		Tests map[string]goTestsConfig `yaml:"tests"`
-	}
+
 	err = yaml.Unmarshal(content, &config)
 	if err != nil {
-		var cfg struct {
-			Tests map[string][]string `yaml:"tests"`
-		}
+		var cfg projectConfig0
 		err = yaml.Unmarshal(content, &cfg)
 		if err != nil {
-			return nil, err
+			return config, err
 		}
 		config.Tests = make(map[string]goTestsConfig)
 		for k, v := range cfg.Tests {
 			config.Tests[k] = goTestsConfig{Cmds: v, Coverage: ""}
 		}
 	}
-	return config.Tests, nil
+	return config, nil
 }
 
 func getDefaultAPIClient(owner string) (*github.Client, error) {

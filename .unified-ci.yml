@@ -1,3 +1,5 @@
+linterAfterTests: true
+
 tests:
   go:
     coverage: 'total:.*?[-+]?((?:\d*\.\d+|\d+)%)'
