@@ -431,7 +431,8 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 
 // HandleMessage handles message
 func HandleMessage(ctx context.Context, message string) error {
-	ctx, cancel := context.WithTimeout(ctx, 120*time.Minute)
+	// 限制总时长为一个小时
+	ctx, cancel := context.WithTimeout(ctx, time.Hour)
 	defer cancel()
 
 	s := strings.Split(message, "/")
