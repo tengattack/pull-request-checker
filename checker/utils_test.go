@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestreadProjectConfig(t *testing.T) {
+func TestReadProjectConfig(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
