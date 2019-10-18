@@ -229,3 +229,7 @@ func TestLintRepo2(t *testing.T) {
 	assert.NotEmpty(annotations)
 	assert.NotZero(problems)
 }
+
+func TestIsOCLint(t *testing.T) {
+	assert.True(t, isOCLint("abc.mm"))
+}

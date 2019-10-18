@@ -35,6 +35,20 @@ func isCPP(fileName string) bool {
 	return false
 }
 
+func isOCLint(fileName string) bool {
+	i := strings.LastIndex(fileName, ".")
+	if i == -1 {
+		return false
+	}
+	ext := fileName[i:]
+	switch ext {
+	case ".m", ".mm", ".c", ".h", ".cpp", ".cc":
+		return true
+	default:
+		return false
+	}
+}
+
 func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, annotations *[]*github.CheckRunAnnotation, problems *int, log *bytes.Buffer, fileName string) {
 	annotationLevel := "warning" // TODO: from lint.Severity
 	for _, lint := range lintsDiff {
@@ -283,6 +297,9 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 	} else if lintEnabled.CPP && isCPP(fileName) {
 		log.WriteString(fmt.Sprintf("CPPLint '%s'\n", fileName))
 		lints, lintErr = CPPLint(fileName, repoPath)
+	} else if lintEnabled.OC && isOCLint(fileName) {
+		log.WriteString(fmt.Sprintf("OCLint '%s'\n", fileName))
+		lints, lintErr = OCLint(fileName, repoPath)
 	} else if lintEnabled.Go && strings.HasSuffix(fileName, ".go") {
 		log.WriteString(fmt.Sprintf("Goreturns '%s'\n", fileName))
 		lintsGoreturns, err := Goreturns(filepath.Join(repoPath, fileName), repoPath)
@@ -639,6 +656,7 @@ func HandleMessage(ctx context.Context, message string) error {
 		if failedTests+passedTests+errTests > 0 {
 			noTest = false
 		}
+
 		notes, annotations, failedLints, err = GenerateAnnotations(ctx, repoPath, diffs, lintEnabled, log)
 		if err != nil {
 			return err

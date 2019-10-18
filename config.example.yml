@@ -11,6 +11,7 @@ core:
   golangcilint: 'golangci-lint'
   remarklint: 'remark'
   cpplint: 'cpplint'
+  oclint: 'oclint-json-compilation-database'
   phplint: 'phplint'
   eslint: './node_modules/.bin/eslint'
   tslint: './node_modules/.bin/tslint'
