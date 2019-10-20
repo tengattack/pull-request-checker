@@ -252,8 +252,7 @@ func OCLint(ctx context.Context, filePath string, cwd string) (lints []LintMessa
 	parser := NewShellParser(cwd)
 	words, _ := parser.Parse(Conf.Core.OCLint)
 	if len(words) < 1 {
-		// use default
-		words = []string{"oclint-json-compilation-database"}
+		return nil, errors.New("Invalid `oclint` configuration")
 	}
 	words = append(words, "-i", filePath, "--", "-report-type", "xml")
 

@@ -35,7 +35,7 @@ func isCPP(fileName string) bool {
 	return false
 }
 
-func isOCLint(fileName string) bool {
+func isOC(fileName string) bool {
 	i := strings.LastIndex(fileName, ".")
 	if i == -1 {
 		return false
@@ -297,7 +297,7 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 	} else if lintEnabled.CPP && isCPP(fileName) {
 		log.WriteString(fmt.Sprintf("CPPLint '%s'\n", fileName))
 		lints, lintErr = CPPLint(fileName, repoPath)
-	} else if lintEnabled.OC && isOCLint(fileName) {
+	} else if lintEnabled.OC && isOC(fileName) {
 		log.WriteString(fmt.Sprintf("OCLint '%s'\n", fileName))
 		lints, lintErr = OCLint(context.TODO(), fileName, repoPath)
 	} else if lintEnabled.Go && strings.HasSuffix(fileName, ".go") {
