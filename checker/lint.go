@@ -224,10 +224,17 @@ func CPPLint(filePath string, repoPath string) (lints []LintMessage, err error) 
 	return lints, nil
 }
 
-type oclintXML struct {
+// OCLintResultXML is the result for OCLint
+type OCLintResultXML struct {
 	XMLName xml.Name `xml:"oclint"`
 
-	Violations []oclintViolation `xml:"violations"`
+	Violations oclintViolations `xml:"violations"`
+}
+
+type oclintViolations struct {
+	XMLName xml.Name `xml:"violations"`
+
+	Violations []oclintViolation `xml:"violation"`
 }
 
 type oclintViolation struct {
@@ -263,7 +270,7 @@ func OCLint(ctx context.Context, filePath string, cwd string) (lints []LintMessa
 	LogAccess.Debugf("OCLint Stderr:\n%s", stderr.String())
 
 	// parse xml
-	var violations oclintXML
+	var violations OCLintResultXML
 	err = xml.Unmarshal(out, &violations)
 	if err != nil {
 		msg := fmt.Sprintf("OCLint can not parse xml: %v", err)
@@ -271,7 +278,7 @@ func OCLint(ctx context.Context, filePath string, cwd string) (lints []LintMessa
 		return nil, errors.New(msg)
 	}
 
-	for _, v := range violations.Violations {
+	for _, v := range violations.Violations.Violations {
 		lints = append(lints, LintMessage{
 			RuleID:  v.Rule,
 			Line:    v.StartLine,
