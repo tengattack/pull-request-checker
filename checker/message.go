@@ -625,7 +625,7 @@ func HandleMessage(ctx context.Context, message string) error {
 		outputTitle := "wrong tests config"
 		checkRun, erro := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
 		if erro != nil {
-			err = fmt.Errorf("Github create check run '%s' failed: %v\n", outputTitle, erro)
+			err = fmt.Errorf("Github create check run '%s' failed: %v", outputTitle, erro)
 			return err
 		}
 		err = fmt.Errorf("ReadProjectConfig error: %v", err)
