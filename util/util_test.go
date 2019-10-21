@@ -27,3 +27,27 @@ func TestFileExists(t *testing.T) {
 	assert.False(FileExists("../testdata"))
 	assert.True(FileExists("./util_test.go"))
 }
+
+func TestTruncated(t *testing.T) {
+	assert := assert.New(t)
+
+	assert.Equal(
+		"12 ... 34",
+		Truncated("1200 0000 0000 0034", " ... ", 9),
+	)
+
+	assert.Equal(
+		"",
+		Truncated("abc", "", 0),
+	)
+
+	assert.Equal(
+		"ac",
+		Truncated("abc", "", 2),
+	)
+
+	assert.Equal(
+		"{}",
+		Truncated("abc", "{,}", 2),
+	)
+}

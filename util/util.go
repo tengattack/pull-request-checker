@@ -42,3 +42,19 @@ func FileExists(filename string) bool {
 	}
 	return !info.IsDir()
 }
+
+// Truncated("1200 0000 0000 0034", " ... ", 9) = "12 ... 34"
+func Truncated(s string, t string, n int) string {
+	if n <= 0 {
+		return ""
+	}
+	if len(t) > n {
+		return Truncated(t, "", n)
+	}
+
+	p := n - len(t)
+
+	b := p / 2
+	e := p - b
+	return s[:b] + t + s[len(s)-e:]
+}
