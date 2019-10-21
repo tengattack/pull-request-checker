@@ -52,7 +52,9 @@ func ReportTestResults(testName string, repoPath string, cmds []string, coverage
 
 	checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
 	if err != nil {
-		LogError.Errorf("github create %s failed: %v", outputTitle, err)
+		msg := fmt.Sprintf("Creating %s check run failed: %v", outputTitle, err)
+		_, _ = io.WriteString(log, msg)
+		LogError.Error(msg)
 		return "", err
 	}
 	checkRunID := checkRun.GetID()
@@ -92,7 +94,7 @@ func testAndSaveCoverage(ctx context.Context, owner, repo, sha string, testName 
 	repoPath string, gpull *github.PullRequest, breakOnFails bool, log io.Writer) (conclusion, reportMessage, outputSummary string) {
 	parser := NewShellParser(repoPath)
 
-	io.WriteString(log, fmt.Sprintf("Testing '%s'\n", testName))
+	_, _ = io.WriteString(log, fmt.Sprintf("Testing '%s'\n", testName))
 	conclusion = "success"
 	for _, cmd := range cmds {
 		if cmd != "" {
@@ -102,7 +104,7 @@ func testAndSaveCoverage(ctx context.Context, owner, repo, sha string, testName 
 				msg += errCmd.Error() + "\n"
 			}
 
-			io.WriteString(log, msg)
+			_, _ = io.WriteString(log, msg)
 			outputSummary += msg
 			if errCmd != nil {
 				conclusion = "failure"
@@ -129,18 +131,18 @@ func testAndSaveCoverage(ctx context.Context, owner, repo, sha string, testName 
 				msg := fmt.Sprintf("Error: %v. Failed to save %v\n", err, c)
 				outputSummary += msg
 				LogError.Error(msg)
-				io.WriteString(log, msg)
+				_, _ = io.WriteString(log, msg)
 			}
 		} else {
 			msg := fmt.Sprintf("Failed to parse '%s': %v\n", percentage, err)
 			LogError.Error(msg)
-			io.WriteString(log, msg)
+			_, _ = io.WriteString(log, msg)
 			// PASS
 		}
 
 		outputSummary += ("Test coverage: " + percentage + "\n")
 		reportMessage = percentage
 	}
-	io.WriteString(log, "\n")
+	_, _ = io.WriteString(log, "\n")
 	return
 }

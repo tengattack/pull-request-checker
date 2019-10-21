@@ -260,6 +260,7 @@ func OCLint(ctx context.Context, filePath string, cwd string) (lints []LintMessa
 	defer cancel()
 
 	var stderr bytes.Buffer
+	// The provided context is used to kill the process (by calling os.Process.Kill)
 	cmd := exec.CommandContext(ctx, words[0], words[1:]...)
 	cmd.Stderr = &stderr
 	cmd.Dir = cwd
