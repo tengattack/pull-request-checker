@@ -113,7 +113,8 @@ func UpdateCheckRun(ctx context.Context, client *github.Client, gpull *github.Pu
 	checkRunStatus := "completed"
 	// Only 65535 characters are allowed in this request
 	if len(outputSummary) > 60000 {
-		outputSummary = util.Truncated(outputSummary, "... truncated ...", 60000)
+		_, outputSummary = util.Truncated(outputSummary, "... truncated ...", 60000)
+		LogError.Warn("The output summary is too long.")
 	}
 	owner := gpull.GetBase().GetRepo().GetOwner().GetLogin()
 	repo := gpull.GetBase().GetRepo().GetName()

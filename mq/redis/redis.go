@@ -145,3 +145,48 @@ func (s *MessageQueue) Retry(message string) error {
 	_, err = redisClient.LRem(mq.SyncPendingChannelKey, 1, message).Result()
 	return err
 }
+
+// Exists checks if message is in the queue
+func (s *MessageQueue) Exists(message string) (bool, error) {
+	exist := false
+
+	// SyncChannelKey
+	i, err := redisClient.LRem(mq.SyncChannelKey, 1, message).Result()
+	if err != nil {
+		return false, err
+	}
+	if i == 1 {
+		exist = true
+	}
+	_, err = redisClient.LPush(mq.SyncChannelKey, message).Result()
+	if err != nil {
+		return false, err
+	}
+
+	// SyncPendingChannelKey
+	i, err = redisClient.LRem(mq.SyncPendingChannelKey, 1, message).Result()
+	if err != nil {
+		return false, err
+	}
+	if i == 1 {
+		exist = true
+	}
+	_, err = redisClient.LPush(mq.SyncPendingChannelKey, message).Result()
+	if err != nil {
+		return false, err
+	}
+
+	// SyncErrorChannelKey
+	i, err = redisClient.LRem(mq.SyncErrorChannelKey, 1, message).Result()
+	if err != nil {
+		return false, err
+	}
+	if i == 1 {
+		exist = true
+	}
+	_, err = redisClient.LPush(mq.SyncErrorChannelKey, message).Result()
+	if err != nil {
+		return false, err
+	}
+	return exist, nil
+}

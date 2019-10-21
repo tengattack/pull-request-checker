@@ -26,4 +26,6 @@ type MessageQueue interface {
 	MoveErrorToPending() (string, error)
 	GetErrorTimes(message string) (int64, error)
 	Retry(message string) error
+
+	Exists(message string) (bool, error)
 }

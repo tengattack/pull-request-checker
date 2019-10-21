@@ -43,11 +43,17 @@ func FileExists(filename string) bool {
 	return !info.IsDir()
 }
 
-// Truncated("1200 0000 0000 0034", " ... ", 9) = "12 ... 34"
-func Truncated(s string, t string, n int) string {
+// Truncated returns whether the truncation is performed and the result of s:
+// e.g. Truncated("1200 0000 0000 0034", " ... ", 9) = (true, "12 ... 34")
+func Truncated(s string, t string, n int) (bool, string) {
 	if n <= 0 {
-		return ""
+		return len(s) != 0, ""
 	}
+
+	if len(s) <= n {
+		return false, s
+	}
+
 	if len(t) > n {
 		return Truncated(t, "", n)
 	}
@@ -56,5 +62,5 @@ func Truncated(s string, t string, n int) string {
 
 	b := p / 2
 	e := p - b
-	return s[:b] + t + s[len(s)-e:]
+	return true, s[:b] + t + s[len(s)-e:]
 }

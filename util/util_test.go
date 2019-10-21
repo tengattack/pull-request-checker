@@ -31,23 +31,23 @@ func TestFileExists(t *testing.T) {
 func TestTruncated(t *testing.T) {
 	assert := assert.New(t)
 
-	assert.Equal(
-		"12 ... 34",
-		Truncated("1200 0000 0000 0034", " ... ", 9),
-	)
+	b, s := Truncated("1200 0000 0000 0034", " ... ", 9)
+	assert.Equal(true, b)
+	assert.Equal("12 ... 34", s)
 
-	assert.Equal(
-		"",
-		Truncated("abc", "", 0),
-	)
+	b, s = Truncated("abc", "", 0)
+	assert.Equal(true, b)
+	assert.Equal("", s)
 
-	assert.Equal(
-		"ac",
-		Truncated("abc", "", 2),
-	)
+	b, s = Truncated("abc", "", 2)
+	assert.Equal(true, b)
+	assert.Equal("ac", s)
 
-	assert.Equal(
-		"{}",
-		Truncated("abc", "{,}", 2),
-	)
+	b, s = Truncated("abc", "{,}", 2)
+	assert.Equal(true, b)
+	assert.Equal("{}", s)
+
+	b, s = Truncated("abc", "", 3)
+	assert.False(b)
+	assert.Equal("abc", s)
 }
