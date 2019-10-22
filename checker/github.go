@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/go-github/github"
+	"github.com/tengattack/unified-ci/mq"
 	"github.com/tengattack/unified-ci/util"
 	githubhook "gopkg.in/rjz/githubhook.v0"
 	"sourcegraph.com/sourcegraph/go-diff/diff"
@@ -323,6 +324,41 @@ func HasLintStatuses(client *github.Client, ref *GithubRef) (bool, error) {
 	return lint > 0, nil
 }
 
+// TODO: add test
+func needPRChecking(client *github.Client, ref *GithubRef, message string, MQ mq.MessageQueue) (bool, error) {
+	statuses, err := ref.GetStatuses(client)
+	if err != nil {
+		err = fmt.Errorf("github get statuses failed: %v", err)
+		return false, err
+	}
+
+	needCheck := true
+	statusPending := false
+	for _, v := range statuses {
+		if v.GetContext() == AppName {
+			switch v.GetState() {
+			case "success", "error", "failure":
+				needCheck = false
+				return needCheck, nil
+			case "pending":
+				statusPending = true
+			}
+			break
+		}
+	}
+
+	if statusPending {
+		exist, err := MQ.Exists(message)
+		if err != nil {
+			return false, err
+		}
+		if exist {
+			needCheck = false
+		}
+	}
+	return needCheck, nil
+}
+
 // WatchLocalRepo scans local repo periodically and sends a checking request if a opened PR hasn't any checks
 func WatchLocalRepo(ctx context.Context) error {
 	var err error
@@ -403,21 +439,14 @@ func WatchLocalRepo(ctx context.Context) error {
 
 								Sha: pull.GetHead().GetSHA(),
 							}
-							exists, err := HasLintStatuses(client, &ref)
+							message := fmt.Sprintf("%s/%s/pull/%d/commits/%s", ref.owner, ref.repo, pull.GetNumber(), ref.Sha)
+							needCheck, err := needPRChecking(client, &ref, message, MQ)
 							if err != nil {
-								LogError.Errorf("WatchLocalRepo:HasLintStatuses: %v", err)
+								LogError.Errorf("WatchLocalRepo:NeedPRChecking: %v", err)
 								continue
 							}
-							if !exists {
-								exists, err = HasLinterChecks(&ref)
-								if err != nil {
-									LogError.Errorf("WatchLocalRepo:HasLinterChecks: %v", err)
-									continue
-								}
-							}
-							if !exists {
+							if needCheck {
 								// no statuses, need check
-								message := fmt.Sprintf("%s/%s/pull/%d/commits/%s", ref.owner, ref.repo, pull.GetNumber(), ref.Sha)
 								LogAccess.WithField("entry", "local").Info("Push message: " + message)
 								err = MQ.Push(message)
 								if err == nil {

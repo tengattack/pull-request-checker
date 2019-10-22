@@ -11,6 +11,8 @@ import (
 	"regexp"
 	"time"
 
+	"github.com/tengattack/unified-ci/util"
+
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/github"
 	"github.com/pkg/errors"
@@ -109,7 +111,11 @@ func UpdateCheckRunWithError(ctx context.Context, client *github.Client, gpull *
 // outputTitle, outputSummary can contain markdown.
 func UpdateCheckRun(ctx context.Context, client *github.Client, gpull *github.PullRequest, checkRunID int64, checkName string, conclusion string, t github.Timestamp, outputTitle string, outputSummary string, annotations []*github.CheckRunAnnotation) error {
 	checkRunStatus := "completed"
-
+	// Only 65535 characters are allowed in this request
+	if len(outputSummary) > 60000 {
+		_, outputSummary = util.Truncated(outputSummary, "... truncated ...", 60000)
+		LogError.Warn("The output summary is too long.")
+	}
 	owner := gpull.GetBase().GetRepo().GetOwner().GetLogin()
 	repo := gpull.GetBase().GetRepo().GetName()
 	_, _, err := client.Checks.UpdateCheckRun(ctx, owner, repo, checkRunID, github.UpdateCheckRunOptions{

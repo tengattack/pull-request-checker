@@ -229,3 +229,8 @@ func TestLintRepo2(t *testing.T) {
 	assert.NotEmpty(annotations)
 	assert.NotZero(problems)
 }
+
+func TestIsOC(t *testing.T) {
+	assert.False(t, isOC("abc"))
+	assert.True(t, isOC("abc.mm"))
+}

@@ -145,3 +145,41 @@ func (s *MessageQueue) Retry(message string) error {
 	_, err = redisClient.LRem(mq.SyncPendingChannelKey, 1, message).Result()
 	return err
 }
+
+// Exists checks if message is in the queue
+// TODO: add test
+func (s *MessageQueue) Exists(message string) (bool, error) {
+	// SyncChannelKey
+	list, err := redisClient.LRange(mq.SyncChannelKey, 0, -1).Result()
+	if err != nil {
+		return false, err
+	}
+	for _, v := range list {
+		if v == message {
+			return true, nil
+		}
+	}
+
+	// SyncPendingChannelKey
+	list, err = redisClient.LRange(mq.SyncPendingChannelKey, 0, -1).Result()
+	if err != nil {
+		return false, err
+	}
+	for _, v := range list {
+		if v == message {
+			return true, nil
+		}
+	}
+
+	// SyncErrorChannelKey
+	list, err = redisClient.LRange(mq.SyncErrorChannelKey, 0, -1).Result()
+	if err != nil {
+		return false, err
+	}
+	for _, v := range list {
+		if v == message {
+			return true, nil
+		}
+	}
+	return false, nil
+}

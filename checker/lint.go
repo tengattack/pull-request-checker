@@ -43,6 +43,7 @@ const (
 // LintEnabled list enabled linter
 type LintEnabled struct {
 	CPP        bool
+	OC         bool
 	Go         bool
 	PHP        bool
 	TypeScript bool
@@ -113,6 +114,7 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 
 	// reset to defaults
 	lintEnabled.CPP = false
+	lintEnabled.OC = false
 	lintEnabled.Go = false
 	lintEnabled.PHP = true
 	lintEnabled.TypeScript = false
@@ -128,6 +130,9 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 	}
 	if _, err := os.Stat(filepath.Join(cwd, "CPPLINT.cfg")); err == nil {
 		lintEnabled.CPP = true
+	}
+	if _, err := os.Stat(filepath.Join(cwd, ".oclint")); err == nil {
+		lintEnabled.OC = true
 	}
 	if _, err := os.Stat(filepath.Join(cwd, ".remarkrc")); err == nil {
 		lintEnabled.MD = true
@@ -215,6 +220,71 @@ func CPPLint(filePath string, repoPath string) (lints []LintMessage, err error) 
 				Message:  msg,
 			})
 		}
+	}
+	return lints, nil
+}
+
+// OCLintResultXML is the result for OCLint
+type OCLintResultXML struct {
+	XMLName xml.Name `xml:"oclint"`
+
+	Violations oclintViolations `xml:"violations"`
+}
+
+type oclintViolations struct {
+	XMLName xml.Name `xml:"violations"`
+
+	Violations []oclintViolation `xml:"violation"`
+}
+
+type oclintViolation struct {
+	XMLName xml.Name `xml:"violation"`
+
+	Message   string `xml:"message,attr"`
+	Rule      string `xml:"rule,attr"`
+	StartLine int    `xml:"startline,attr"`
+	EndLine   int    `xml:"endline,attr"`
+	Path      string `xml:"path,attr"`
+}
+
+// OCLint lints objective-c files
+func OCLint(ctx context.Context, filePath string, cwd string) (lints []LintMessage, err error) {
+	parser := NewShellParser(cwd)
+	words, _ := parser.Parse(Conf.Core.OCLint)
+	if len(words) < 1 {
+		return nil, errors.New("Invalid `oclint` configuration")
+	}
+	words = append(words, "-i", filePath, "--", "-report-type", "xml")
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+
+	var stderr bytes.Buffer
+	// The provided context is used to kill the process (by calling os.Process.Kill)
+	cmd := exec.CommandContext(ctx, words[0], words[1:]...)
+	cmd.Stderr = &stderr
+	cmd.Dir = cwd
+	out, _ := cmd.Output()
+
+	LogAccess.Debugf("OCLint Output:\n%s", out)
+	LogAccess.Debugf("OCLint Stderr:\n%s", stderr.String())
+
+	// parse xml
+	var violations OCLintResultXML
+	err = xml.Unmarshal(out, &violations)
+	if err != nil {
+		msg := fmt.Sprintf("OCLint can not parse xml: %v", err)
+		LogError.Error(msg)
+		return nil, errors.New(msg)
+	}
+
+	for _, v := range violations.Violations.Violations {
+		lints = append(lints, LintMessage{
+			RuleID:  v.Rule,
+			Line:    v.StartLine,
+			Column:  v.EndLine, // %d:%d, using the second number as the endline number in oclint
+			Message: v.Message,
+		})
 	}
 	return lints, nil
 }

@@ -28,6 +28,7 @@ type SectionCore struct {
 	GolangCILint  string `yaml:"golangcilint"`
 	RemarkLint    string `yaml:"remarklint"`
 	CPPLint       string `yaml:"cpplint"`
+	OCLint        string `yaml:"oclint"`
 	PHPLint       string `yaml:"phplint"`
 	ESLint        string `yaml:"eslint"`
 	TSLint        string `yaml:"tslint"`
