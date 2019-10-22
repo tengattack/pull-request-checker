@@ -147,6 +147,7 @@ func (s *MessageQueue) Retry(message string) error {
 }
 
 // Exists checks if message is in the queue
+// TODO: add test
 func (s *MessageQueue) Exists(message string) (bool, error) {
 	// SyncChannelKey
 	list, err := redisClient.LRange(mq.SyncChannelKey, 0, -1).Result()

@@ -343,6 +343,7 @@ func needPRChecking(client *github.Client, ref *GithubRef, message string, MQ mq
 			case "pending":
 				statusPending = true
 			}
+			break
 		}
 	}
 
