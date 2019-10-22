@@ -324,10 +324,11 @@ func HasLintStatuses(client *github.Client, ref *GithubRef) (bool, error) {
 	return lint > 0, nil
 }
 
+// TODO: add test
 func needPRChecking(client *github.Client, ref *GithubRef, message string, MQ mq.MessageQueue) (bool, error) {
 	statuses, err := ref.GetStatuses(client)
 	if err != nil {
-		LogError.Errorf("github get statuses failed: %v", err)
+		err = fmt.Errorf("github get statuses failed: %v", err)
 		return false, err
 	}
 

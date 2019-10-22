@@ -35,10 +35,6 @@ func TestTruncated(t *testing.T) {
 	assert.Equal(true, b)
 	assert.Equal("12 ... 34", s)
 
-	b, s = Truncated("abc", "", 0)
-	assert.Equal(true, b)
-	assert.Equal("", s)
-
 	b, s = Truncated("abc", "", 2)
 	assert.Equal(true, b)
 	assert.Equal("ac", s)

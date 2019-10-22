@@ -47,7 +47,7 @@ func FileExists(filename string) bool {
 // e.g. Truncated("1200 0000 0000 0034", " ... ", 9) = (true, "12 ... 34")
 func Truncated(s string, t string, n int) (bool, string) {
 	if n <= 0 {
-		return len(s) != 0, ""
+		panic("n <= 0")
 	}
 
 	if len(s) <= n {

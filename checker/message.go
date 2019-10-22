@@ -716,7 +716,7 @@ func HandleMessage(ctx context.Context, message string) error {
 	return err
 }
 
-//TODO: add test
+// TODO: add test
 func checkLints(ctx context.Context, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string,
 	repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled, log *os.File) (problems int, err error) {
 

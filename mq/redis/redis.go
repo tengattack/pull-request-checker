@@ -148,45 +148,37 @@ func (s *MessageQueue) Retry(message string) error {
 
 // Exists checks if message is in the queue
 func (s *MessageQueue) Exists(message string) (bool, error) {
-	exist := false
-
 	// SyncChannelKey
-	i, err := redisClient.LRem(mq.SyncChannelKey, 1, message).Result()
+	list, err := redisClient.LRange(mq.SyncChannelKey, 0, -1).Result()
 	if err != nil {
 		return false, err
 	}
-	if i == 1 {
-		exist = true
-	}
-	_, err = redisClient.LPush(mq.SyncChannelKey, message).Result()
-	if err != nil {
-		return false, err
+	for _, v := range list {
+		if v == message {
+			return true, nil
+		}
 	}
 
 	// SyncPendingChannelKey
-	i, err = redisClient.LRem(mq.SyncPendingChannelKey, 1, message).Result()
+	list, err = redisClient.LRange(mq.SyncPendingChannelKey, 0, -1).Result()
 	if err != nil {
 		return false, err
 	}
-	if i == 1 {
-		exist = true
-	}
-	_, err = redisClient.LPush(mq.SyncPendingChannelKey, message).Result()
-	if err != nil {
-		return false, err
+	for _, v := range list {
+		if v == message {
+			return true, nil
+		}
 	}
 
 	// SyncErrorChannelKey
-	i, err = redisClient.LRem(mq.SyncErrorChannelKey, 1, message).Result()
+	list, err = redisClient.LRange(mq.SyncErrorChannelKey, 0, -1).Result()
 	if err != nil {
 		return false, err
 	}
-	if i == 1 {
-		exist = true
+	for _, v := range list {
+		if v == message {
+			return true, nil
+		}
 	}
-	_, err = redisClient.LPush(mq.SyncErrorChannelKey, message).Result()
-	if err != nil {
-		return false, err
-	}
-	return exist, nil
+	return false, nil
 }
