@@ -870,6 +870,7 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 	return &issues, "", nil
 }
 
+// ClangLint runs the clang-format lint
 func ClangLint(ctx context.Context, repoPath string, filePath string) (lints []LintMessage, err error) {
 	parser := NewShellParser(repoPath)
 	words, err := parser.Parse(Conf.Core.ClangLint)
@@ -916,6 +917,6 @@ func ClangLint(ctx context.Context, repoPath string, filePath string) (lints []L
 		}
 	}
 
-	lints = getLintsFromDiff(fileDiff, lints, "clanglint")
+	lints = getLintsFromDiff(fileDiff, lints, ruleClangLint)
 	return
 }
