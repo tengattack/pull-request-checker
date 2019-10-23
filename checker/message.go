@@ -300,6 +300,12 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 	} else if lintEnabled.OC && isOC(fileName) {
 		log.WriteString(fmt.Sprintf("OCLint '%s'\n", fileName))
 		lints, lintErr = OCLint(context.TODO(), fileName, repoPath)
+	} else if lintEnabled.ClangLint && isOC(fileName) {
+		lintsDiff, err := ClangLint(context.TODO(), repoPath, filepath.Join(repoPath, fileName))
+		if err != nil {
+			return err
+		}
+		pickDiffLintMessages(lintsDiff, d, annotations, problems, log, fileName)
 	} else if lintEnabled.Go && strings.HasSuffix(fileName, ".go") {
 		log.WriteString(fmt.Sprintf("Goreturns '%s'\n", fileName))
 		lintsGoreturns, err := Goreturns(filepath.Join(repoPath, fileName), repoPath)

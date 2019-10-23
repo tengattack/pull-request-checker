@@ -29,6 +29,7 @@ type SectionCore struct {
 	RemarkLint    string `yaml:"remarklint"`
 	CPPLint       string `yaml:"cpplint"`
 	OCLint        string `yaml:"oclint"`
+	ClangLint     string `yaml:"clanglint"`
 	PHPLint       string `yaml:"phplint"`
 	ESLint        string `yaml:"eslint"`
 	TSLint        string `yaml:"tslint"`
