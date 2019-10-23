@@ -38,8 +38,8 @@ func TestLabelPRSize(t *testing.T) {
 
 	// Wrap the shared transport for use with the integrati
 	// TODO: add installation ID to db
-	appID := 35105
-	installationID := 1248133 // tengattack/playground
+	appID := int64(35105)
+	installationID := int64(1248133) // tengattack/playground
 	tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
 		appID, installationID, path.Join(currentDir, "../testdata/unified-ci-test.2019-07-09.private-key.pem"))
 	require.NoError(err)

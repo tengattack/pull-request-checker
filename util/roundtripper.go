@@ -16,7 +16,7 @@ import (
 var JWTClient *github.Client
 
 // InitJWTClient initializes the jwtClient
-func InitJWTClient(id int, privateKeyFile string) error {
+func InitJWTClient(id int64, privateKeyFile string) error {
 	privateKey, err := ioutil.ReadFile(privateKeyFile)
 	if err != nil {
 		return fmt.Errorf("could not read private key: %s", err)
@@ -28,7 +28,7 @@ func InitJWTClient(id int, privateKeyFile string) error {
 
 type jwtRoundTripper struct {
 	transport http.RoundTripper
-	iss       int
+	iss       int64
 	key       []byte
 
 	mu  *sync.Mutex // mu protects token
@@ -36,7 +36,7 @@ type jwtRoundTripper struct {
 	exp time.Time
 }
 
-func newJWTRoundTripper(iss int, key []byte, transport http.RoundTripper) *jwtRoundTripper {
+func newJWTRoundTripper(iss int64, key []byte, transport http.RoundTripper) *jwtRoundTripper {
 	return &jwtRoundTripper{
 		iss:       iss,
 		key:       key,

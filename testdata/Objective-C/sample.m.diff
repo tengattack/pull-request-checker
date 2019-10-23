@@ -1,0 +1,15 @@
+diff --git a/t.m b/sample.m
+index 6480344..fc846bf 100644
+--- a/t.m
++++ b/sample.m
+@@ -1,3 +1,9 @@
++#import <Foundation/Foundation.h>
++
+ int main (int argc, const char * argv[]) {
+-    return 0;
++    NSAutoreleasePool * pool  = [[NSAutoreleasePool alloc] init];
++
++    NSLog (@"hello world");
++    [pool drain];
++return 0;
+ }

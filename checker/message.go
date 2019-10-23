@@ -551,7 +551,7 @@ func HandleMessage(ctx context.Context, message string) error {
 		return err
 	}
 
-	installationToken, _, err := util.JWTClient.Apps.CreateInstallationToken(ctx, int64(installationID))
+	installationToken, _, err := util.JWTClient.Apps.CreateInstallationToken(ctx, int64(installationID), nil)
 	if err != nil {
 		return err
 	}
