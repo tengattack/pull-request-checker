@@ -297,15 +297,19 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 	} else if lintEnabled.CPP && isCPP(fileName) {
 		log.WriteString(fmt.Sprintf("CPPLint '%s'\n", fileName))
 		lints, lintErr = CPPLint(fileName, repoPath)
-	} else if lintEnabled.OC && isOC(fileName) {
-		log.WriteString(fmt.Sprintf("OCLint '%s'\n", fileName))
-		lints, lintErr = OCLint(context.TODO(), fileName, repoPath)
-	} else if lintEnabled.ClangLint && isOC(fileName) {
-		lintsDiff, err := ClangLint(context.TODO(), repoPath, filepath.Join(repoPath, fileName))
-		if err != nil {
-			return err
+	} else if isOC(fileName) {
+		if lintEnabled.OC {
+			log.WriteString(fmt.Sprintf("OCLint '%s'\n", fileName))
+			lints, lintErr = OCLint(context.TODO(), fileName, repoPath)
 		}
-		pickDiffLintMessages(lintsDiff, d, annotations, problems, log, fileName)
+		if lintEnabled.ClangLint {
+			log.WriteString(fmt.Sprintf("ClangLint '%s'\n", fileName))
+			lintsDiff, err := ClangLint(context.TODO(), repoPath, filepath.Join(repoPath, fileName))
+			if err != nil {
+				return err
+			}
+			pickDiffLintMessages(lintsDiff, d, annotations, problems, log, fileName)
+		}
 	} else if lintEnabled.Go && strings.HasSuffix(fileName, ".go") {
 		log.WriteString(fmt.Sprintf("Goreturns '%s'\n", fileName))
 		lintsGoreturns, err := Goreturns(filepath.Join(repoPath, fileName), repoPath)
@@ -887,6 +891,10 @@ func loadBaseFromStore(ref GithubRef, baseSHA string, tests map[string]goTestsCo
 	baseTestsNeedToRun := make(map[string]goTestsConfig)
 	for testName, testCfg := range tests {
 		found := false
+		if testCfg.Coverage == "" {
+			// no need to run in base as it has no coverage requirements
+			continue
+		}
 		for _, v := range baseSavedRecords {
 			if testName == v.Test {
 				found = true
@@ -936,6 +944,19 @@ func findBaseCoverage(baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun m
 			Pull:     gpull,
 		}
 		runTests(baseTestsNeedToRun, t, baseCoverage)
+
+		io.WriteString(log, "$ git checkout -f "+ref.Sha+"\n")
+		cmd = exec.Command("git", "checkout", "-f", ref.Sha)
+		cmd.Dir = repoPath
+		cmd.Stdout = log
+		cmd.Stderr = log
+		err = cmd.Run()
+		if err != nil {
+			msg := fmt.Sprintf("Failed to checkout back: %v\n", err)
+			LogError.Error(msg)
+			io.WriteString(log, msg)
+			return err
+		}
 	}
 	return nil
 }

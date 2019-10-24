@@ -275,6 +275,11 @@ func OCLint(ctx context.Context, filePath string, cwd string) (lints []LintMessa
 	LogAccess.Debugf("OCLint Output:\n%s", out)
 	LogAccess.Debugf("OCLint Stderr:\n%s", stderr.String())
 
+	if len(out) <= 0 {
+		// empty result
+		return lints, nil
+	}
+
 	// parse xml
 	var violations OCLintResultXML
 	err = xml.Unmarshal(out, &violations)
@@ -904,16 +909,17 @@ func ClangLint(ctx context.Context, repoPath string, filePath string) (lints []L
 			ToFile:   "formatted",
 			Context:  0,
 		}
-		w := &bytes.Buffer{}
-		err = difflib.WriteUnifiedDiff(w, udf)
+		data, err := difflib.GetUnifiedDiffString(udf)
 		if err != nil {
-			return nil, fmt.Errorf("computing diff: %s", err)
+			return nil, fmt.Errorf("computing diff error: %s", err)
 		}
-		if w.Len() > 0 {
-			fileDiff, err = diff.ParseFileDiff(w.Bytes())
-			if err != nil {
-				return nil, err
-			}
+		if data == "" {
+			// TODO: final EOL
+			return nil, nil
+		}
+		fileDiff, err = diff.ParseFileDiff([]byte(data))
+		if err != nil {
+			return nil, fmt.Errorf("parse diff error: %s", err)
 		}
 	}
 
