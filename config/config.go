@@ -89,6 +89,7 @@ func BuildDefaultConf() Config {
 	conf.Core.CheckLogURI = ""
 	conf.Core.RemarkLint = "remark"
 	conf.Core.CPPLint = "cpplint"
+	conf.Core.ClangLint = "clang-format"
 	conf.Core.PHPLint = "phplint"
 	conf.Core.ESLint = ""
 	conf.Core.TSLint = ""

@@ -56,7 +56,6 @@ var dataSet = []TestsData{
 
 func TestGenerateComments(t *testing.T) {
 	Conf = config.BuildDefaultConf()
-	Conf.Core.ClangLint = "./spacecommander/format-objc-file-dry-run.sh"
 
 	err := InitLog(Conf)
 	require.Nil(t, err)
