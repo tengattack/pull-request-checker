@@ -61,7 +61,14 @@ func ReportTestResults(testName string, repoPath string, cmds []string, coverage
 
 	conclusion, reportMessage, outputSummary := testAndSaveCoverage(ctx, ref.owner, ref.repo, ref.Sha, testName, cmds,
 		coveragePattern, repoPath, gpull, false, log)
-	err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, "coverage: "+reportMessage, "```\n"+outputSummary+"\n```", nil)
+
+	title := ""
+	if coveragePattern == "" {
+		title = conclusion
+	} else {
+		title = "coverage: " + reportMessage
+	}
+	err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, title, "```\n"+outputSummary+"\n```", nil)
 	if err != nil {
 		LogError.Errorf("report test results to github failed: %v", err)
 		// PASS

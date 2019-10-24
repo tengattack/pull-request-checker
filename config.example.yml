@@ -12,7 +12,7 @@ core:
   remarklint: 'remark'
   cpplint: 'cpplint'
   oclint: 'oclint-json-compilation-database'
-  clanglint: './spacecommander/format-objc-file-dry-run.sh'
+  clanglint: 'clang-format'
   phplint: 'phplint'
   eslint: './node_modules/.bin/eslint'
   tslint: './node_modules/.bin/tslint'
