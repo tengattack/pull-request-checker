@@ -3,7 +3,7 @@
 # IndentNestedBlocks: false
 # AllowNewlineBeforeBlockParameter: false
 
-Language:        Cpp
+Language:        ObjC
 # BasedOnStyle:  Google
 AccessModifierOffset: -1
 ConstructorInitializerIndentWidth: 4
