@@ -38,12 +38,14 @@ const (
 	ruleGolint            = "golint"
 	ruleGoreturns         = "goreturns"
 	ruleMarkdownFormatted = "remark"
+	ruleClangLint         = "clanglint"
 )
 
 // LintEnabled list enabled linter
 type LintEnabled struct {
 	CPP        bool
 	OC         bool
+	ClangLint  bool
 	Go         bool
 	PHP        bool
 	TypeScript bool
@@ -115,6 +117,7 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 	// reset to defaults
 	lintEnabled.CPP = false
 	lintEnabled.OC = false
+	lintEnabled.ClangLint = false
 	lintEnabled.Go = false
 	lintEnabled.PHP = true
 	lintEnabled.TypeScript = false
@@ -133,6 +136,9 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 	}
 	if _, err := os.Stat(filepath.Join(cwd, ".oclint")); err == nil {
 		lintEnabled.OC = true
+	}
+	if _, err := os.Stat(filepath.Join(cwd, ".clang-format")); err == nil {
+		lintEnabled.ClangLint = true
 	}
 	if _, err := os.Stat(filepath.Join(cwd, ".remarkrc")); err == nil {
 		lintEnabled.MD = true
@@ -268,6 +274,11 @@ func OCLint(ctx context.Context, filePath string, cwd string) (lints []LintMessa
 
 	LogAccess.Debugf("OCLint Output:\n%s", out)
 	LogAccess.Debugf("OCLint Stderr:\n%s", stderr.String())
+
+	if len(out) <= 0 {
+		// empty result
+		return lints, nil
+	}
 
 	// parse xml
 	var violations OCLintResultXML
@@ -862,4 +873,56 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 		issues.Issues[i].Location.File = relativeFile
 	}
 	return &issues, "", nil
+}
+
+// ClangLint runs the clang-format lint
+func ClangLint(ctx context.Context, repoPath string, filePath string) (lints []LintMessage, err error) {
+	parser := NewShellParser(repoPath)
+	words, err := parser.Parse(Conf.Core.ClangLint)
+	if err != nil {
+		return nil, err
+	}
+	words = append(words, filePath)
+
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, words[0], words[1:]...)
+	cmd.Dir = repoPath
+
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+
+	// compute the unified diff between src and out
+	src, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var fileDiff *diff.FileDiff
+	if !bytes.Equal(src, out) {
+		udf := difflib.UnifiedDiff{
+			A:        difflib.SplitLines(string(src)),
+			B:        difflib.SplitLines(string(out)),
+			FromFile: "original",
+			ToFile:   "formatted",
+			Context:  0,
+		}
+		data, err := difflib.GetUnifiedDiffString(udf)
+		if err != nil {
+			return nil, fmt.Errorf("computing diff error: %s", err)
+		}
+		if data == "" {
+			// TODO: final EOL
+			return nil, nil
+		}
+		fileDiff, err = diff.ParseFileDiff([]byte(data))
+		if err != nil {
+			return nil, fmt.Errorf("parse diff error: %s", err)
+		}
+	}
+
+	lints = getLintsFromDiff(fileDiff, lints, ruleClangLint)
+	return
 }

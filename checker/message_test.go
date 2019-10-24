@@ -47,6 +47,11 @@ var dataSet = []TestsData{
 		{[]string{"Hello 你好"}, "hello ☺.md", 1},
 		{[]string{"undefined"}, "hello ☺.md", 3},
 	}},
+	{"Objective-C", "../testdata/Objective-C", "sample.m", []CheckAnnotation{
+		{[]string{`pool = `}, "sample.m", 3},
+		{[]string{`NSLog\(`}, "sample.m", 6},
+		{[]string{`\+\s+return 0;`}, "sample.m", 8},
+	}},
 }
 
 func TestGenerateComments(t *testing.T) {

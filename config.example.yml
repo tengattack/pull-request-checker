@@ -12,6 +12,7 @@ core:
   remarklint: 'remark'
   cpplint: 'cpplint'
   oclint: 'oclint-json-compilation-database'
+  clanglint: 'clang-format'
   phplint: 'phplint'
   eslint: './node_modules/.bin/eslint'
   tslint: './node_modules/.bin/tslint'

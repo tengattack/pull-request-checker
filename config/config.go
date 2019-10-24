@@ -29,6 +29,7 @@ type SectionCore struct {
 	RemarkLint    string `yaml:"remarklint"`
 	CPPLint       string `yaml:"cpplint"`
 	OCLint        string `yaml:"oclint"`
+	ClangLint     string `yaml:"clanglint"`
 	PHPLint       string `yaml:"phplint"`
 	ESLint        string `yaml:"eslint"`
 	TSLint        string `yaml:"tslint"`
@@ -48,10 +49,10 @@ type SectionAPI struct {
 
 // SectionGitHub is a sub section of config.
 type SectionGitHub struct {
-	AppID         int            `yaml:"app_id"`
-	Secret        string         `yaml:"secret"`
-	PrivateKey    string         `yaml:"private_key"`
-	Installations map[string]int `yaml:"installations"`
+	AppID         int64            `yaml:"app_id"`
+	Secret        string           `yaml:"secret"`
+	PrivateKey    string           `yaml:"private_key"`
+	Installations map[string]int64 `yaml:"installations"`
 }
 
 // SectionLog is a sub section of config.
@@ -88,6 +89,7 @@ func BuildDefaultConf() Config {
 	conf.Core.CheckLogURI = ""
 	conf.Core.RemarkLint = "remark"
 	conf.Core.CPPLint = "cpplint"
+	conf.Core.ClangLint = "clang-format"
 	conf.Core.PHPLint = "phplint"
 	conf.Core.ESLint = ""
 	conf.Core.TSLint = ""
@@ -105,7 +107,7 @@ func BuildDefaultConf() Config {
 	conf.GitHub.AppID = 0
 	conf.GitHub.Secret = ""
 	conf.GitHub.PrivateKey = ""
-	conf.GitHub.Installations = make(map[string]int)
+	conf.GitHub.Installations = make(map[string]int64)
 
 	// Log
 	conf.Log.Format = "string"
