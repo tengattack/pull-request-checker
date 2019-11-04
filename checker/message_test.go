@@ -240,3 +240,13 @@ func TestIsOC(t *testing.T) {
 	assert.False(t, isOC("abc"))
 	assert.True(t, isOC("abc.mm"))
 }
+
+func TestFilterLints(t *testing.T) {
+	assert := assert.New(t)
+
+	file := "sdk/v2/x"
+	annotations := filterLints([]string{"sdk/**"}, []*github.CheckRunAnnotation{
+		&github.CheckRunAnnotation{Path: &file},
+	})
+	assert.Empty(annotations)
+}
