@@ -157,8 +157,6 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 			apiDocOutput = fmt.Sprintf("APIDoc error: %v\n", err) + apiDocOutput
 			problems++
 			err = nil
-		} else {
-			apiDocOutput = ""
 		}
 		log.WriteString(apiDocOutput + "\n") // Add an additional '\n'
 		outputSummaries.WriteString(apiDocOutput)
