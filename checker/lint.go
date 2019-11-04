@@ -775,12 +775,14 @@ func APIDoc(ctx context.Context, repoPath string) (string, error) {
 		LogError.Error("APIDoc: " + err.Error())
 		return "", err
 	}
-	switch {
-	case args.FileFilters != "":
+
+	if args.FileFilters != "" {
 		words = append(words, "-f", args.FileFilters)
-	case args.ExcludeFilters != "":
+	}
+	if args.ExcludeFilters != "" {
 		words = append(words, "-e", args.ExcludeFilters)
-	case args.Input != "":
+	}
+	if args.Input != "" {
 		words = append(words, "-i", args.Input)
 	}
 
