@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestIgnoreFilePath(t *testing.T) {
+func TestMatchAny(t *testing.T) {
 	assert := assert.New(t)
 
 	assert.True(MatchAny([]string{"sdk/**"}, "sdk/v2/x"))

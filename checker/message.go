@@ -223,9 +223,6 @@ func lintIndividually(repoPath string, diffs []*diff.FileDiff, lintEnabled LintE
 	)
 	for _, d := range diffs {
 		d := d
-		if MatchAny(ignoredPath, d.OrigName) {
-			continue
-		}
 		if MatchAny(ignoredPath, d.NewName) {
 			continue
 		}
