@@ -1,7 +1,6 @@
 package checker_test
 
 import (
-	"context"
 	"encoding/xml"
 	"io/ioutil"
 	"testing"
@@ -11,12 +10,16 @@ import (
 	"github.com/tengattack/unified-ci/checker"
 )
 
-func TestAPIDoc(t *testing.T) {
+func TestParseAPIDocCommands(t *testing.T) {
 	assert := assert.New(t)
+	require := require.New(t)
 
-	output, err := checker.APIDoc(context.Background(), "../testdata/go")
-	assert.Error(err)
-	assert.NotEmpty(output)
+	words, err := checker.ParseAPIDocCommands("../testdata/go")
+	require.NoError(err)
+	assert.Equal(
+		[]string{"apidoc", "-f", "file-filters", "-e", "exclude-filters", "-i", "input"},
+		words,
+	)
 }
 
 func TestOCLintResultXML(t *testing.T) {
