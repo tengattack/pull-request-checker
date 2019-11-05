@@ -206,7 +206,8 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 	return
 }
 
-func lintIndividually(repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled, log io.Writer) ([]*github.CheckRunAnnotation, int, error) {
+func lintIndividually(repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled, ignoredPath []string,
+	log io.Writer) ([]*github.CheckRunAnnotation, int, error) {
 	annotationLevel := "warning" // TODO: from lint.Severity
 	maxPending := Conf.Concurrency.Lint
 	if maxPending < 1 {
@@ -221,8 +222,14 @@ func lintIndividually(repoPath string, diffs []*diff.FileDiff, lintEnabled LintE
 		problems    int
 	)
 	for _, d := range diffs {
-		pending <- 0
 		d := d
+		if MatchAny(ignoredPath, d.OrigName) {
+			continue
+		}
+		if MatchAny(ignoredPath, d.NewName) {
+			continue
+		}
+		pending <- 0
 		eg.Go(func() error {
 			defer func() { <-pending }()
 			var (
