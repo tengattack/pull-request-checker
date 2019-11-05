@@ -54,7 +54,8 @@ func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, annotations
 }
 
 // GenerateAnnotations generate github annotations from github diffs and lint option
-func GenerateAnnotations(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled, log *os.File) (
+func GenerateAnnotations(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled,
+	ignoredPath []string, log *os.File) (
 	outputSummary string, annotations []*github.CheckRunAnnotation, problems int, err error) {
 	var (
 		annotations1, annotations2 []*github.CheckRunAnnotation
@@ -69,7 +70,7 @@ func GenerateAnnotations(ctx context.Context, repoPath string, diffs []*diff.Fil
 		return err1
 	})
 	eg.Go(func() error {
-		annotations2, problems2, err2 = lintIndividually(repoPath, diffs, lintEnabled, &buf2)
+		annotations2, problems2, err2 = lintIndividually(repoPath, diffs, lintEnabled, ignoredPath, &buf2)
 		return err2
 	})
 	err = eg.Wait()
@@ -718,7 +719,7 @@ func checkLints(ctx context.Context, client *github.Client, gpull *github.PullRe
 	}
 	checkRunID := checkRun.GetID()
 
-	notes, annotations, failedLints, err := GenerateAnnotations(ctx, repoPath, diffs, lintEnabled, log)
+	notes, annotations, failedLints, err := GenerateAnnotations(ctx, repoPath, diffs, lintEnabled, ignoredPath, log)
 	if err != nil {
 		UpdateCheckRunWithError(ctx, client, gpull, checkRunID, "linter", "linter", err)
 		return 0, err
