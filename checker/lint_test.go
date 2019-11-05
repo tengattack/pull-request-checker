@@ -1,4 +1,4 @@
-package checker_test
+package checker
 
 import (
 	"encoding/xml"
@@ -7,14 +7,13 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/tengattack/unified-ci/checker"
 )
 
 func TestParseAPIDocCommands(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	words, err := checker.ParseAPIDocCommands("../testdata/go")
+	words, err := parseAPIDocCommands("../testdata/go")
 	require.NoError(err)
 	assert.Equal(
 		[]string{"apidoc", "-f", "file-filters", "-e", "exclude-filters", "-i", "input"},
@@ -29,7 +28,7 @@ func TestOCLintResultXML(t *testing.T) {
 	out, err := ioutil.ReadFile("../testdata/oclint.xml")
 	require.NoError(err)
 
-	var violations checker.OCLintResultXML
+	var violations OCLintResultXML
 	err = xml.Unmarshal(out, &violations)
 	assert.NoError(err)
 	assert.NotEmpty(violations)

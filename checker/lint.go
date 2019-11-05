@@ -749,8 +749,7 @@ type apiDocJSON struct {
 	Input          string `json:"input"`
 }
 
-// ParseAPIDocCommands will return apidoc command options parsed from apidoc.json in the repoPath directory.
-func ParseAPIDocCommands(repoPath string) ([]string, error) {
+func parseAPIDocCommands(repoPath string) ([]string, error) {
 	var args apiDocJSON
 
 	fileName := path.Join(repoPath, "apidoc.json")
@@ -790,9 +789,9 @@ func ParseAPIDocCommands(repoPath string) ([]string, error) {
 
 // APIDoc generates apidoc
 func APIDoc(ctx context.Context, repoPath string) (string, error) {
-	words, err := ParseAPIDocCommands(repoPath)
+	words, err := parseAPIDocCommands(repoPath)
 	if err != nil {
-		return "ParseAPIDocCommands error\n", err
+		return "parseAPIDocCommands error\n", err
 	}
 	cmd := exec.CommandContext(ctx, words[0], words[1:]...)
 	cmd.Dir = repoPath
