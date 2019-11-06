@@ -130,7 +130,7 @@ func TestGetBaseCoverage(t *testing.T) {
 	cmd.Dir = repoPath
 	cmd.Run()
 
-	cmd = exec.Command("git", "commit", "-am", "init")
+	cmd = exec.Command("git", "-c", "user.name=test", "-c", "user.email=user@test.com", "commit", "-am", "init")
 	cmd.Dir = repoPath
 	cmd.Run()
 
@@ -146,11 +146,12 @@ func TestGetBaseCoverage(t *testing.T) {
 	require.NoError(err)
 
 	author := "author"
+	baseSHA := strings.TrimSpace(sha.String())
 	ref := GithubRef{
 		owner: "owner",
 		repo:  "repo",
+		Sha:   baseSHA,
 	}
-	baseSHA := strings.TrimSpace(sha.String())
 	baseSavedRecords, baseTestsNeedToRun := loadBaseFromStore(ref, baseSHA, tests, os.Stdout)
 	assert.Empty(baseSavedRecords)
 	assert.Equal(len(tests), len(baseTestsNeedToRun))
