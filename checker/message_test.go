@@ -119,20 +119,20 @@ func TestGetBaseCoverage(t *testing.T) {
 
 	cmd := exec.Command("git", "init")
 	cmd.Dir = repoPath
-	cmd.Run()
+	_ = cmd.Run()
 	defer os.RemoveAll(path.Join(repoPath, ".git/"))
 
 	cmd = exec.Command("git", "add", ".gitignore")
 	cmd.Dir = repoPath
-	cmd.Run()
+	_ = cmd.Run()
 
 	cmd = exec.Command("git", "add", "-A")
 	cmd.Dir = repoPath
-	cmd.Run()
+	_ = cmd.Run()
 
 	cmd = exec.Command("git", "-c", "user.name=test", "-c", "user.email=user@test.com", "commit", "-am", "init")
 	cmd.Dir = repoPath
-	cmd.Run()
+	_ = cmd.Run()
 
 	var sha strings.Builder
 	cmd = exec.Command("git", "rev-parse", "--verify", "HEAD")
