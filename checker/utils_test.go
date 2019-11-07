@@ -9,6 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestMatchAny(t *testing.T) {
+	assert := assert.New(t)
+
+	assert.True(MatchAny([]string{"sdk/**"}, "sdk/v2/x"))
+	assert.False(MatchAny([]string{"sdk/*"}, "sdk/v2/x"))
+}
+
 func TestReadProjectConfig(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
@@ -23,6 +30,10 @@ func TestReadProjectConfig(t *testing.T) {
 	repoConf, err = readProjectConfig(currentDir + "/../")
 	require.NoError(err)
 	assert.True(len(repoConf.Tests) > 0)
+	assert.Equal([]string{
+		"testdata/**",
+		"sdk/**",
+	}, repoConf.IgnorePatterns)
 }
 
 func TestNewShellParser(t *testing.T) {

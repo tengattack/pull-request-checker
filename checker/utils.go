@@ -11,12 +11,12 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/tengattack/unified-ci/util"
-
+	"github.com/bmatcuk/doublestar"
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/github"
 	"github.com/pkg/errors"
 	shellwords "github.com/tengattack/go-shellwords"
+	"github.com/tengattack/unified-ci/util"
 	yaml "gopkg.in/yaml.v2"
 )
 
@@ -158,11 +158,13 @@ type goTestsConfig struct {
 type projectConfig struct {
 	LinterAfterTests bool                     `yaml:"linterAfterTests"`
 	Tests            map[string]goTestsConfig `yaml:"tests"`
+	IgnorePatterns   []string                 `yaml:"ignorePatterns"`
 }
 
 type projectConfigRaw struct {
 	LinterAfterTests bool                `yaml:"linterAfterTests"`
 	Tests            map[string][]string `yaml:"tests"`
+	IgnorePatterns   []string            `yaml:"ignorePatterns"`
 }
 
 func isEmptyTest(cmds []string) bool {
@@ -235,4 +237,15 @@ func NewShellParser(repoPath string) *shellwords.Parser {
 	}
 
 	return parser
+}
+
+// MatchAny checks if path matches any of the given patterns
+func MatchAny(patterns []string, path string) bool {
+	for _, pattern := range patterns {
+		match, _ := doublestar.Match(pattern, path)
+		if match {
+			return true
+		}
+	}
+	return false
 }

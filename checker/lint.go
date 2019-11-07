@@ -111,6 +111,30 @@ func init() {
 	}
 }
 
+func isCPP(fileName string) bool {
+	ext := []string{".c", ".cc", ".h", ".hpp", ".c++", ".h++", ".cu", ".cpp", ".hxx", ".cxx", ".cuh"}
+	for i := 0; i < len(ext); i++ {
+		if strings.HasSuffix(fileName, ext[i]) {
+			return true
+		}
+	}
+	return false
+}
+
+func isOC(fileName string) bool {
+	i := strings.LastIndex(fileName, ".")
+	if i == -1 {
+		return false
+	}
+	ext := fileName[i:]
+	switch ext {
+	case ".c", ".cc", ".cpp", ".h", ".m", ".mm":
+		return true
+	default:
+		return false
+	}
+}
+
 // Init default LintEnabled struct
 func (lintEnabled *LintEnabled) Init(cwd string) {
 

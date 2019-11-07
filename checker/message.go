@@ -25,30 +25,6 @@ import (
 	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
-func isCPP(fileName string) bool {
-	ext := []string{".c", ".cc", ".h", ".hpp", ".c++", ".h++", ".cu", ".cpp", ".hxx", ".cxx", ".cuh"}
-	for i := 0; i < len(ext); i++ {
-		if strings.HasSuffix(fileName, ext[i]) {
-			return true
-		}
-	}
-	return false
-}
-
-func isOC(fileName string) bool {
-	i := strings.LastIndex(fileName, ".")
-	if i == -1 {
-		return false
-	}
-	ext := fileName[i:]
-	switch ext {
-	case ".c", ".cc", ".cpp", ".h", ".m", ".mm":
-		return true
-	default:
-		return false
-	}
-}
-
 func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, annotations *[]*github.CheckRunAnnotation, problems *int, log *bytes.Buffer, fileName string) {
 	annotationLevel := "warning" // TODO: from lint.Severity
 	for _, lint := range lintsDiff {
@@ -78,7 +54,8 @@ func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, annotations
 }
 
 // GenerateAnnotations generate github annotations from github diffs and lint option
-func GenerateAnnotations(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled, log *os.File) (
+func GenerateAnnotations(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled,
+	ignoredPath []string, log *os.File) (
 	outputSummary string, annotations []*github.CheckRunAnnotation, problems int, err error) {
 	var (
 		annotations1, annotations2 []*github.CheckRunAnnotation
@@ -93,7 +70,7 @@ func GenerateAnnotations(ctx context.Context, repoPath string, diffs []*diff.Fil
 		return err1
 	})
 	eg.Go(func() error {
-		annotations2, problems2, err2 = lintIndividually(repoPath, diffs, lintEnabled, &buf2)
+		annotations2, problems2, err2 = lintIndividually(repoPath, diffs, lintEnabled, ignoredPath, &buf2)
 		return err2
 	})
 	err = eg.Wait()
@@ -230,7 +207,8 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 	return
 }
 
-func lintIndividually(repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled, log io.Writer) ([]*github.CheckRunAnnotation, int, error) {
+func lintIndividually(repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled, ignoredPath []string,
+	log io.Writer) ([]*github.CheckRunAnnotation, int, error) {
 	annotationLevel := "warning" // TODO: from lint.Severity
 	maxPending := Conf.Concurrency.Lint
 	if maxPending < 1 {
@@ -245,8 +223,11 @@ func lintIndividually(repoPath string, diffs []*diff.FileDiff, lintEnabled LintE
 		problems    int
 	)
 	for _, d := range diffs {
-		pending <- 0
 		d := d
+		if MatchAny(ignoredPath, d.NewName) {
+			continue
+		}
+		pending <- 0
 		eg.Go(func() error {
 			defer func() { <-pending }()
 			var (
@@ -660,13 +641,13 @@ func HandleMessage(ctx context.Context, message string) error {
 		}
 
 		failedLints, err = checkLints(ctx, client, gpull, ref, targetURL,
-			repoPath, diffs, lintEnabled, log)
+			repoPath, diffs, lintEnabled, repoConf.IgnorePatterns, log)
 		if err != nil {
 			return err
 		}
 	} else {
 		failedLints, err = checkLints(ctx, client, gpull, ref, targetURL,
-			repoPath, diffs, lintEnabled, log)
+			repoPath, diffs, lintEnabled, repoConf.IgnorePatterns, log)
 		if err != nil {
 			return err
 		}
@@ -728,7 +709,7 @@ func HandleMessage(ctx context.Context, message string) error {
 
 // TODO: add test
 func checkLints(ctx context.Context, client *github.Client, gpull *github.PullRequest, ref GithubRef, targetURL string,
-	repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled, log *os.File) (problems int, err error) {
+	repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled, ignoredPath []string, log *os.File) (problems int, err error) {
 
 	t := github.Timestamp{Time: time.Now()}
 	outputTitle := "linter"
@@ -738,12 +719,13 @@ func checkLints(ctx context.Context, client *github.Client, gpull *github.PullRe
 	}
 	checkRunID := checkRun.GetID()
 
-	notes, annotations, failedLints, err := GenerateAnnotations(ctx, repoPath, diffs, lintEnabled, log)
+	notes, annotations, failedLints, err := GenerateAnnotations(ctx, repoPath, diffs, lintEnabled, ignoredPath, log)
 	if err != nil {
 		UpdateCheckRunWithError(ctx, client, gpull, checkRunID, "linter", "linter", err)
 		return 0, err
 	}
 
+	annotations = filterLints(ignoredPath, annotations)
 	if len(annotations) > 50 {
 		// TODO: push all
 		annotations = annotations[:50]
@@ -767,6 +749,16 @@ func checkLints(ctx context.Context, client *github.Client, gpull *github.PullRe
 	}
 	err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, outputTitle, outputSummary, annotations)
 	return failedLints, err
+}
+
+func filterLints(ignoredPath []string, annotations []*github.CheckRunAnnotation) []*github.CheckRunAnnotation {
+	var filteredAnnotations []*github.CheckRunAnnotation
+	for _, a := range annotations {
+		if !MatchAny(ignoredPath, a.GetPath()) {
+			filteredAnnotations = append(filteredAnnotations, a)
+		}
+	}
+	return filteredAnnotations
 }
 
 func checkTests(ctx context.Context, repoPath string, tests map[string]goTestsConfig,
