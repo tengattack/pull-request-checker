@@ -749,8 +749,7 @@ type apiDocJSON struct {
 	Input          string `json:"input"`
 }
 
-// APIDoc generates apidoc
-func APIDoc(ctx context.Context, repoPath string) (string, error) {
+func parseAPIDocCommands(repoPath string) ([]string, error) {
 	var args apiDocJSON
 
 	fileName := path.Join(repoPath, "apidoc.json")
@@ -773,18 +772,28 @@ func APIDoc(ctx context.Context, repoPath string) (string, error) {
 	}
 	if err != nil {
 		LogError.Error("APIDoc: " + err.Error())
-		return "", err
-	}
-	switch {
-	case args.FileFilters != "":
-		words = append(words, "-f", args.FileFilters)
-	case args.ExcludeFilters != "":
-		words = append(words, "-e", args.ExcludeFilters)
-	case args.Input != "":
-		words = append(words, "-i", args.Input)
+		return nil, err
 	}
 
-	cmd := exec.Command(words[0], words[1:]...)
+	if args.FileFilters != "" {
+		words = append(words, "-f", args.FileFilters)
+	}
+	if args.ExcludeFilters != "" {
+		words = append(words, "-e", args.ExcludeFilters)
+	}
+	if args.Input != "" {
+		words = append(words, "-i", args.Input)
+	}
+	return words, nil
+}
+
+// APIDoc generates apidoc
+func APIDoc(ctx context.Context, repoPath string) (string, error) {
+	words, err := parseAPIDocCommands(repoPath)
+	if err != nil {
+		return "parseAPIDocCommands error\n", err
+	}
+	cmd := exec.CommandContext(ctx, words[0], words[1:]...)
 	cmd.Dir = repoPath
 	output, err := cmd.CombinedOutput()
 	return string(output) + "\n", err
