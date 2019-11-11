@@ -823,6 +823,32 @@ func APIDoc(ctx context.Context, repoPath string) (string, error) {
 	return string(output) + "\n", err
 }
 
+// CheckstyleResult struct represents a list of gradle checkstyle files
+type CheckstyleResult struct {
+	XMLName xml.Name `xml:"checkstyle"`
+
+	File []CheckstyleFile `xml:"file"`
+}
+
+// CheckstyleFile struct represents a list of gradle checkstyle file
+type CheckstyleFile struct {
+	XMLName xml.Name `xml:"file"`
+
+	Name  string            `xml:"name,attr"`
+	Error []CheckstyleError `xml:"error"`
+}
+
+// CheckstyleError struct represents a list of gradle checkstyle errors
+type CheckstyleError struct {
+	XMLName xml.Name `xml:"error"`
+
+	Line     int    `xml:"line,attr"`
+	Column   int    `xml:"column,attr"`
+	Severity string `xml:"severity,attr"`
+	Message  string `xml:"message,attr"`
+	Source   string `xml:"source,attr"`
+}
+
 // Issues struct represents a list of Android lint issues
 type Issues struct {
 	XMLName xml.Name `xml:"issues"`
@@ -840,8 +866,9 @@ type Issue struct {
 	Category string `xml:"category,attr"`
 
 	Location struct {
-		File string `xml:"file,attr"`
-		Line int    `xml:"line,attr"`
+		File   string `xml:"file,attr"`
+		Line   int    `xml:"line,attr"`
+		Column int    `xml:"column,attr"`
 	} `xml:"location"`
 }
 
@@ -859,6 +886,80 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 	if runtime.GOOS == "windows" {
 		words[0] = path.Join(repoPath, words[0])
 	}
+
+	basePath, err := filepath.Abs(repoPath)
+	if err != nil {
+		msg := fmt.Sprintf("Can not get absolute repo path: %v\n", err)
+		LogError.Error(msg)
+		return nil, msg, nil
+	}
+
+	// TODO: merge results
+	// checkstyle first
+	var checkstyleResult CheckstyleResult
+	doCheckstyle := false
+	// TODO: configure checkstyle command
+	checkstyleWords := make([]string, len(words))
+	for i, w := range words {
+		if w == "lint" {
+			copy(checkstyleWords, words)
+			checkstyleWords[i] = "checkstyle"
+			doCheckstyle = true
+			break
+		}
+	}
+	if doCheckstyle {
+		cmd := exec.Command(checkstyleWords[0], checkstyleWords[1:]...)
+		cmd.Dir = repoPath
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			LogError.Errorf("Android lint (checkstyle): %v\n%s", err, output)
+			// PASS
+		} else {
+			fileName := path.Join(repoPath, "app/build/reports/checkstyle/checkstyle.xml")
+			if !util.FileExists(fileName) {
+				msg := fmt.Sprintf("Can not find %s\n", fileName)
+				LogError.Error(msg)
+				// PASS
+			} else {
+				xmls, err := ioutil.ReadFile(fileName)
+				if err != nil {
+					msg := fmt.Sprintf("Can not read %s: %v\n", fileName, err)
+					LogError.Error(msg)
+					// PASS
+				} else {
+					err = xml.Unmarshal(xmls, &checkstyleResult)
+					if err != nil {
+						msg := fmt.Sprintf("Can not parse xml: %v\n", err)
+						LogError.Error(msg)
+						// PASS
+					} else {
+						for i, v := range checkstyleResult.File {
+							relativeFile, err := filepath.Rel(basePath, v.Name)
+							if err != nil {
+								msg := fmt.Sprintf("Can not get relative path: %v\n", err)
+								LogError.Error(msg)
+								// PASS
+								continue
+							}
+							if runtime.GOOS == "windows" {
+								relativeFile = filepath.ToSlash(relativeFile)
+							}
+							checkstyleResult.File[i].Name = relativeFile
+							// strip checkstyle error source name
+							for j, e := range v.Error {
+								pos := strings.Index(e.Source, "checkstyle")
+								if pos >= 0 {
+									v.Error[j].Source = e.Source[pos:]
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
 	cmd := exec.Command(words[0], words[1:]...)
 	cmd.Dir = repoPath
 	output, err := cmd.CombinedOutput()
@@ -887,12 +988,6 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 		return nil, msg, nil
 	}
 
-	basePath, err := filepath.Abs(repoPath)
-	if err != nil {
-		msg := fmt.Sprintf("Can not get absolute repo path: %v\n", err)
-		LogError.Error(msg)
-		return nil, msg, nil
-	}
 	for i, v := range issues.Issues {
 		relativeFile, err := filepath.Rel(basePath, v.Location.File)
 		if err != nil {
@@ -904,6 +999,30 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 			relativeFile = filepath.ToSlash(relativeFile)
 		}
 		issues.Issues[i].Location.File = relativeFile
+	}
+
+	if len(checkstyleResult.File) > 0 {
+		for _, v := range checkstyleResult.File {
+			for _, e := range v.Error {
+				issue := Issue{
+					Severity: e.Severity,
+					Message:  e.Message,
+				}
+				parts := strings.Split(e.Source, ".")
+				if len(parts) >= 4 {
+					// eg.: checkstyle.checks.indentation.IndentationCheck
+					issue.ID = parts[3]
+					issue.Category = parts[2]
+				} else {
+					// eg.: SeparatorWrapDot
+					issue.ID = e.Source
+				}
+				issue.Location.File = v.Name
+				issue.Location.Line = e.Line
+				issue.Location.Column = e.Column
+				issues.Issues = append(issues.Issues, issue)
+			}
+		}
 	}
 	return &issues, "", nil
 }

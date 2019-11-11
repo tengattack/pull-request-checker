@@ -126,8 +126,14 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 						startLine := v.Location.Line
 						for _, hunk := range d.Hunks {
 							if int32(startLine) >= hunk.NewStartLine && int32(startLine) < hunk.NewStartLine+hunk.NewLines {
-								comment := fmt.Sprintf("%s:%d  %s",
-									fileName, startLine, v.Message)
+								var ruleID string
+								if v.Category != "" {
+									ruleID = v.Category + "." + v.ID
+								} else {
+									ruleID = v.ID
+								}
+								comment := fmt.Sprintf("`%s` %d:%d %s",
+									ruleID, startLine, v.Location.Column, v.Message)
 								annotations = append(annotations, &github.CheckRunAnnotation{
 									Path:            &fileName,
 									Message:         &comment,
