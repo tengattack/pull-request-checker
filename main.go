@@ -71,7 +71,7 @@ func main() {
 	defer store.Deinit()
 
 	if err = checker.InitMessageQueue(); err != nil {
-		return
+		log.Fatalf("error: %v", err)
 	}
 
 	parent, cancel := context.WithCancel(context.Background())
