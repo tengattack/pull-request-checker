@@ -108,10 +108,16 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 	disableUnnecessaryLints(diffs, &lintEnabled)
 
 	if lintEnabled.Android {
+		log.WriteString(fmt.Sprintf("AndroidLint '%s'\n", repoPath))
 		issues, msg, err := AndroidLint(ctx, repoPath)
 		if err != nil {
-			log.WriteString(fmt.Sprintf("Android lint error: %v\n", err))
-			return msg, nil, 0, err
+			log.WriteString(fmt.Sprintf("Android lint error: %v\n%s\n", err, msg))
+			if msg != "" {
+				err = fmt.Errorf("Android lint error: %v\n```\n%s\n```", err, msg)
+			} else {
+				err = fmt.Errorf("Android lint error: %v", err)
+			}
+			return "", nil, 0, err
 		}
 		if issues != nil {
 			for _, d := range diffs {
@@ -164,15 +170,21 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 			apiDocOutput = fmt.Sprintf("APIDoc error: %v\n", err) + apiDocOutput
 			problems++
 			err = nil
+			// PASS
 		}
 		log.WriteString(apiDocOutput + "\n") // Add an additional '\n'
 		outputSummaries.WriteString(apiDocOutput)
 	}
 	if lintEnabled.Go {
 		log.WriteString(fmt.Sprintf("GolangCILint '%s'\n", repoPath))
-		lints, _, err := GolangCILint(ctx, repoPath)
+		lints, msg, err := GolangCILint(ctx, repoPath)
 		if err != nil {
-			log.WriteString(fmt.Sprintf("GolangCILint error: %v\n", err))
+			log.WriteString(fmt.Sprintf("GolangCILint error: %v\n%s\n", err, msg))
+			if msg != "" {
+				err = fmt.Errorf("GolangCILint error: %v\n```\n%s\n```", err, msg)
+			} else {
+				err = fmt.Errorf("GolangCILint error: %v", err)
+			}
 			return "", nil, 0, err
 		}
 		for _, d := range diffs {

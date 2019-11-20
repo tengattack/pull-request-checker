@@ -889,10 +889,12 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 
 	basePath, err := filepath.Abs(repoPath)
 	if err != nil {
-		msg := fmt.Sprintf("Can not get absolute repo path: %v\n", err)
-		LogError.Error(msg)
-		return nil, msg, nil
+		err = fmt.Errorf("Can not get absolute repo path: %v", err)
+		LogError.Error(err)
+		return nil, "", err
 	}
+
+	var outputs strings.Builder
 
 	// TODO: merge results
 	// checkstyle first
@@ -909,17 +911,26 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 		}
 	}
 	if doCheckstyle {
+		outputs.WriteString("checkstyle:\n")
 		cmd := exec.Command(checkstyleWords[0], checkstyleWords[1:]...)
 		cmd.Dir = repoPath
 		output, err := cmd.CombinedOutput()
 		if err != nil {
+			outputs.WriteString(err.Error() + "\n")
+			outputs.Write(output)
 			LogError.Errorf("Android lint (checkstyle): %v\n%s", err, output)
 			// PASS
 		} else {
-			fileName := path.Join(repoPath, "app/build/reports/checkstyle/checkstyle.xml")
+			outputs.Write(output)
+			fileName := path.Join(repoPath, "build/reports/checkstyle/checkstyle.xml")
 			if !util.FileExists(fileName) {
-				msg := fmt.Sprintf("Can not find %s\n", fileName)
-				LogError.Error(msg)
+				msg := fmt.Sprintf("Can not find checkstyle result file: %s\n", fileName)
+				LogAccess.Warn(msg)
+				fileName = path.Join(repoPath, "app/build/reports/checkstyle/checkstyle.xml")
+			}
+			if !util.FileExists(fileName) {
+				msg := fmt.Sprintf("Can not find checkstyle result file: %s\n", fileName)
+				LogAccess.Warn(msg)
 				// PASS
 			} else {
 				xmls, err := ioutil.ReadFile(fileName)
@@ -958,42 +969,50 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 				}
 			}
 		}
+		outputs.WriteString("\n")
 	}
 
+	outputs.WriteString("lint:\n")
 	cmd := exec.Command(words[0], words[1:]...)
 	cmd.Dir = repoPath
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		outputs.WriteString(err.Error() + "\n")
+		outputs.Write(output)
 		LogError.Errorf("Android lint: %v\n%s", err, output)
-		return nil, string(output), err
+		return nil, outputs.String(), err
 	}
 
 	var issues Issues
 	fileName := path.Join(repoPath, "app/build/reports/lint-results.xml")
 	if !util.FileExists(fileName) {
-		msg := fmt.Sprintf("Can not find %s\n", fileName)
-		LogError.Error(msg)
-		return nil, msg, nil
+		err = fmt.Errorf("Can not find %s", fileName)
+		LogError.Error(err)
+		outputs.WriteString(err.Error() + "\n")
+		return nil, outputs.String(), err
 	}
 	xmls, err := ioutil.ReadFile(fileName)
 	if err != nil {
-		msg := fmt.Sprintf("Can not read %s: %v\n", fileName, err)
-		LogError.Error(msg)
-		return nil, msg, nil
+		err = fmt.Errorf("Can not read %s: %v", fileName, err)
+		LogError.Error(err)
+		outputs.WriteString(err.Error() + "\n")
+		return nil, outputs.String(), err
 	}
 	err = xml.Unmarshal(xmls, &issues)
 	if err != nil {
-		msg := fmt.Sprintf("Can not parse xml: %v\n", err)
-		LogError.Error(msg)
-		return nil, msg, nil
+		err = fmt.Errorf("Can not parse xml: %v", err)
+		LogError.Error(err)
+		outputs.WriteString(err.Error() + "\n")
+		return nil, outputs.String(), err
 	}
 
 	for i, v := range issues.Issues {
 		relativeFile, err := filepath.Rel(basePath, v.Location.File)
 		if err != nil {
-			msg := fmt.Sprintf("Can not get relative path: %v\n", err)
-			LogError.Error(msg)
-			return nil, msg, nil
+			err = fmt.Errorf("Can not get relative path for %s: %v", v.Location.File, err)
+			LogError.Error(err)
+			outputs.WriteString(err.Error() + "\n")
+			return nil, outputs.String(), err
 		}
 		if runtime.GOOS == "windows" {
 			relativeFile = filepath.ToSlash(relativeFile)
@@ -1024,7 +1043,7 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 			}
 		}
 	}
-	return &issues, "", nil
+	return &issues, outputs.String(), nil
 }
 
 // ClangLint runs the clang-format lint
