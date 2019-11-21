@@ -12,10 +12,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/go-github/github"
+	"github.com/sourcegraph/go-diff/diff"
 	"github.com/tengattack/unified-ci/mq"
 	"github.com/tengattack/unified-ci/util"
 	githubhook "gopkg.in/rjz/githubhook.v0"
-	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
 const (

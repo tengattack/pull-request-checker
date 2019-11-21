@@ -3,7 +3,7 @@ package checker
 import (
 	"strings"
 
-	"sourcegraph.com/sourcegraph/go-diff/diff"
+	"github.com/sourcegraph/go-diff/diff"
 )
 
 func getNumberofContextLines(hunk *diff.Hunk, limit int) int {

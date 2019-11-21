@@ -19,11 +19,11 @@ import (
 	"time"
 
 	"github.com/martinlindhe/go-difflib/difflib"
+	"github.com/sourcegraph/go-diff/diff"
 	"github.com/sqs/goreturns/returns"
 	"github.com/tengattack/unified-ci/util"
 	"golang.org/x/lint"
 	"golang.org/x/tools/imports"
-	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
 // A value in (0,1] estimating the confidence of correctness in golint reports

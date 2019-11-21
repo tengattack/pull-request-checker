@@ -11,10 +11,10 @@ import (
 
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/github"
+	"github.com/sourcegraph/go-diff/diff"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tengattack/unified-ci/config"
-	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
 func TestMain(m *testing.M) {

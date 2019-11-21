@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/google/go-github/github"
-	shellwords "github.com/tengattack/go-shellwords"
+	shellwords "github.com/mattn/go-shellwords"
 	"github.com/tengattack/unified-ci/store"
 	"github.com/tengattack/unified-ci/util"
 )

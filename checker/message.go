@@ -19,10 +19,10 @@ import (
 
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/github"
+	"github.com/sourcegraph/go-diff/diff"
 	"github.com/tengattack/unified-ci/store"
 	"github.com/tengattack/unified-ci/util"
 	"golang.org/x/sync/errgroup"
-	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
 func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, annotations *[]*github.CheckRunAnnotation, problems *int, log *bytes.Buffer, fileName string) {

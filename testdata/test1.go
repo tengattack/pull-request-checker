@@ -1,9 +1,9 @@
 package checker
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"bytes"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -11,10 +11,10 @@ import (
 	"strings"
 
 	"github.com/pmezard/go-difflib/difflib"
+	"github.com/sourcegraph/go-diff/diff"
 	"github.com/sqs/goreturns/returns"
 	"golang.org/x/lint"
 	"golang.org/x/tools/imports"
-	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
 const golintMinConfidenceDefault = 0.8 // 0 ~ 1

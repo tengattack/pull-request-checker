@@ -6,9 +6,9 @@ import (
 	"runtime"
 	"testing"
 
+	shellwords "github.com/mattn/go-shellwords"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	shellwords "github.com/tengattack/go-shellwords"
 )
 
 func TestCoverRegex(t *testing.T) {

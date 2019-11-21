@@ -14,8 +14,8 @@ import (
 	"github.com/bmatcuk/doublestar"
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/github"
+	shellwords "github.com/mattn/go-shellwords"
 	"github.com/pkg/errors"
-	shellwords "github.com/tengattack/go-shellwords"
 	"github.com/tengattack/unified-ci/util"
 	yaml "gopkg.in/yaml.v2"
 )

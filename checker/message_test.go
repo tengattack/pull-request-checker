@@ -12,11 +12,11 @@ import (
 	"testing"
 
 	"github.com/google/go-github/github"
+	"github.com/sourcegraph/go-diff/diff"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tengattack/unified-ci/config"
 	"github.com/tengattack/unified-ci/store"
-	"sourcegraph.com/sourcegraph/go-diff/diff"
 )
 
 // CheckAnnotation contains path & position for github comment
