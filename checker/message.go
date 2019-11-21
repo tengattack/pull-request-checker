@@ -113,6 +113,7 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 		if err != nil {
 			log.WriteString(fmt.Sprintf("Android lint error: %v\n%s\n", err, msg))
 			if msg != "" {
+				_, msg = util.Truncated(msg, "... (truncated) ...", 10000)
 				err = fmt.Errorf("Android lint error: %v\n```\n%s\n```", err, msg)
 			} else {
 				err = fmt.Errorf("Android lint error: %v", err)
@@ -181,6 +182,7 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 		if err != nil {
 			log.WriteString(fmt.Sprintf("GolangCILint error: %v\n%s\n", err, msg))
 			if msg != "" {
+				_, msg = util.Truncated(msg, "... (truncated) ...", 10000)
 				err = fmt.Errorf("GolangCILint error: %v\n```\n%s\n```", err, msg)
 			} else {
 				err = fmt.Errorf("GolangCILint error: %v", err)

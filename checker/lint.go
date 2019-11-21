@@ -982,6 +982,7 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 		LogError.Errorf("Android lint: %v\n%s", err, output)
 		return nil, outputs.String(), err
 	}
+	outputs.Write(output)
 
 	var issues Issues
 	fileName := path.Join(repoPath, "app/build/reports/lint-results.xml")
