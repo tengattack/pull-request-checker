@@ -432,7 +432,7 @@ func WatchLocalRepo(ctx context.Context) error {
 								// PASS
 							} else {
 								// check master commit status
-								masterCommitSHA := *masterBranch.Commit.Commit.SHA
+								masterCommitSHA := *masterBranch.Commit.SHA
 								commitInfos, err := store.ListCommitsInfo(owner, repo, masterCommitSHA)
 								if err != nil {
 									LogError.Errorf("WatchLocalRepo:LoadCommitsInfo for master error: %v", err)

@@ -12,14 +12,15 @@ import (
 
 // CommitsInfo struct
 type CommitsInfo struct {
-	Owner    string   `db:"owner"`
-	Repo     string   `db:"repo"`
-	Sha      string   `db:"sha"`
-	Author   string   `db:"author"`
-	Test     string   `db:"test"`
-	Coverage *float64 `db:"coverage"`
-	Passing  int      `db:"passing"`
-	Status   int      `db:"status"`
+	Owner      string   `db:"owner"`
+	Repo       string   `db:"repo"`
+	Sha        string   `db:"sha"`
+	Author     string   `db:"author"`
+	Test       string   `db:"test"`
+	Coverage   *float64 `db:"coverage"`
+	Passing    int      `db:"passing"`
+	Status     int      `db:"status"`
+	CreateTime int64    `db:"create_time"`
 }
 
 var (
@@ -89,6 +90,7 @@ func (c *CommitsInfo) Save() error {
 	if err != nil {
 		return err
 	}
+	c.CreateTime = t
 	return nil
 }
 
