@@ -253,7 +253,7 @@ func webhookHandler(c *gin.Context) {
 				return
 			}
 			if prNum == 0 {
-				LogAccess.Infof("%s no longer exists. No need to review.", *payload.CheckRun.HeadSHA)
+				LogAccess.Infof("commit: %s no longer exists. No need to review.", *payload.CheckRun.HeadSHA)
 				return
 			}
 		}

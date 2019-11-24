@@ -529,22 +529,22 @@ func HandleMessage(ctx context.Context, message string) error {
 		log.Close()
 	}()
 
-	exist, err := util.SearchGithubPR(ctx, client, repository, commitSha)
-	if err != nil {
-		err = fmt.Errorf("SearchGithubPR error: %v", err)
-		return err
-	}
-	if exist == 0 {
-		log.WriteString(fmt.Sprintf("commit:%s no longer exists.\n", commitSha))
-		return nil
-	}
-
 	log.WriteString(UserAgent() + " Date: " + time.Now().Format(time.RFC1123) + "\n\n")
 
 	if checkType == "tree" {
 		log.WriteString(fmt.Sprintf("Start fetching %s/tree/%s\n", repository, pull))
 	} else {
 		log.WriteString(fmt.Sprintf("Start fetching %s/pull/%s\n", repository, pull))
+
+		exist, err := util.SearchGithubPR(ctx, client, repository, commitSha)
+		if err != nil {
+			err = fmt.Errorf("SearchGithubPR error: %v", err)
+			return err
+		}
+		if exist == 0 {
+			log.WriteString(fmt.Sprintf("commit: %s no longer exists.\n", commitSha))
+			return nil
+		}
 
 		gpull, err = GetGithubPull(ctx, client, ref.owner, ref.repo, prNum)
 		if err != nil {
