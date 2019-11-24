@@ -40,8 +40,9 @@ type GithubPull struct {
 }
 
 type GithubRef struct {
-	owner string
-	repo  string
+	checkType string
+	owner     string
+	repo      string
 
 	Repo struct {
 		Name     string     `json:"name"`

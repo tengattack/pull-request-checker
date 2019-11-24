@@ -50,14 +50,17 @@ func ReportTestResults(testName string, repoPath string, cmds []string, coverage
 
 	t := github.Timestamp{Time: time.Now()}
 
-	checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
-	if err != nil {
-		msg := fmt.Sprintf("Creating %s check run failed: %v", outputTitle, err)
-		_, _ = io.WriteString(log, msg)
-		LogError.Error(msg)
-		return "", err
+	var checkRunID int64
+	if ref.checkType == "pull" {
+		checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
+		if err != nil {
+			msg := fmt.Sprintf("Creating %s check run failed: %v", outputTitle, err)
+			_, _ = io.WriteString(log, msg)
+			LogError.Error(msg)
+			return "", err
+		}
+		checkRunID = checkRun.GetID()
 	}
-	checkRunID := checkRun.GetID()
 
 	conclusion, reportMessage, outputSummary := testAndSaveCoverage(ctx, ref.owner, ref.repo, ref.Sha, testName, cmds,
 		coveragePattern, repoPath, gpull, false, log)
@@ -68,13 +71,15 @@ func ReportTestResults(testName string, repoPath string, cmds []string, coverage
 	} else {
 		title = "coverage: " + reportMessage
 	}
-	err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, title, "```\n"+outputSummary+"\n```", nil)
-	if err != nil {
-		LogError.Errorf("report test results to github failed: %v", err)
-		// PASS
+	if ref.checkType == "pull" {
+		err := UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, title, "```\n"+outputSummary+"\n```", nil)
+		if err != nil {
+			LogError.Errorf("report test results to github failed: %v", err)
+			// PASS
+		}
 	}
 	if conclusion == "failure" {
-		err = &testNotPass{Title: outputTitle}
+		err := &testNotPass{Title: outputTitle}
 		return reportMessage, err
 	}
 	return reportMessage, nil

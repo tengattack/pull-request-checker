@@ -474,9 +474,10 @@ func HandleMessage(ctx context.Context, message string) error {
 
 	// ref to be checked in the owner/repo
 	ref := GithubRef{
-		owner: s[0],
-		repo:  s[1],
-		Sha:   commitSha,
+		checkType: s[2],
+		owner:     s[0],
+		repo:      s[1],
+		Sha:       commitSha,
 	}
 	targetURL := ""
 	if len(Conf.Core.CheckLogURI) > 0 {
@@ -597,7 +598,7 @@ func HandleMessage(ctx context.Context, message string) error {
 	if checkType == "tree" {
 		localBranch := pull
 
-		log.WriteString("$ git fetch -f -u " + gpull.GetBase().GetRepo().GetCloneURL() +
+		log.WriteString("$ git fetch -f -u " + cloneURL +
 			fmt.Sprintf(" %s:%s\n", pull, localBranch))
 		cmd = exec.CommandContext(ctx, "git", "fetch", "-f", "-u", fetchURL,
 			fmt.Sprintf("%s:%s", pull, localBranch))
@@ -670,15 +671,17 @@ func HandleMessage(ctx context.Context, message string) error {
 
 	repoConf, err := readProjectConfig(repoPath)
 	if err != nil {
-		// Can not get tests from config: report action_required instead.
-		outputTitle := "wrong tests config"
-		checkRun, erro := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
-		if erro != nil {
-			err = fmt.Errorf("Github create check run '%s' failed: %v", outputTitle, erro)
-			return err
-		}
 		err = fmt.Errorf("ReadProjectConfig error: %v", err)
-		UpdateCheckRunWithError(ctx, client, gpull, checkRun.GetID(), outputTitle, outputTitle, err)
+		if checkType == "pull" {
+			// Can not get tests from config: report action_required instead.
+			outputTitle := "wrong tests config"
+			checkRun, erro := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
+			if erro != nil {
+				err = fmt.Errorf("Github create check run '%s' failed: %v", outputTitle, erro)
+				return err
+			}
+			UpdateCheckRunWithError(ctx, client, gpull, checkRun.GetID(), outputTitle, outputTitle, err)
+		}
 		return err
 	}
 
@@ -841,18 +844,21 @@ func checkTests(ctx context.Context, repoPath string, tests map[string]goTestsCo
 	}
 	var headCoverage sync.Map
 	failedTests, passedTests, errTests = runTests(tests, t, &headCoverage)
-	// compare test coverage with base
-	baseSHA, err := util.GetBaseSHA(ctx, client, ref.owner, ref.repo, gpull.GetNumber())
-	if err != nil {
-		msg := fmt.Sprintf("Cannot get BaseSHA: %v\n", err)
-		LogError.Error(msg)
-		log.WriteString(msg)
-		return
+
+	if ref.checkType == "pull" {
+		// compare test coverage with base
+		baseSHA, err := util.GetBaseSHA(ctx, client, ref.owner, ref.repo, gpull.GetNumber())
+		if err != nil {
+			msg := fmt.Sprintf("Cannot get BaseSHA: %v\n", err)
+			LogError.Error(msg)
+			log.WriteString(msg)
+			return
+		}
+		baseSavedRecords, baseTestsNeedToRun := loadBaseFromStore(ref, baseSHA, tests, log)
+		var baseCoverage sync.Map
+		_ = findBaseCoverage(baseSavedRecords, baseTestsNeedToRun, repoPath, baseSHA, gpull, ref, log, &baseCoverage)
+		testMsg = util.DiffCoverage(&headCoverage, &baseCoverage)
 	}
-	baseSavedRecords, baseTestsNeedToRun := loadBaseFromStore(ref, baseSHA, tests, log)
-	var baseCoverage sync.Map
-	_ = findBaseCoverage(baseSavedRecords, baseTestsNeedToRun, repoPath, baseSHA, gpull, ref, log, &baseCoverage)
-	testMsg = util.DiffCoverage(&headCoverage, &baseCoverage)
 	return
 }
 
