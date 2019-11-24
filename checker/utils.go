@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -248,4 +249,10 @@ func MatchAny(patterns []string, path string) bool {
 		}
 	}
 	return false
+}
+
+// FibonacciBinet calculates fibonacci value by analytic (Binet's formula)
+func FibonacciBinet(num int64) int64 {
+	n := float64(num)
+	return int64(((math.Pow(((1+math.Sqrt(5))/2), n) - math.Pow(1-((1+math.Sqrt(5))/2), n)) / math.Sqrt(5)) + 0.5)
 }

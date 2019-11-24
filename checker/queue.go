@@ -3,7 +3,6 @@ package checker
 import (
 	"context"
 	"errors"
-	"math"
 	"time"
 
 	"github.com/tengattack/unified-ci/mq/redis"
@@ -95,13 +94,7 @@ func RetryErrorMessages(ctx context.Context) {
 	}
 }
 
-// Analytic (Binet's formula)
-func fibonacciBinet(num int64) int64 {
-	n := float64(num)
-	return int64(((math.Pow(((1+math.Sqrt(5))/2), n) - math.Pow(1-((1+math.Sqrt(5))/2), n)) / math.Sqrt(5)) + 0.5)
-}
-
 func retryMessage(message string, retries int64) {
-	time.Sleep(time.Duration(fibonacciBinet(retries)*60) * time.Second)
+	time.Sleep(time.Duration(FibonacciBinet(retries)*60) * time.Second)
 	MQ.Retry(message)
 }
