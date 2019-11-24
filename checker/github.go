@@ -14,6 +14,7 @@ import (
 	"github.com/google/go-github/github"
 	"github.com/sourcegraph/go-diff/diff"
 	"github.com/tengattack/unified-ci/mq"
+	"github.com/tengattack/unified-ci/store"
 	"github.com/tengattack/unified-ci/util"
 	githubhook "gopkg.in/rjz/githubhook.v0"
 )
@@ -85,9 +86,9 @@ type GithubWebHookCheckRun struct {
 }
 
 // GetGithubPulls gets the pull requests of the specified repository.
-func GetGithubPulls(client *github.Client, owner, repo string) ([]*github.PullRequest, error) {
+func GetGithubPulls(ctx context.Context, client *github.Client, owner, repo string) ([]*github.PullRequest, error) {
 	opt := &github.PullRequestListOptions{}
-	pulls, _, err := client.PullRequests.List(context.Background(), owner, repo, opt)
+	pulls, _, err := client.PullRequests.List(ctx, owner, repo, opt)
 	if err != nil {
 		LogError.Errorf("PullRequests.List returned error: %v", err)
 		return nil, err
@@ -96,8 +97,8 @@ func GetGithubPulls(client *github.Client, owner, repo string) ([]*github.PullRe
 }
 
 // GetGithubPull gets a single pull request.
-func GetGithubPull(client *github.Client, owner, repo string, prNum int) (*github.PullRequest, error) {
-	thePull, _, err := client.PullRequests.Get(context.Background(), owner, repo, prNum)
+func GetGithubPull(ctx context.Context, client *github.Client, owner, repo string, prNum int) (*github.PullRequest, error) {
+	thePull, _, err := client.PullRequests.Get(ctx, owner, repo, prNum)
 	if err != nil {
 		LogError.Errorf("PullRequests.Get returned error: %v", err)
 		return nil, err
@@ -106,8 +107,8 @@ func GetGithubPull(client *github.Client, owner, repo string, prNum int) (*githu
 }
 
 // GetGithubPullDiff gets the diff of the pull request.
-func GetGithubPullDiff(client *github.Client, owner, repo string, prNum int) ([]byte, error) {
-	got, _, err := client.PullRequests.GetRaw(context.Background(), owner, repo, prNum, github.RawOptions{github.Diff})
+func GetGithubPullDiff(ctx context.Context, client *github.Client, owner, repo string, prNum int) ([]byte, error) {
+	got, _, err := client.PullRequests.GetRaw(ctx, owner, repo, prNum, github.RawOptions{github.Diff})
 	if err != nil {
 		LogError.Errorf("PullRequests.GetRaw returned error: %v", err)
 		return nil, err
@@ -421,9 +422,50 @@ func WatchLocalRepo(ctx context.Context) error {
 						}
 					}
 					if isDir {
-						pulls, err := GetGithubPulls(client, file.Name(), subfile.Name())
+						owner, repo := file.Name(), subfile.Name()
+						projConf, err := readProjectConfig(path)
+						if err == nil && len(projConf.Tests) > 0 {
+							masterBranch, _, err := client.Repositories.GetBranch(ctx, owner, repo, "master")
+							if err != nil {
+								LogError.Errorf("WatchLocalRepo:GetBranch for master error: %v", err)
+								// PASS
+							} else {
+								// check master commit status
+								masterCommitSHA := *masterBranch.Commit.Commit.SHA
+								commitInfos, err := store.ListCommitsInfo(owner, repo, masterCommitSHA)
+								if err != nil {
+									LogError.Errorf("WatchLocalRepo:LoadCommitsInfo for master error: %v", err)
+									// PASS
+								} else if len(commitInfos) <= 0 {
+									ref := GithubRef{
+										owner: owner,
+										repo:  repo,
+
+										Sha: masterCommitSHA,
+									}
+									message := fmt.Sprintf("%s/%s/tree/%s/commits/%s", ref.owner, ref.repo, "master", masterCommitSHA)
+									needCheck, err := needPRChecking(client, &ref, message, MQ)
+									if err != nil {
+										LogError.Errorf("WatchLocalRepo:NeedPRChecking for master error: %v", err)
+										continue
+									}
+									if needCheck {
+										// no statuses, need check
+										LogAccess.WithField("entry", "local").Info("Push message: " + message)
+										err = MQ.Push(message)
+										if err == nil {
+											markAsPending(client, ref)
+										} else {
+											LogAccess.Error("Add message to queue error: " + err.Error())
+											// PASS
+										}
+									}
+								}
+							}
+						}
+						pulls, err := GetGithubPulls(ctx, client, owner, repo)
 						if err != nil {
-							LogError.Errorf("WatchLocalRepo:GetGithubPulls: %v", err)
+							LogError.Errorf("WatchLocalRepo:GetGithubPulls error: %v", err)
 							continue
 						}
 						for _, pull := range pulls {
@@ -434,15 +476,15 @@ func WatchLocalRepo(ctx context.Context) error {
 							default:
 							}
 							ref := GithubRef{
-								owner: file.Name(),
-								repo:  subfile.Name(),
+								owner: owner,
+								repo:  repo,
 
 								Sha: pull.GetHead().GetSHA(),
 							}
 							message := fmt.Sprintf("%s/%s/pull/%d/commits/%s", ref.owner, ref.repo, pull.GetNumber(), ref.Sha)
 							needCheck, err := needPRChecking(client, &ref, message, MQ)
 							if err != nil {
-								LogError.Errorf("WatchLocalRepo:NeedPRChecking: %v", err)
+								LogError.Errorf("WatchLocalRepo:NeedPRChecking error: %v", err)
 								continue
 							}
 							if needCheck {
