@@ -92,6 +92,19 @@ func (c *CommitsInfo) Save() error {
 	return nil
 }
 
+// UpdateStatus updates state
+func (c *CommitsInfo) UpdateStatus(status int) error {
+	rwCommitsInfo.Lock()
+	defer rwCommitsInfo.Unlock()
+	_, err := db.Exec("UPDATE commits_tests SET status = ? WHERE owner = ? AND repo = ? AND sha = ? AND test = ?",
+		status, c.Owner, c.Repo, c.Sha, c.Test)
+	if err != nil {
+		return err
+	}
+	c.Status = status
+	return nil
+}
+
 // LoadCommitsInfo gets a CommitsInfo by owner, repo, sha and test
 func LoadCommitsInfo(owner, repo, sha, test string) (*CommitsInfo, error) {
 	rwCommitsInfo.RLock()

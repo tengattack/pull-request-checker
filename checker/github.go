@@ -424,7 +424,7 @@ func WatchLocalRepo(ctx context.Context) error {
 					}
 					if isDir {
 						owner, repo := file.Name(), subfile.Name()
-						projConf, err := readProjectConfig(path)
+						projConf, err := readProjectConfig(filepath.Join(path, subfile.Name()))
 						if err == nil && len(projConf.Tests) > 0 {
 							masterBranch, _, err := client.Repositories.GetBranch(ctx, owner, repo, "master")
 							if err != nil {
@@ -437,7 +437,24 @@ func WatchLocalRepo(ctx context.Context) error {
 								if err != nil {
 									LogError.Errorf("WatchLocalRepo:LoadCommitsInfo for master error: %v", err)
 									// PASS
-								} else if len(commitInfos) <= 0 {
+								} else if len(commitInfos) >= len(projConf.Tests) {
+									// promote status
+									updated := false
+									for _, commitInfo := range commitInfos {
+										if commitInfo.Status == 0 {
+											err = commitInfo.UpdateStatus(1)
+											if err != nil {
+												LogError.Errorf("WatchLocalRepo:CommitInfo:UpdateStatus error: %v", err)
+												// PASS
+											} else {
+												updated = true
+											}
+										}
+									}
+									if updated {
+										LogAccess.Infof("CommitInfo %s/%s %s for master status updated", owner, repo, masterCommitSHA)
+									}
+								} else {
 									ref := GithubRef{
 										owner: owner,
 										repo:  repo,
