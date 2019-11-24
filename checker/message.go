@@ -578,7 +578,16 @@ func HandleMessage(ctx context.Context, message string) error {
 		return err
 	}
 
-	originURL, err := url.Parse(gpull.GetBase().GetRepo().GetCloneURL()) // e.g. https://github.com/octocat/Hello-World.git
+	var cloneURL string
+	if checkType == "tree" {
+		// branchs
+		// TODO: using GetBranch api
+		cloneURL = "https://github.com/" + ref.owner + "/" + ref.repo + ".git"
+	} else {
+		// pulls
+		cloneURL = gpull.GetBase().GetRepo().GetCloneURL()
+	}
+	originURL, err := url.Parse(cloneURL) // e.g. https://github.com/octocat/Hello-World.git
 	if err != nil {
 		return err
 	}
