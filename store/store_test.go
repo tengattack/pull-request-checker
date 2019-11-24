@@ -24,6 +24,11 @@ func TestSaveCommitsInfo(t *testing.T) {
 		Coverage: nil,
 	}
 	assert.NoError(c1.Save())
+	assert.NotEmpty(c1.CreateTime)
+
+	info, err := GetLatestCommitsInfo(c1.Owner, c1.Repo)
+	assert.NoError(err)
+	assert.Nil(info)
 
 	c2 := &CommitsInfo{
 		Owner:    "owner",
@@ -32,8 +37,17 @@ func TestSaveCommitsInfo(t *testing.T) {
 		Author:   "author",
 		Test:     "C",
 		Coverage: nil,
+		Passing:  0,
+		Status:   1,
 	}
 	assert.NoError(c2.Save())
+	assert.NotEmpty(c2.CreateTime)
+
+	info, err = GetLatestCommitsInfo(c2.Owner, c2.Repo)
+	assert.NoError(err)
+	assert.Len(info, 1)
+	assert.Equal("C", info[0].Test)
+
 	Deinit()
 
 	// Init should be idempotent

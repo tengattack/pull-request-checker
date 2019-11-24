@@ -72,6 +72,11 @@ func Init(file string) (err error) {
 		db.Close()
 		return err
 	}
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS IDX_OWNER_REPO_CREATE_TIME ON commits_tests (owner, repo, create_time)`)
+	if err != nil {
+		db.Close()
+		return err
+	}
 	return nil
 }
 
@@ -105,6 +110,29 @@ func (c *CommitsInfo) UpdateStatus(status int) error {
 	}
 	c.Status = status
 	return nil
+}
+
+// GetLatestCommitsInfo gets commits info for latest commit
+func GetLatestCommitsInfo(owner, repo string) ([]CommitsInfo, error) {
+	rwCommitsInfo.RLock()
+	defer rwCommitsInfo.RUnlock()
+	var c CommitsInfo
+	status := 1
+	err := db.Get(&c, "SELECT * FROM commits_tests WHERE owner = ? AND repo = ? AND status = ? ORDER BY create_time DESC LIMIT 1",
+		owner, repo, status)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var cs []CommitsInfo
+	err = db.Select(&cs, "SELECT * FROM commits_tests WHERE owner = ? AND repo = ? AND sha = ? AND status = ?",
+		owner, repo, c.Sha, status)
+	if err != nil {
+		return nil, err
+	}
+	return cs, nil
 }
 
 // LoadCommitsInfo gets a CommitsInfo by owner, repo, sha and test

@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -158,6 +160,93 @@ func (ref *GithubRef) CreateReview(client *github.Client, prNum int, event, body
 		return err
 	}
 	return nil
+}
+
+func badgesHandler(c *gin.Context) {
+	owner := c.Param("owner")
+	repo := c.Param("repo")
+	badgeType := c.Param("type")
+
+	switch badgeType {
+	case "build.svg":
+	case "coverage.svg":
+	default:
+		abortWithError(c, 400, "error params")
+		return
+	}
+
+	commitsInfo, err := store.GetLatestCommitsInfo(owner, repo)
+	if err != nil {
+		abortWithError(c, 500, "get latest commits info for "+owner+"/"+repo+" error: "+err.Error())
+		return
+	}
+
+	build := "unknown"
+	coverage := "unknown"
+	for _, info := range commitsInfo {
+		if info.Passing == 1 {
+			build = "passing"
+		} else {
+			build = "failed"
+			break
+		}
+	}
+
+	var coverageNum int
+	if len(commitsInfo) > 0 {
+		var pct float64
+		coverage = ""
+		for _, info := range commitsInfo {
+			if info.Coverage == nil {
+				coverage = "unknown"
+				break
+			} else {
+				pct += *info.Coverage
+			}
+		}
+		if coverage == "" {
+			coverageNum = int(math.Round(100 * pct / float64(len(commitsInfo))))
+			coverage = strconv.Itoa(coverageNum) + "%"
+		}
+	}
+
+	var color string
+	unknownColor := "#9f9f9f"
+	colors := []string{"#4c1", "#97ca00", "#a4a61d", "#dfb317", "#fe7d37", "#e05d44"}
+	buildTemplate := `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="88" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h37v20H0z"/><path fill="%s" d="M37 0h51v20H37z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"> <text x="195" y="140" transform="scale(.1)" textLength="270">build</text><text x="615" y="140" transform="scale(.1)" textLength="410">%s</text></g> </svg>`
+	coverageTemplate := `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="98" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="%s" d="M61 0h37v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"> <text x="315" y="140" transform="scale(.1)" textLength="510">coverage</text><text x="785" y="140" transform="scale(.1)" textLength="270">%s</text></g> </svg>`
+
+	switch badgeType {
+	case "build.svg":
+		switch build {
+		case "passing":
+			color = colors[0]
+		case "failed":
+			color = colors[len(colors)-1]
+		default:
+			// unknown
+			color = unknownColor
+		}
+		c.Data(http.StatusOK, "image/svg+xml; charset=utf-8", []byte(fmt.Sprintf(buildTemplate, color, build)))
+	case "coverage.svg":
+		// or starts from 97%
+		if coverageNum >= 93 {
+			color = colors[0]
+		} else if coverageNum >= 80 {
+			color = colors[1]
+		} else if coverageNum >= 65 {
+			color = colors[2]
+		} else if coverageNum >= 45 {
+			color = colors[3]
+		} else if coverageNum >= 15 {
+			color = colors[4]
+		} else {
+			color = colors[5]
+		}
+		c.Data(http.StatusOK, "image/svg+xml; charset=utf-8", []byte(fmt.Sprintf(coverageTemplate, color, coverage)))
+	default:
+		panic("unexpected params")
+	}
 }
 
 func webhookHandler(c *gin.Context) {

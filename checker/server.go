@@ -52,6 +52,7 @@ func routerEngine() *gin.Engine {
 	r.POST(Conf.API.WebHookURI, webhookHandler)
 	// r.GET("/api/stat/app", appStatusHandler)
 	r.GET("/version", versionHandler)
+	r.GET("/badges/:owner/:repo/:type", badgesHandler)
 	r.GET("/", rootHandler)
 
 	return r
