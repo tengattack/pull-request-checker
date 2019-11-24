@@ -17,6 +17,8 @@ type CommitsInfo struct {
 	Author   string   `db:"author"`
 	Test     string   `db:"test"`
 	Coverage *float64 `db:"coverage"`
+	Passing  int      `db:"passing"`
+	Status   int      `db:"status"`
 }
 
 var (
@@ -37,11 +39,21 @@ func Init(file string) (err error) {
 		author TEXT NOT NULL DEFAULT '',
 		test TEXT NOT NULL DEFAULT '',
 		coverage REAL DEFAULT NULL,
+		passing INT NOT NULL DEFAULT '0',
+		status INT NOT NULL DEFAULT '0',
 		UNIQUE (owner, repo, sha, test)
 	)`)
 	if err != nil {
 		db.Close()
 		return err
+	}
+	_, err = db.Exec(`ALERT TABLE commits_tests ADD passing INT NOT NULL DEFAULT '0'`)
+	if err != nil {
+		// PASS
+	}
+	_, err = db.Exec(`ALERT TABLE commits_tests ADD status INT NOT NULL DEFAULT '0'`)
+	if err != nil {
+		// PASS
 	}
 	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS IDX_OWNER_REPO_SHA ON commits_tests (owner, repo, sha)`)
 	if err != nil {
@@ -60,8 +72,8 @@ func Deinit() {
 func (c *CommitsInfo) Save() error {
 	rwCommitsInfo.Lock()
 	defer rwCommitsInfo.Unlock()
-	_, err := db.Exec("INSERT OR REPLACE INTO commits_tests (owner, repo, sha, author, test, coverage) VALUES (?, ?, ?, ?, ?, ?)",
-		c.Owner, c.Repo, c.Sha, c.Author, c.Test, c.Coverage)
+	_, err := db.Exec("INSERT OR REPLACE INTO commits_tests (owner, repo, sha, author, test, coverage, passing, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		c.Owner, c.Repo, c.Sha, c.Author, c.Test, c.Coverage, c.Passing, c.Status)
 	if err != nil {
 		return err
 	}

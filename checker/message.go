@@ -608,7 +608,7 @@ func HandleMessage(ctx context.Context, message string) error {
 		// git fetch -f -u https://x-access-token:token@github.com/octocat/Hello-World.git pull/%d/head:pull-%d
 		// -u option can be used to bypass the restriction which prevents git from fetching into current branch:
 		// link: https://stackoverflow.com/a/32561463/4213218
-		log.WriteString("$ git fetch -f -u " + gpull.GetBase().GetRepo().GetCloneURL() +
+		log.WriteString("$ git fetch -f -u " + cloneURL +
 			fmt.Sprintf(" pull/%d/head:%s\n", prNum, localBranch))
 		cmd = exec.CommandContext(ctx, "git", "fetch", "-f", "-u", fetchURL,
 			fmt.Sprintf("pull/%d/head:%s", prNum, localBranch))
@@ -672,9 +672,15 @@ func HandleMessage(ctx context.Context, message string) error {
 	repoConf, err := readProjectConfig(repoPath)
 	if err != nil {
 		err = fmt.Errorf("ReadProjectConfig error: %v", err)
-		if checkType == "pull" {
+		outputTitle := "wrong ci config"
+		if checkType == "tree" {
+			// Update state to error
+			erro := ref.UpdateState(client, AppName, "error", targetURL, outputTitle)
+			if erro != nil {
+				// PASS
+			}
+		} else {
 			// Can not get tests from config: report action_required instead.
-			outputTitle := "wrong tests config"
 			checkRun, erro := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
 			if erro != nil {
 				err = fmt.Errorf("Github create check run '%s' failed: %v", outputTitle, erro)
@@ -1036,7 +1042,9 @@ type baseTestAndSave struct {
 
 func (t *baseTestAndSave) Run(testName string, testConfig goTestsConfig) (string, error) {
 	var buf bytes.Buffer
-	_, reportMessage, _ := testAndSaveCoverage(context.TODO(), t.Ref.owner, t.Ref.repo, t.BaseSHA,
+	ref := t.Ref
+	ref.Sha = t.BaseSHA
+	_, reportMessage, _ := testAndSaveCoverage(context.TODO(), ref,
 		testName, testConfig.Cmds, testConfig.Coverage, t.RepoPath, t.Pull, true, &buf)
 	t.lm.Lock()
 	defer t.lm.Unlock()

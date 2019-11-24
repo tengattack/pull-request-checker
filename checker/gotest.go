@@ -70,7 +70,7 @@ func ReportTestResults(testName string, repoPath string, cmds []string, coverage
 		checkRunID = checkRun.GetID()
 	}
 
-	conclusion, reportMessage, outputSummary := testAndSaveCoverage(ctx, ref.owner, ref.repo, ref.Sha, testName, cmds,
+	conclusion, reportMessage, outputSummary := testAndSaveCoverage(ctx, ref, testName, cmds,
 		coveragePattern, repoPath, gpull, false, log)
 
 	title := ""
@@ -122,7 +122,7 @@ func parseCoverage(pattern, output string) (string, float64, error) {
 	return coverage, pct, nil
 }
 
-func testAndSaveCoverage(ctx context.Context, owner, repo, sha string, testName string, cmds []string, coveragePattern string,
+func testAndSaveCoverage(ctx context.Context, ref GithubRef, testName string, cmds []string, coveragePattern string,
 	repoPath string, gpull *github.PullRequest, breakOnFails bool, log io.Writer) (conclusion, reportMessage, outputSummary string) {
 	parser := NewShellParser(repoPath)
 
@@ -149,14 +149,30 @@ func testAndSaveCoverage(ctx context.Context, owner, repo, sha string, testName 
 	// get test coverage even if the conclusion is failure when ignoring the failed tests
 	if coveragePattern != "" && (conclusion == "success" || !breakOnFails) {
 		percentage, pct, err := parseCoverage(coveragePattern, outputSummary)
-		if err == nil {
+		if err != nil {
+			msg := fmt.Sprintf("Failed to parse %s test coverage: %v\n", testName, err)
+			LogError.Error(msg)
+			_, _ = io.WriteString(log, msg)
+			// PASS
+		}
+		if err == nil || ref.checkType == "tree" {
 			c := store.CommitsInfo{
-				Owner:    owner,
-				Repo:     repo,
-				Sha:      sha,
+				Owner:    ref.owner,
+				Repo:     ref.repo,
+				Sha:      ref.Sha,
 				Author:   gpull.GetHead().GetUser().GetLogin(),
 				Test:     testName,
 				Coverage: &pct,
+			}
+			if conclusion == "success" {
+				c.Passing = 1
+			}
+			if ref.checkType == "tree" {
+				// always save for tree test check
+				c.Status = 1
+				if err != nil {
+					c.Coverage = nil
+				}
 			}
 			err := c.Save()
 			if err != nil {
@@ -165,11 +181,6 @@ func testAndSaveCoverage(ctx context.Context, owner, repo, sha string, testName 
 				LogError.Error(msg)
 				_, _ = io.WriteString(log, msg)
 			}
-		} else {
-			msg := fmt.Sprintf("Failed to parse '%s': %v\n", percentage, err)
-			LogError.Error(msg)
-			_, _ = io.WriteString(log, msg)
-			// PASS
 		}
 
 		outputSummary += ("Test coverage: " + percentage + "\n")
