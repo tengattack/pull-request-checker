@@ -185,6 +185,27 @@ func testAndSaveCoverage(ctx context.Context, ref GithubRef, testName string, cm
 
 		outputSummary += ("Test coverage: " + percentage + "\n")
 		reportMessage = percentage
+	} else if coveragePattern == "" && ref.checkType == "tree" {
+		// saving build state with NULL coverage
+		c := store.CommitsInfo{
+			Owner:    ref.owner,
+			Repo:     ref.repo,
+			Sha:      ref.Sha,
+			Author:   gpull.GetHead().GetUser().GetLogin(),
+			Test:     testName,
+			Coverage: nil,
+			Passing:  0,
+			Status:   1,
+		}
+		if conclusion == "success" {
+			c.Passing = 1
+		}
+		err := c.Save()
+		if err != nil {
+			msg := fmt.Sprintf("Error: %v. Failed to save %v\n", err, c)
+			LogError.Error(msg)
+			_, _ = io.WriteString(log, msg)
+		}
 	}
 	_, _ = io.WriteString(log, "\n")
 	return
