@@ -51,11 +51,19 @@ func ReportTestResults(testName string, repoPath string, cmds []string, coverage
 	t := github.Timestamp{Time: time.Now()}
 
 	var checkRunID int64
-	if ref.checkType == "pull" {
+	if ref.checkType == "tree" {
+		err := ref.UpdateState(client, outputTitle, "pending", targetURL, "running")
+		if err != nil {
+			msg := fmt.Sprintf("Update commit state %s failed: %v", outputTitle, err)
+			_, _ = io.WriteString(log, msg+"\n")
+			LogError.Error(msg)
+			// PASS
+		}
+	} else {
 		checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
 		if err != nil {
 			msg := fmt.Sprintf("Creating %s check run failed: %v", outputTitle, err)
-			_, _ = io.WriteString(log, msg)
+			_, _ = io.WriteString(log, msg+"\n")
 			LogError.Error(msg)
 			return "", err
 		}
@@ -71,7 +79,19 @@ func ReportTestResults(testName string, repoPath string, cmds []string, coverage
 	} else {
 		title = "coverage: " + reportMessage
 	}
-	if ref.checkType == "pull" {
+	if ref.checkType == "tree" {
+		state := "success"
+		if conclusion == "failure" {
+			state = "error"
+		}
+		err := ref.UpdateState(client, outputTitle, state, targetURL, title)
+		if err != nil {
+			msg := fmt.Sprintf("Update commit state %s failed: %v", outputTitle, err)
+			_, _ = io.WriteString(log, msg+"\n")
+			LogError.Error(msg)
+			// PASS
+		}
+	} else {
 		err := UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, title, "```\n"+outputSummary+"\n```", nil)
 		if err != nil {
 			LogError.Errorf("report test results to github failed: %v", err)
