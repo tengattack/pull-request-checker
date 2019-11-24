@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"sync"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 	// import the sqlite driver
@@ -41,21 +42,31 @@ func Init(file string) (err error) {
 		coverage REAL DEFAULT NULL,
 		passing INT NOT NULL DEFAULT '0',
 		status INT NOT NULL DEFAULT '0',
+		create_time INT NOT NULL,
 		UNIQUE (owner, repo, sha, test)
 	)`)
 	if err != nil {
 		db.Close()
 		return err
 	}
-	_, err = db.Exec(`ALERT TABLE commits_tests ADD passing INT NOT NULL DEFAULT '0'`)
+	_, err = db.Exec(`ALTER TABLE commits_tests ADD passing INT NOT NULL DEFAULT '0'`)
 	if err != nil {
 		// PASS
 	}
-	_, err = db.Exec(`ALERT TABLE commits_tests ADD status INT NOT NULL DEFAULT '0'`)
+	_, err = db.Exec(`ALTER TABLE commits_tests ADD status INT NOT NULL DEFAULT '0'`)
+	if err != nil {
+		// PASS
+	}
+	_, err = db.Exec(`ALTER TABLE commits_tests ADD create_time INT NOT NULL`)
 	if err != nil {
 		// PASS
 	}
 	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS IDX_OWNER_REPO_SHA ON commits_tests (owner, repo, sha)`)
+	if err != nil {
+		db.Close()
+		return err
+	}
+	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS IDX_CREATE_TIME ON commits_tests (create_time)`)
 	if err != nil {
 		db.Close()
 		return err
@@ -72,8 +83,9 @@ func Deinit() {
 func (c *CommitsInfo) Save() error {
 	rwCommitsInfo.Lock()
 	defer rwCommitsInfo.Unlock()
-	_, err := db.Exec("INSERT OR REPLACE INTO commits_tests (owner, repo, sha, author, test, coverage, passing, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		c.Owner, c.Repo, c.Sha, c.Author, c.Test, c.Coverage, c.Passing, c.Status)
+	t := time.Now().Unix()
+	_, err := db.Exec("INSERT OR REPLACE INTO commits_tests (owner, repo, sha, author, test, coverage, passing, status, create_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		c.Owner, c.Repo, c.Sha, c.Author, c.Test, c.Coverage, c.Passing, c.Status, t)
 	if err != nil {
 		return err
 	}
