@@ -57,7 +57,7 @@ func Init(file string) (err error) {
 	if err != nil {
 		// PASS
 	}
-	_, err = db.Exec(`ALTER TABLE commits_tests ADD create_time INT NOT NULL`)
+	_, err = db.Exec(`ALTER TABLE commits_tests ADD create_time INT NOT NULL DEFAULT '0'`)
 	if err != nil {
 		// PASS
 	}
