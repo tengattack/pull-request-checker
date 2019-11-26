@@ -1,5 +1,7 @@
 # unified-ci
 
+![build state](https://ci-badges.maoer.co/badges/tengattack/unified-ci/build.svg) ![coverage state](https://ci-badges.maoer.co/badges/tengattack/unified-ci/coverage.svg)
+
 A unified continuous integration tool for coding style check.
 
 ## Dependencies
