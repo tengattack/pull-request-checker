@@ -4,17 +4,20 @@ import (
 	"context"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path"
 	"runtime"
 	"testing"
 
 	"github.com/bradleyfalzon/ghinstallation"
+	"github.com/gin-gonic/gin"
 	"github.com/google/go-github/github"
 	"github.com/sourcegraph/go-diff/diff"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tengattack/unified-ci/config"
+	"github.com/tengattack/unified-ci/store"
 )
 
 func TestMain(m *testing.M) {
@@ -23,7 +26,22 @@ func TestMain(m *testing.M) {
 	if err != nil {
 		panic(err)
 	}
-	os.Exit(m.Run())
+
+	fileDB := "file name.db"
+	err = store.Init(fileDB)
+	if err != nil {
+		panic(err)
+	}
+
+	gin.SetMode(gin.TestMode)
+
+	code := m.Run()
+
+	// clean up
+	store.Deinit()
+	os.Remove(fileDB)
+
+	os.Exit(code)
 }
 
 func TestLabelPRSize(t *testing.T) {
@@ -72,4 +90,75 @@ func TestLabelPRSize(t *testing.T) {
 
 	// cleanup
 	_, _ = client.Issues.RemoveLabelsForIssue(ctx, ref.owner, ref.repo, 1)
+}
+
+func TestBadgesHandler(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	resp := httptest.NewRecorder()
+	c, r := gin.CreateTestContext(resp)
+
+	r.GET("/badges/:owner/:repo/:type", badgesHandler)
+
+	// bad request
+	resp = httptest.NewRecorder()
+	c.Request = httptest.NewRequest(http.MethodGet, "/badges/Test/NonExists/unknown.svg", nil)
+	r.ServeHTTP(resp, c.Request)
+	assert.Equal(http.StatusBadRequest, resp.Code)
+
+	// non exists
+	resp = httptest.NewRecorder()
+	c.Request = httptest.NewRequest(http.MethodGet, "/badges/Test/NonExists/build.svg", nil)
+	r.ServeHTTP(resp, c.Request)
+	assert.Equal(http.StatusOK, resp.Code)
+	assert.Contains(resp.Body.String(), ">build<")
+	assert.Contains(resp.Body.String(), ">unknown<")
+
+	coverage := float64(0.201)
+	commitInfo := store.CommitsInfo{
+		Owner:    "Test",
+		Repo:     "Exists",
+		Sha:      "sha",
+		Author:   "nobody",
+		Test:     "test",
+		Coverage: &coverage,
+		Passing:  0,
+		Status:   0, // unmerged to master
+	}
+	require.NoError(commitInfo.Save())
+
+	resp = httptest.NewRecorder()
+	c.Request = httptest.NewRequest(http.MethodGet, "/badges/Test/Exists/coverage.svg", nil)
+	r.ServeHTTP(resp, c.Request)
+	assert.Equal(http.StatusOK, resp.Code)
+	assert.Contains(resp.Body.String(), ">coverage<")
+	assert.Contains(resp.Body.String(), ">unknown<")
+
+	commitInfo.Status = 1 // merged to master
+	require.NoError(commitInfo.Save())
+
+	resp = httptest.NewRecorder()
+	c.Request = httptest.NewRequest(http.MethodGet, "/badges/Test/Exists/coverage.svg", nil)
+	r.ServeHTTP(resp, c.Request)
+	assert.Equal(http.StatusOK, resp.Code)
+	assert.Contains(resp.Body.String(), ">coverage<")
+	assert.Contains(resp.Body.String(), ">20%<") // round to integer
+
+	resp = httptest.NewRecorder()
+	c.Request = httptest.NewRequest(http.MethodGet, "/badges/Test/Exists/build.svg", nil)
+	r.ServeHTTP(resp, c.Request)
+	assert.Equal(http.StatusOK, resp.Code)
+	assert.Contains(resp.Body.String(), ">build<")
+	assert.Contains(resp.Body.String(), ">failing<") // round to integer
+
+	commitInfo.Passing = 1 // passing
+	require.NoError(commitInfo.Save())
+
+	resp = httptest.NewRecorder()
+	c.Request = httptest.NewRequest(http.MethodGet, "/badges/Test/Exists/build.svg", nil)
+	r.ServeHTTP(resp, c.Request)
+	assert.Equal(http.StatusOK, resp.Code)
+	assert.Contains(resp.Body.String(), ">build<")
+	assert.Contains(resp.Body.String(), ">passing<") // round to integer
 }
