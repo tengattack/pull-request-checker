@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/google/go-github/github"
 	"github.com/sourcegraph/go-diff/diff"
 	"github.com/tengattack/unified-ci/mq"
+	"github.com/tengattack/unified-ci/store"
 	"github.com/tengattack/unified-ci/util"
 	githubhook "gopkg.in/rjz/githubhook.v0"
 )
@@ -39,8 +42,9 @@ type GithubPull struct {
 }
 
 type GithubRef struct {
-	owner string
-	repo  string
+	checkType string
+	owner     string
+	repo      string
 
 	Repo struct {
 		Name     string     `json:"name"`
@@ -85,9 +89,9 @@ type GithubWebHookCheckRun struct {
 }
 
 // GetGithubPulls gets the pull requests of the specified repository.
-func GetGithubPulls(client *github.Client, owner, repo string) ([]*github.PullRequest, error) {
+func GetGithubPulls(ctx context.Context, client *github.Client, owner, repo string) ([]*github.PullRequest, error) {
 	opt := &github.PullRequestListOptions{}
-	pulls, _, err := client.PullRequests.List(context.Background(), owner, repo, opt)
+	pulls, _, err := client.PullRequests.List(ctx, owner, repo, opt)
 	if err != nil {
 		LogError.Errorf("PullRequests.List returned error: %v", err)
 		return nil, err
@@ -96,8 +100,8 @@ func GetGithubPulls(client *github.Client, owner, repo string) ([]*github.PullRe
 }
 
 // GetGithubPull gets a single pull request.
-func GetGithubPull(client *github.Client, owner, repo string, prNum int) (*github.PullRequest, error) {
-	thePull, _, err := client.PullRequests.Get(context.Background(), owner, repo, prNum)
+func GetGithubPull(ctx context.Context, client *github.Client, owner, repo string, prNum int) (*github.PullRequest, error) {
+	thePull, _, err := client.PullRequests.Get(ctx, owner, repo, prNum)
 	if err != nil {
 		LogError.Errorf("PullRequests.Get returned error: %v", err)
 		return nil, err
@@ -106,8 +110,8 @@ func GetGithubPull(client *github.Client, owner, repo string, prNum int) (*githu
 }
 
 // GetGithubPullDiff gets the diff of the pull request.
-func GetGithubPullDiff(client *github.Client, owner, repo string, prNum int) ([]byte, error) {
-	got, _, err := client.PullRequests.GetRaw(context.Background(), owner, repo, prNum, github.RawOptions{github.Diff})
+func GetGithubPullDiff(ctx context.Context, client *github.Client, owner, repo string, prNum int) ([]byte, error) {
+	got, _, err := client.PullRequests.GetRaw(ctx, owner, repo, prNum, github.RawOptions{github.Diff})
 	if err != nil {
 		LogError.Errorf("PullRequests.GetRaw returned error: %v", err)
 		return nil, err
@@ -156,6 +160,113 @@ func (ref *GithubRef) CreateReview(client *github.Client, prNum int, event, body
 		return err
 	}
 	return nil
+}
+
+func badgesHandler(c *gin.Context) {
+	owner := c.Param("owner")
+	repo := c.Param("repo")
+	badgeType := c.Param("type")
+
+	switch badgeType {
+	case "build.svg":
+	case "coverage.svg":
+	default:
+		abortWithError(c, 400, "error params")
+		return
+	}
+
+	commitsInfo, err := store.GetLatestCommitsInfo(owner, repo)
+	if err != nil {
+		abortWithError(c, 500, "get latest commits info for "+owner+"/"+repo+" error: "+err.Error())
+		return
+	}
+
+	build := "unknown"
+	coverage := "unknown"
+	for _, info := range commitsInfo {
+		if info.Passing == 1 {
+			build = "passing"
+		} else {
+			build = "failing"
+			break
+		}
+	}
+
+	var coverageNum int
+	if len(commitsInfo) > 0 {
+		var pct float64
+		coverage = ""
+		for _, info := range commitsInfo {
+			if info.Coverage == nil {
+				coverage = "unknown"
+				break
+			} else {
+				pct += *info.Coverage
+			}
+		}
+		if coverage == "" {
+			coverageNum = int(math.Round(100 * pct / float64(len(commitsInfo))))
+			coverage = strconv.Itoa(coverageNum) + "%"
+		}
+	}
+
+	var color string
+	unknownColor := "#9f9f9f"
+	colors := []string{"#4c1", "#97ca00", "#a4a61d", "#dfb317", "#fe7d37", "#e05d44"}
+	// TODO: common template
+	buildTemplate := `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="88" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h37v20H0z"/><path fill="%s" d="M37 0h51v20H37z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"> <text x="185" y="140" transform="scale(.1)" textLength="270">build</text><text x="615" y="140" transform="scale(.1)" textLength="410">%s</text></g> </svg>`
+	buildFailingTemplate := `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="80" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h37v20H0z"/><path fill="%s" d="M37 0h43v20H37z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"> <text x="185" y="140" transform="scale(.1)" textLength="270">build</text><text x="575" y="140" transform="scale(.1)" textLength="330">%s</text></g> </svg>`
+	buildUnknownTemplate := `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="98" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h37v20H0z"/><path fill="%s" d="M37 0h61v20H37z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"> <text x="185" y="140" transform="scale(.1)" textLength="270">build</text><text x="665" y="140" transform="scale(.1)" textLength="510">%s</text></g> </svg>`
+	coverageTemplate := `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="98" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="%s" d="M61 0h37v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"> <text x="305" y="140" transform="scale(.1)" textLength="510">coverage</text><text x="785" y="140" transform="scale(.1)" textLength="270">%s</text></g> </svg>`
+	coverageSmallTemplate := `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="90" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="%s" d="M61 0h29v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"> <text x="305" y="140" transform="scale(.1)" textLength="510">coverage</text><text x="745" y="140" transform="scale(.1)" textLength="190">%s</text></g> </svg>`
+	coverageUnknownTemplate := `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="122" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="%s" d="M61 0h61v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"> <text x="305" y="140" transform="scale(.1)" textLength="510">coverage</text><text x="905" y="140" transform="scale(.1)" textLength="510">%s</text></g> </svg>`
+
+	// make camo do not cache our responses
+	c.Header("Cache-Control", "no-cache, max-age=0")
+
+	switch badgeType {
+	case "build.svg":
+		switch build {
+		case "passing":
+			color = colors[0]
+			c.Data(http.StatusOK, "image/svg+xml; charset=utf-8", []byte(fmt.Sprintf(buildTemplate, color, build)))
+		case "failing":
+			color = colors[len(colors)-1]
+			c.Data(http.StatusOK, "image/svg+xml; charset=utf-8", []byte(fmt.Sprintf(buildFailingTemplate, color, build)))
+		default:
+			// unknown
+			color = unknownColor
+			c.Data(http.StatusOK, "image/svg+xml; charset=utf-8", []byte(fmt.Sprintf(buildUnknownTemplate, color, build)))
+		}
+	case "coverage.svg":
+		if coverage == "unknown" {
+			color = unknownColor
+			c.Data(http.StatusOK, "image/svg+xml; charset=utf-8", []byte(fmt.Sprintf(coverageUnknownTemplate, color, coverage)))
+			return
+		}
+
+		if coverageNum >= 93 { // or starts from 97%
+			color = colors[0]
+		} else if coverageNum >= 80 {
+			color = colors[1]
+		} else if coverageNum >= 65 {
+			color = colors[2]
+		} else if coverageNum >= 45 {
+			color = colors[3]
+		} else if coverageNum >= 15 {
+			color = colors[4]
+		} else if coverageNum >= 10 {
+			color = colors[5]
+		} else {
+			// small coverage
+			color = colors[5]
+			c.Data(http.StatusOK, "image/svg+xml; charset=utf-8", []byte(fmt.Sprintf(coverageSmallTemplate, color, coverage)))
+			return
+		}
+		c.Data(http.StatusOK, "image/svg+xml; charset=utf-8", []byte(fmt.Sprintf(coverageTemplate, color, coverage)))
+	default:
+		panic("unexpected params")
+	}
 }
 
 func webhookHandler(c *gin.Context) {
@@ -251,7 +362,7 @@ func webhookHandler(c *gin.Context) {
 				return
 			}
 			if prNum == 0 {
-				LogAccess.Infof("%s no longer exists. No need to review.", *payload.CheckRun.HeadSHA)
+				LogAccess.Infof("commit: %s no longer exists. No need to review.", *payload.CheckRun.HeadSHA)
 				return
 			}
 		}
@@ -421,9 +532,67 @@ func WatchLocalRepo(ctx context.Context) error {
 						}
 					}
 					if isDir {
-						pulls, err := GetGithubPulls(client, file.Name(), subfile.Name())
+						owner, repo := file.Name(), subfile.Name()
+						projConf, err := readProjectConfig(filepath.Join(path, subfile.Name()))
+						if err == nil && len(projConf.Tests) > 0 {
+							masterBranch, _, err := client.Repositories.GetBranch(ctx, owner, repo, "master")
+							if err != nil {
+								LogError.Errorf("WatchLocalRepo:GetBranch for master error: %v", err)
+								// PASS
+							} else {
+								// check master commit status
+								masterCommitSHA := *masterBranch.Commit.SHA
+								commitInfos, err := store.ListCommitsInfo(owner, repo, masterCommitSHA)
+								if err != nil {
+									LogError.Errorf("WatchLocalRepo:LoadCommitsInfo for master error: %v", err)
+									// PASS
+								} else if len(commitInfos) >= len(projConf.Tests) {
+									// promote status
+									updated := false
+									for _, commitInfo := range commitInfos {
+										if commitInfo.Status == 0 {
+											err = commitInfo.UpdateStatus(1)
+											if err != nil {
+												LogError.Errorf("WatchLocalRepo:CommitInfo:UpdateStatus error: %v", err)
+												// PASS
+											} else {
+												updated = true
+											}
+										}
+									}
+									if updated {
+										LogAccess.Infof("CommitInfo %s/%s %s for master status updated", owner, repo, masterCommitSHA)
+									}
+								} else {
+									ref := GithubRef{
+										owner: owner,
+										repo:  repo,
+
+										Sha: masterCommitSHA,
+									}
+									message := fmt.Sprintf("%s/%s/tree/%s/commits/%s", ref.owner, ref.repo, "master", masterCommitSHA)
+									needCheck, err := needPRChecking(client, &ref, message, MQ)
+									if err != nil {
+										LogError.Errorf("WatchLocalRepo:NeedPRChecking for master error: %v", err)
+										continue
+									}
+									if needCheck {
+										// no statuses, need check
+										LogAccess.WithField("entry", "local").Info("Push message: " + message)
+										err = MQ.Push(message)
+										if err == nil {
+											markAsPending(client, ref)
+										} else {
+											LogAccess.Error("Add message to queue error: " + err.Error())
+											// PASS
+										}
+									}
+								}
+							}
+						}
+						pulls, err := GetGithubPulls(ctx, client, owner, repo)
 						if err != nil {
-							LogError.Errorf("WatchLocalRepo:GetGithubPulls: %v", err)
+							LogError.Errorf("WatchLocalRepo:GetGithubPulls error: %v", err)
 							continue
 						}
 						for _, pull := range pulls {
@@ -434,15 +603,15 @@ func WatchLocalRepo(ctx context.Context) error {
 							default:
 							}
 							ref := GithubRef{
-								owner: file.Name(),
-								repo:  subfile.Name(),
+								owner: owner,
+								repo:  repo,
 
 								Sha: pull.GetHead().GetSHA(),
 							}
 							message := fmt.Sprintf("%s/%s/pull/%d/commits/%s", ref.owner, ref.repo, pull.GetNumber(), ref.Sha)
 							needCheck, err := needPRChecking(client, &ref, message, MQ)
 							if err != nil {
-								LogError.Errorf("WatchLocalRepo:NeedPRChecking: %v", err)
+								LogError.Errorf("WatchLocalRepo:NeedPRChecking error: %v", err)
 								continue
 							}
 							if needCheck {

@@ -447,24 +447,37 @@ func HandleMessage(ctx context.Context, message string) error {
 	defer cancel()
 
 	s := strings.Split(message, "/")
-	if len(s) != 6 || s[2] != "pull" || s[4] != "commits" {
+
+	var repository, pull, commitSha string
+
+	if len(s) != 6 || (s[2] != "pull" && s[2] != "tree") || s[4] != "commits" {
 		LogAccess.Warnf("malformed message: %s", message)
 		return nil
 	}
 
-	repository, pull, commitSha := s[0]+"/"+s[1], s[3], s[5]
-	prNum, err := strconv.Atoi(pull)
-	if err != nil {
-		LogAccess.Warnf("malformed message: %s", message)
-		return nil
+	checkType := s[2]
+	repository, pull, commitSha = s[0]+"/"+s[1], s[3], s[5]
+	prNum := 0
+	if checkType == "tree" {
+		// branchs
+		LogAccess.Infof("Start handling %s/tree/%s", repository, pull)
+	} else {
+		// pulls
+		var err error
+		prNum, err = strconv.Atoi(pull)
+		if err != nil {
+			LogAccess.Warnf("malformed message: %s", message)
+			return nil
+		}
+		LogAccess.Infof("Start handling %s/pull/%s", repository, pull)
 	}
-	LogAccess.Infof("Start handling %s/pull/%s", repository, pull)
 
 	// ref to be checked in the owner/repo
 	ref := GithubRef{
-		owner: s[0],
-		repo:  s[1],
-		Sha:   commitSha,
+		checkType: s[2],
+		owner:     s[0],
+		repo:      s[1],
+		Sha:       commitSha,
 	}
 	targetURL := ""
 	if len(Conf.Core.CheckLogURI) > 0 {
@@ -516,27 +529,32 @@ func HandleMessage(ctx context.Context, message string) error {
 		log.Close()
 	}()
 
-	exist, err := util.SearchGithubPR(ctx, client, repository, commitSha)
-	if err != nil {
-		err = fmt.Errorf("SearchGithubPR error: %v", err)
-		return err
-	}
-	if exist == 0 {
-		log.WriteString(fmt.Sprintf("commit:%s no longer exists.\n", commitSha))
-		return nil
-	}
+	log.WriteString(UserAgent() + " Date: " + time.Now().Format(time.RFC1123) + "\n\n")
 
-	log.WriteString(UserAgent() + " Date: " + time.Now().String() + "\n\n")
-	log.WriteString(fmt.Sprintf("Start fetching %s/pull/%s\n", repository, pull))
+	if checkType == "tree" {
+		log.WriteString(fmt.Sprintf("Start fetching %s/tree/%s\n", repository, pull))
+	} else {
+		log.WriteString(fmt.Sprintf("Start fetching %s/pull/%s\n", repository, pull))
 
-	gpull, err = GetGithubPull(client, ref.owner, ref.repo, prNum)
-	if err != nil {
-		err = fmt.Errorf("GetGithubPull error: %v", err)
-		return err
-	}
-	if gpull.GetState() != "open" {
-		log.WriteString("PR " + gpull.GetState() + ".\n")
-		return nil
+		exist, err := util.SearchGithubPR(ctx, client, repository, commitSha)
+		if err != nil {
+			err = fmt.Errorf("SearchGithubPR error: %v", err)
+			return err
+		}
+		if exist == 0 {
+			log.WriteString(fmt.Sprintf("commit: %s no longer exists.\n", commitSha))
+			return nil
+		}
+
+		gpull, err = GetGithubPull(ctx, client, ref.owner, ref.repo, prNum)
+		if err != nil {
+			err = fmt.Errorf("GetGithubPull error: %v", err)
+			return err
+		}
+		if gpull.GetState() != "open" {
+			log.WriteString("PR " + gpull.GetState() + ".\n")
+			return nil
+		}
 	}
 
 	err = ref.UpdateState(client, AppName, "pending", targetURL, "checking")
@@ -561,22 +579,40 @@ func HandleMessage(ctx context.Context, message string) error {
 		return err
 	}
 
-	originURL, err := url.Parse(gpull.GetBase().GetRepo().GetCloneURL()) // e.g. https://github.com/octocat/Hello-World.git
+	var cloneURL string
+	if checkType == "tree" {
+		// branchs
+		// TODO: using GetBranch api
+		cloneURL = "https://github.com/" + ref.owner + "/" + ref.repo + ".git"
+	} else {
+		// pulls
+		cloneURL = gpull.GetBase().GetRepo().GetCloneURL()
+	}
+	originURL, err := url.Parse(cloneURL) // e.g. https://github.com/octocat/Hello-World.git
 	if err != nil {
 		return err
 	}
 	originURL.User = url.UserPassword("x-access-token", installationToken.GetToken())
 
 	fetchURL := originURL.String()
-	localBranch := fmt.Sprintf("pull-%d", prNum)
+	if checkType == "tree" {
+		localBranch := pull
 
-	// git fetch -f -u https://x-access-token:token@github.com/octocat/Hello-World.git pull/%d/head:pull-%d
-	// -u option can be used to bypass the restriction which prevents git from fetching into current branch:
-	// link: https://stackoverflow.com/a/32561463/4213218
-	log.WriteString("$ git fetch -f -u " + gpull.GetBase().GetRepo().GetCloneURL() +
-		fmt.Sprintf(" pull/%d/head:%s\n", prNum, localBranch))
-	cmd = exec.CommandContext(ctx, "git", "fetch", "-f", "-u", fetchURL,
-		fmt.Sprintf("pull/%d/head:%s", prNum, localBranch))
+		log.WriteString("$ git fetch -f -u " + cloneURL +
+			fmt.Sprintf(" %s:%s\n", pull, localBranch))
+		cmd = exec.CommandContext(ctx, "git", "fetch", "-f", "-u", fetchURL,
+			fmt.Sprintf("%s:%s", pull, localBranch))
+	} else {
+		localBranch := fmt.Sprintf("pull-%d", prNum)
+
+		// git fetch -f -u https://x-access-token:token@github.com/octocat/Hello-World.git pull/%d/head:pull-%d
+		// -u option can be used to bypass the restriction which prevents git from fetching into current branch:
+		// link: https://stackoverflow.com/a/32561463/4213218
+		log.WriteString("$ git fetch -f -u " + cloneURL +
+			fmt.Sprintf(" pull/%d/head:%s\n", prNum, localBranch))
+		cmd = exec.CommandContext(ctx, "git", "fetch", "-f", "-u", fetchURL,
+			fmt.Sprintf("pull/%d/head:%s", prNum, localBranch))
+	}
 	cmd.Dir = repoPath
 	cmd.Stdout = log
 	cmd.Stderr = log
@@ -596,35 +632,38 @@ func HandleMessage(ctx context.Context, message string) error {
 		return err
 	}
 
-	// this works not accurately
-	// git diff -U3 <base_commits>
-	// log.WriteString("$ git diff -U3 " + p.Base.Sha + "\n")
-	// cmd = exec.Command("git", "diff", "-U3", p.Base.Sha)
-	// cmd.Dir = repoPath
-	// out, err := cmd.Output()
-	// if err != nil {
-	// 	return err
-	// }
+	var diffs []*diff.FileDiff
+	if checkType == "pull" {
+		// this works not accurately
+		// git diff -U3 <base_commits>
+		// log.WriteString("$ git diff -U3 " + p.Base.Sha + "\n")
+		// cmd = exec.Command("git", "diff", "-U3", p.Base.Sha)
+		// cmd.Dir = repoPath
+		// out, err := cmd.Output()
+		// if err != nil {
+		// 	return err
+		// }
 
-	// get diff from github
-	out, err := GetGithubPullDiff(client, ref.owner, ref.repo, prNum)
-	if err != nil {
-		err = fmt.Errorf("GetGithubPullDiff error: %v", err)
-		return err
-	}
+		// get diff from github
+		out, err := GetGithubPullDiff(ctx, client, ref.owner, ref.repo, prNum)
+		if err != nil {
+			err = fmt.Errorf("GetGithubPullDiff error: %v", err)
+			return err
+		}
 
-	log.WriteString("\nParsing diff...\n\n")
-	diffs, err := diff.ParseMultiFileDiff(out)
-	if err != nil {
-		err = fmt.Errorf("ParseMultiFileDiff error: %v", err)
-		return err
-	}
+		log.WriteString("\nParsing diff...\n\n")
+		diffs, err = diff.ParseMultiFileDiff(out)
+		if err != nil {
+			err = fmt.Errorf("ParseMultiFileDiff error: %v", err)
+			return err
+		}
 
-	err = LabelPRSize(ctx, client, ref, prNum, diffs)
-	if err != nil {
-		log.WriteString("Label PR error: " + err.Error() + "\n")
-		LogError.Errorf("Label PR error: %v", err)
-		// PASS
+		err = LabelPRSize(ctx, client, ref, prNum, diffs)
+		if err != nil {
+			log.WriteString("Label PR error: " + err.Error() + "\n")
+			LogError.Errorf("Label PR error: %v", err)
+			// PASS
+		}
 	}
 
 	lintEnabled := LintEnabled{}
@@ -632,15 +671,23 @@ func HandleMessage(ctx context.Context, message string) error {
 
 	repoConf, err := readProjectConfig(repoPath)
 	if err != nil {
-		// Can not get tests from config: report action_required instead.
-		outputTitle := "wrong tests config"
-		checkRun, erro := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
-		if erro != nil {
-			err = fmt.Errorf("Github create check run '%s' failed: %v", outputTitle, erro)
-			return err
-		}
 		err = fmt.Errorf("ReadProjectConfig error: %v", err)
-		UpdateCheckRunWithError(ctx, client, gpull, checkRun.GetID(), outputTitle, outputTitle, err)
+		outputTitle := "wrong ci config"
+		if checkType == "tree" {
+			// Update state to error
+			erro := ref.UpdateState(client, AppName, "error", targetURL, outputTitle)
+			if erro != nil {
+				// PASS
+			}
+		} else {
+			// Can not get tests from config: report action_required instead.
+			checkRun, erro := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
+			if erro != nil {
+				err = fmt.Errorf("Github create check run '%s' failed: %v", outputTitle, erro)
+				return err
+			}
+			UpdateCheckRunWithError(ctx, client, gpull, checkRun.GetID(), outputTitle, outputTitle, err)
+		}
 		return err
 	}
 
@@ -654,7 +701,14 @@ func HandleMessage(ctx context.Context, message string) error {
 	)
 	noTest := true
 
-	if repoConf.LinterAfterTests {
+	if checkType == "tree" {
+		// only tests
+		failedLints = 0
+		failedTests, passedTests, errTests, testMsg = checkTests(ctx, repoPath, repoConf.Tests, client, gpull, ref, targetURL, log)
+		if failedTests+passedTests+errTests > 0 {
+			noTest = false
+		}
+	} else if repoConf.LinterAfterTests {
 		failedTests, passedTests, errTests, testMsg = checkTests(ctx, repoPath, repoConf.Tests, client, gpull, ref, targetURL, log)
 		if failedTests+passedTests+errTests > 0 {
 			noTest = false
@@ -693,36 +747,36 @@ func HandleMessage(ctx context.Context, message string) error {
 		// update PR state
 		outputSummary = fmt.Sprintf("The check failed! %d problem(s) found.\n", sumCount)
 		err = ref.UpdateState(client, AppName, "error", targetURL, outputSummary)
-		if err != nil {
-			log.WriteString("UpdateState error: " + err.Error() + "\n")
-			LogError.Errorf("UpdateState error: %v", err)
-		}
-
-		// create review
-		comment := fmt.Sprintf("**lint**: %d problem(s) found.\n", failedLints)
-		if !noTest {
-			comment += fmt.Sprintf("**test**: %d problem(s) found.\n\n", failedTests)
-			comment += testMsg
-		}
-		err = ref.CreateReview(client, prNum, "REQUEST_CHANGES", comment, nil)
 	} else {
 		// update PR state
 		outputSummary = "The check succeed!"
 		err = ref.UpdateState(client, AppName, "success", targetURL, outputSummary)
-		if err != nil {
-			log.WriteString("UpdateState error: " + err.Error() + "\n")
-			LogError.Errorf("UpdateState error: %v", err)
-		}
-
-		// create review
-		comment := "**check**: no problems found.\n"
-		if !noTest {
-			comment += ("\n" + testMsg)
-		}
-		err = ref.CreateReview(client, prNum, "APPROVE", comment, nil)
 	}
 	if err != nil {
-		err = fmt.Errorf("CreateReview error: %v", err)
+		log.WriteString("UpdateState error: " + err.Error() + "\n")
+		LogError.Errorf("UpdateState error: %v", err)
+		// PASS
+	}
+
+	if checkType == "pull" {
+		// create review
+		if sumCount > 0 {
+			comment := fmt.Sprintf("**lint**: %d problem(s) found.\n", failedLints)
+			if !noTest {
+				comment += fmt.Sprintf("**test**: %d problem(s) found.\n\n", failedTests)
+				comment += testMsg
+			}
+			err = ref.CreateReview(client, prNum, "REQUEST_CHANGES", comment, nil)
+		} else {
+			comment := "**check**: no problems found.\n"
+			if !noTest {
+				comment += ("\n" + testMsg)
+			}
+			err = ref.CreateReview(client, prNum, "APPROVE", comment, nil)
+		}
+		if err != nil {
+			err = fmt.Errorf("CreateReview error: %v", err)
+		}
 	}
 	return err
 }
@@ -796,18 +850,21 @@ func checkTests(ctx context.Context, repoPath string, tests map[string]goTestsCo
 	}
 	var headCoverage sync.Map
 	failedTests, passedTests, errTests = runTests(tests, t, &headCoverage)
-	// compare test coverage with base
-	baseSHA, err := util.GetBaseSHA(ctx, client, ref.owner, ref.repo, gpull.GetNumber())
-	if err != nil {
-		msg := fmt.Sprintf("Cannot get BaseSHA: %v\n", err)
-		LogError.Error(msg)
-		log.WriteString(msg)
-		return
+
+	if ref.checkType == "pull" {
+		// compare test coverage with base
+		baseSHA, err := util.GetBaseSHA(ctx, client, ref.owner, ref.repo, gpull.GetNumber())
+		if err != nil {
+			msg := fmt.Sprintf("Cannot get BaseSHA: %v\n", err)
+			LogError.Error(msg)
+			log.WriteString(msg)
+			return
+		}
+		baseSavedRecords, baseTestsNeedToRun := loadBaseFromStore(ref, baseSHA, tests, log)
+		var baseCoverage sync.Map
+		_ = findBaseCoverage(baseSavedRecords, baseTestsNeedToRun, repoPath, baseSHA, gpull, ref, log, &baseCoverage)
+		testMsg = util.DiffCoverage(&headCoverage, &baseCoverage)
 	}
-	baseSavedRecords, baseTestsNeedToRun := loadBaseFromStore(ref, baseSHA, tests, log)
-	var baseCoverage sync.Map
-	_ = findBaseCoverage(baseSavedRecords, baseTestsNeedToRun, repoPath, baseSHA, gpull, ref, log, &baseCoverage)
-	testMsg = util.DiffCoverage(&headCoverage, &baseCoverage)
 	return
 }
 
@@ -985,7 +1042,9 @@ type baseTestAndSave struct {
 
 func (t *baseTestAndSave) Run(testName string, testConfig goTestsConfig) (string, error) {
 	var buf bytes.Buffer
-	_, reportMessage, _ := testAndSaveCoverage(context.TODO(), t.Ref.owner, t.Ref.repo, t.BaseSHA,
+	ref := t.Ref
+	ref.Sha = t.BaseSHA
+	_, reportMessage, _ := testAndSaveCoverage(context.TODO(), ref,
 		testName, testConfig.Cmds, testConfig.Coverage, t.RepoPath, t.Pull, true, &buf)
 	t.lm.Lock()
 	defer t.lm.Unlock()
