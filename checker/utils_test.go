@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"testing"
 
+	"github.com/sourcegraph/go-diff/diff"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -59,4 +60,20 @@ func TestFibonacciBinet(t *testing.T) {
 	assert.Equal(int64(5), FibonacciBinet(5))
 	assert.Equal(int64(55), FibonacciBinet(10))
 	assert.Equal(int64(6765), FibonacciBinet(20))
+}
+
+func TestGetTrimmedNewName(t *testing.T) {
+	assert := assert.New(t)
+
+	name, ok := getTrimmedNewName(&diff.FileDiff{NewName: "b/name"})
+	assert.True(ok)
+	assert.Equal("name", name)
+
+	name, ok = getTrimmedNewName(&diff.FileDiff{NewName: "b/hello \342\230\272.md"})
+	assert.True(ok)
+	assert.Equal("hello ☺.md", name)
+
+	name, ok = getTrimmedNewName(&diff.FileDiff{NewName: "name"})
+	assert.False(ok)
+	assert.Equal("name", name)
 }

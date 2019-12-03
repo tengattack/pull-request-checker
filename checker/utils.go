@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/bmatcuk/doublestar"
@@ -17,6 +18,7 @@ import (
 	"github.com/google/go-github/github"
 	shellwords "github.com/mattn/go-shellwords"
 	"github.com/pkg/errors"
+	"github.com/sourcegraph/go-diff/diff"
 	"github.com/tengattack/unified-ci/util"
 	yaml "gopkg.in/yaml.v2"
 )
@@ -255,4 +257,12 @@ func MatchAny(patterns []string, path string) bool {
 func FibonacciBinet(num int64) int64 {
 	n := float64(num)
 	return int64(((math.Pow(((1+math.Sqrt(5))/2), n) - math.Pow(1-((1+math.Sqrt(5))/2), n)) / math.Sqrt(5)) + 0.5)
+}
+
+func getTrimmedNewName(d *diff.FileDiff) (string, bool) {
+	newName := util.Unquote(d.NewName)
+	if strings.HasPrefix(newName, "b/") {
+		return newName[2:], true
+	}
+	return newName, false
 }
