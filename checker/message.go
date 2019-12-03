@@ -797,9 +797,8 @@ func checkLints(ctx context.Context, client *github.Client, gpull *github.PullRe
 		return 0, err
 	}
 
-	annotationsTmp := filterLints(ignoredPath, annotations)
-	failedLints -= len(annotations) - len(annotationsTmp)
-	annotations = annotationsTmp
+	annotations, count := filterLints(ignoredPath, annotations)
+	failedLints -= count
 
 	if len(annotations) > 50 {
 		// TODO: push all
@@ -826,14 +825,14 @@ func checkLints(ctx context.Context, client *github.Client, gpull *github.PullRe
 	return failedLints, err
 }
 
-func filterLints(ignoredPath []string, annotations []*github.CheckRunAnnotation) []*github.CheckRunAnnotation {
+func filterLints(ignoredPath []string, annotations []*github.CheckRunAnnotation) ([]*github.CheckRunAnnotation, int) {
 	var filteredAnnotations []*github.CheckRunAnnotation
 	for _, a := range annotations {
 		if !MatchAny(ignoredPath, a.GetPath()) {
 			filteredAnnotations = append(filteredAnnotations, a)
 		}
 	}
-	return filteredAnnotations
+	return filteredAnnotations, len(annotations) - len(filteredAnnotations)
 }
 
 func checkTests(ctx context.Context, repoPath string, tests map[string]goTestsConfig,
