@@ -259,11 +259,10 @@ func FibonacciBinet(num int64) int64 {
 	return int64(((math.Pow(((1+math.Sqrt(5))/2), n) - math.Pow(1-((1+math.Sqrt(5))/2), n)) / math.Sqrt(5)) + 0.5)
 }
 
-func getTrimmedNewName(d *diff.FileDiff) string {
+func getTrimmedNewName(d *diff.FileDiff) (string, bool) {
 	newName := util.Unquote(d.NewName)
-	if !strings.HasPrefix(newName, "b/") {
-		return newName
+	if strings.HasPrefix(newName, "b/") {
+		return newName[2:], true
 	}
-	fileName := newName[2:]
-	return fileName
+	return newName, false
 }

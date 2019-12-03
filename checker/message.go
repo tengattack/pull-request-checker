@@ -122,12 +122,11 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 		}
 		if issues != nil {
 			for _, d := range diffs {
-				newName := util.Unquote(d.NewName)
-				if !strings.HasPrefix(newName, "b/") {
-					log.WriteString("No need to process " + newName + "\n")
+				fileName, ok := getTrimmedNewName(d)
+				if !ok {
+					log.WriteString("No need to process " + fileName + "\n")
 					continue
 				}
-				fileName := newName[2:]
 				for _, v := range issues.Issues {
 					if v.Location.File == fileName {
 						startLine := v.Location.Line
@@ -190,12 +189,11 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 			return "", nil, 0, err
 		}
 		for _, d := range diffs {
-			newName := util.Unquote(d.NewName)
-			if !strings.HasPrefix(newName, "b/") {
-				log.WriteString("No need to process " + newName + "\n")
+			fileName, ok := getTrimmedNewName(d)
+			if !ok {
+				log.WriteString("No need to process " + fileName + "\n")
 				continue
 			}
-			fileName := newName[2:]
 			if !strings.HasSuffix(fileName, ".go") {
 				continue
 			}
@@ -244,7 +242,8 @@ func lintIndividually(repoPath string, diffs []*diff.FileDiff, lintEnabled LintE
 	)
 	for _, d := range diffs {
 		d := d
-		if MatchAny(ignoredPath, getTrimmedNewName(d)) {
+		fileNewName, _ := getTrimmedNewName(d)
+		if MatchAny(ignoredPath, fileNewName) {
 			continue
 		}
 		pending <- 0
@@ -273,12 +272,11 @@ func lintIndividually(repoPath string, diffs []*diff.FileDiff, lintEnabled LintE
 }
 
 func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled, annotationLevel string, log *bytes.Buffer, annotations *[]*github.CheckRunAnnotation, problems *int) error {
-	newName := util.Unquote(d.NewName)
-	if !strings.HasPrefix(newName, "b/") {
-		log.WriteString("No need to process " + newName + "\n\n")
+	fileName, ok := getTrimmedNewName(d)
+	if !ok {
+		log.WriteString("No need to process " + fileName + "\n")
 		return nil
 	}
-	fileName := newName[2:]
 	log.WriteString(fmt.Sprintf("Checking '%s'\n", fileName))
 
 	var lints []LintMessage

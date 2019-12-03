@@ -65,6 +65,15 @@ func TestFibonacciBinet(t *testing.T) {
 func TestGetTrimmedNewName(t *testing.T) {
 	assert := assert.New(t)
 
-	assert.Equal("name", getTrimmedNewName(&diff.FileDiff{NewName: "b/name"}))
-	assert.Equal("hello ☺.md", getTrimmedNewName(&diff.FileDiff{NewName: "b/hello \342\230\272.md"}))
+	name, ok := getTrimmedNewName(&diff.FileDiff{NewName: "b/name"})
+	assert.True(ok)
+	assert.Equal("name", name)
+
+	name, ok = getTrimmedNewName(&diff.FileDiff{NewName: "b/hello \342\230\272.md"})
+	assert.True(ok)
+	assert.Equal("hello ☺.md", name)
+
+	name, ok = getTrimmedNewName(&diff.FileDiff{NewName: "name"})
+	assert.False(ok)
+	assert.Equal("name", name)
 }
