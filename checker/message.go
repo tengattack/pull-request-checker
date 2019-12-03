@@ -797,7 +797,10 @@ func checkLints(ctx context.Context, client *github.Client, gpull *github.PullRe
 		return 0, err
 	}
 
-	annotations = filterLints(ignoredPath, annotations)
+	annotationsTmp := filterLints(ignoredPath, annotations)
+	failedLints -= len(annotations) - len(annotationsTmp)
+	annotations = annotationsTmp
+
 	if len(annotations) > 50 {
 		// TODO: push all
 		annotations = annotations[:50]
