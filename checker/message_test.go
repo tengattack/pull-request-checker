@@ -245,9 +245,9 @@ func TestFilterLints(t *testing.T) {
 	assert := assert.New(t)
 
 	file := "sdk/v2/x"
-	annotations, count := filterLints([]string{"sdk/**"}, []*github.CheckRunAnnotation{
+	annotations, filtered := filterLints([]string{"sdk/**"}, []*github.CheckRunAnnotation{
 		&github.CheckRunAnnotation{Path: &file},
 	})
 	assert.Empty(annotations)
-	assert.Equal(1, count)
+	assert.Equal(1, filtered)
 }
