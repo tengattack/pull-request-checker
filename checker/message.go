@@ -244,7 +244,7 @@ func lintIndividually(repoPath string, diffs []*diff.FileDiff, lintEnabled LintE
 	)
 	for _, d := range diffs {
 		d := d
-		if MatchAny(ignoredPath, d.NewName) {
+		if MatchAny(ignoredPath, getTrimmedNewName(d)) {
 			continue
 		}
 		pending <- 0
