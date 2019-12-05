@@ -88,7 +88,7 @@ func TestGenerateComments(t *testing.T) {
 			lintEnabled := LintEnabled{}
 			lintEnabled.Init(testRepoPath)
 
-			annotations, problems, err := lintIndividually(testRepoPath, diffs, lintEnabled, nil, log)
+			annotations, problems, err := lintIndividually(GithubRef{}, testRepoPath, diffs, lintEnabled, nil, log)
 			require.NoError(err)
 			require.Equal(len(v.Annotations), problems)
 			for i, check := range v.Annotations {
@@ -198,7 +198,7 @@ func TestLintRepo1(t *testing.T) {
 	Conf.Core.GolangCILint = "golangci-lint"
 
 	var buf strings.Builder
-	_, annotations, problems, err := lintRepo(context.TODO(), repoDir, diffs, lintEnabled, &buf)
+	_, annotations, problems, err := lintRepo(context.TODO(), GithubRef{}, repoDir, diffs, lintEnabled, &buf)
 	require.NoError(err)
 	assert.NotEmpty(annotations)
 	assert.NotZero(problems)
@@ -230,7 +230,7 @@ func TestLintRepo2(t *testing.T) {
 	}
 
 	var buf strings.Builder
-	_, annotations, problems, err := lintRepo(context.TODO(), repoDir, diffs, lintEnabled, &buf)
+	_, annotations, problems, err := lintRepo(context.TODO(), GithubRef{}, repoDir, diffs, lintEnabled, &buf)
 	require.NoError(err)
 	assert.NotEmpty(annotations)
 	assert.NotZero(problems)

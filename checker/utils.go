@@ -221,7 +221,7 @@ func getDefaultAPIClient(owner string) (*github.Client, error) {
 }
 
 // NewShellParser returns a shell parser
-func NewShellParser(repoPath string) *shellwords.Parser {
+func NewShellParser(repoPath string, ref GithubRef) *shellwords.Parser {
 	parser := shellwords.NewParser()
 	parser.ParseEnv = true
 	parser.ParseBacktick = true
@@ -235,6 +235,10 @@ func NewShellParser(repoPath string) *shellwords.Parser {
 			return repoPath
 		case "PROJECT_NAME":
 			return projectName
+		case "CI_CHECK_TYPE":
+			return ref.checkType
+		case "CI_CHECK_REF":
+			return ref.checkRef
 		}
 		return os.Getenv(key)
 	}

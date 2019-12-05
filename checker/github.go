@@ -43,8 +43,10 @@ type GithubPull struct {
 
 type GithubRef struct {
 	checkType string
-	owner     string
-	repo      string
+	checkRef  string
+
+	owner string
+	repo  string
 
 	Repo struct {
 		Name     string     `json:"name"`
@@ -57,6 +59,10 @@ type GithubRef struct {
 	Ref   string     `json:"ref"`
 	Sha   string     `json:"sha"`
 	User  githubUser `json:"user"`
+}
+
+func (ref GithubRef) isTree() bool {
+	return ref.checkType == CheckTypeBranch
 }
 
 type GithubRefReviewResponse struct {

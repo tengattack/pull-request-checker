@@ -44,12 +44,16 @@ func TestNewShellParser(t *testing.T) {
 	_, filename, _, _ := runtime.Caller(0)
 	currentDir := path.Dir(filename)
 
-	parser := NewShellParser(currentDir)
+	ref := GithubRef{
+		checkType: CheckTypeBranch,
+		checkRef:  "stable",
+	}
+	parser := NewShellParser(currentDir, ref)
 	require.NotNil(parser)
 
-	words, err := parser.Parse("echo $PWD $PROJECT_NAME")
+	words, err := parser.Parse("echo $PWD $PROJECT_NAME $CI_CHECK_TYPE $CI_CHECK_REF")
 	require.NoError(err)
-	assert.Equal([]string{"echo", currentDir, "checker"}, words)
+	assert.Equal([]string{"echo", currentDir, "checker", CheckTypeBranch, "stable"}, words)
 }
 
 func TestFibonacciBinet(t *testing.T) {

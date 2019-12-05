@@ -54,7 +54,7 @@ func pickDiffLintMessages(lintsDiff []LintMessage, d *diff.FileDiff, annotations
 }
 
 // GenerateAnnotations generate github annotations from github diffs and lint option
-func GenerateAnnotations(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled,
+func GenerateAnnotations(ctx context.Context, ref GithubRef, repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled,
 	ignoredPath []string, log *os.File) (
 	outputSummary string, annotations []*github.CheckRunAnnotation, problems int, err error) {
 	var (
@@ -66,11 +66,11 @@ func GenerateAnnotations(ctx context.Context, repoPath string, diffs []*diff.Fil
 
 	var eg errgroup.Group
 	eg.Go(func() error {
-		outputSummary, annotations1, problems1, err1 = lintRepo(ctx, repoPath, diffs, lintEnabled, &buf1)
+		outputSummary, annotations1, problems1, err1 = lintRepo(ctx, ref, repoPath, diffs, lintEnabled, &buf1)
 		return err1
 	})
 	eg.Go(func() error {
-		annotations2, problems2, err2 = lintIndividually(repoPath, diffs, lintEnabled, ignoredPath, &buf2)
+		annotations2, problems2, err2 = lintIndividually(ref, repoPath, diffs, lintEnabled, ignoredPath, &buf2)
 		return err2
 	})
 	err = eg.Wait()
@@ -85,7 +85,7 @@ func GenerateAnnotations(ctx context.Context, repoPath string, diffs []*diff.Fil
 	return
 }
 
-func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled,
+func lintRepo(ctx context.Context, ref GithubRef, repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled,
 	log io.StringWriter) (outputSummary string, annotations []*github.CheckRunAnnotation,
 	problems int, err error) {
 	annotationLevel := "warning" // TODO: from lint.Severity
@@ -109,7 +109,7 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 
 	if lintEnabled.Android {
 		log.WriteString(fmt.Sprintf("AndroidLint '%s'\n", repoPath))
-		issues, msg, err := AndroidLint(ctx, repoPath)
+		issues, msg, err := AndroidLint(ctx, ref, repoPath)
 		if err != nil {
 			log.WriteString(fmt.Sprintf("Android lint error: %v\n%s\n", err, msg))
 			if msg != "" {
@@ -165,7 +165,7 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 		log.WriteString(title)
 		outputSummaries.WriteString(title)
 		var apiDocOutput string
-		apiDocOutput, err = APIDoc(ctx, repoPath)
+		apiDocOutput, err = APIDoc(ctx, ref, repoPath)
 		if err != nil {
 			apiDocOutput = fmt.Sprintf("APIDoc error: %v\n", err) + apiDocOutput
 			problems++
@@ -177,7 +177,7 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 	}
 	if lintEnabled.Go {
 		log.WriteString(fmt.Sprintf("GolangCILint '%s'\n", repoPath))
-		lints, msg, err := GolangCILint(ctx, repoPath)
+		lints, msg, err := GolangCILint(ctx, ref, repoPath)
 		if err != nil {
 			log.WriteString(fmt.Sprintf("GolangCILint error: %v\n%s\n", err, msg))
 			if msg != "" {
@@ -225,7 +225,7 @@ func lintRepo(ctx context.Context, repoPath string, diffs []*diff.FileDiff, lint
 	return
 }
 
-func lintIndividually(repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled, ignoredPath []string,
+func lintIndividually(ref GithubRef, repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled, ignoredPath []string,
 	log io.Writer) ([]*github.CheckRunAnnotation, int, error) {
 	annotationLevel := "warning" // TODO: from lint.Severity
 	maxPending := Conf.Concurrency.Lint
@@ -255,7 +255,7 @@ func lintIndividually(repoPath string, diffs []*diff.FileDiff, lintEnabled LintE
 				problems_    int
 			)
 
-			err := handleSingleFile(repoPath, d, lintEnabled, annotationLevel, &buf, &annotations_, &problems_)
+			err := handleSingleFile(ref, repoPath, d, lintEnabled, annotationLevel, &buf, &annotations_, &problems_)
 
 			mtx.Lock()
 			defer mtx.Unlock()
@@ -271,7 +271,7 @@ func lintIndividually(repoPath string, diffs []*diff.FileDiff, lintEnabled LintE
 	return annotations, problems, err
 }
 
-func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled, annotationLevel string, log *bytes.Buffer, annotations *[]*github.CheckRunAnnotation, problems *int) error {
+func handleSingleFile(ref GithubRef, repoPath string, d *diff.FileDiff, lintEnabled LintEnabled, annotationLevel string, log *bytes.Buffer, annotations *[]*github.CheckRunAnnotation, problems *int) error {
 	fileName, ok := getTrimmedNewName(d)
 	if !ok {
 		log.WriteString("No need to process " + fileName + "\n")
@@ -283,7 +283,7 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 	var lintErr error
 	if lintEnabled.MD && strings.HasSuffix(fileName, ".md") {
 		log.WriteString(fmt.Sprintf("Markdown '%s'\n", fileName))
-		rps, out, err := remark(fileName, repoPath)
+		rps, out, err := remark(ref, fileName, repoPath)
 		if err != nil {
 			return err
 		}
@@ -295,15 +295,15 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 		lints, lintErr = MDLint(rps)
 	} else if lintEnabled.CPP && isCPP(fileName) {
 		log.WriteString(fmt.Sprintf("CPPLint '%s'\n", fileName))
-		lints, lintErr = CPPLint(fileName, repoPath)
+		lints, lintErr = CPPLint(ref, fileName, repoPath)
 	} else if isOC(fileName) {
 		if lintEnabled.OC {
 			log.WriteString(fmt.Sprintf("OCLint '%s'\n", fileName))
-			lints, lintErr = OCLint(context.TODO(), fileName, repoPath)
+			lints, lintErr = OCLint(context.TODO(), ref, fileName, repoPath)
 		}
 		if lintEnabled.ClangLint {
 			log.WriteString(fmt.Sprintf("ClangLint '%s'\n", fileName))
-			lintsDiff, err := ClangLint(context.TODO(), repoPath, filepath.Join(repoPath, fileName))
+			lintsDiff, err := ClangLint(context.TODO(), ref, repoPath, filepath.Join(repoPath, fileName))
 			if err != nil {
 				return err
 			}
@@ -321,7 +321,7 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 	} else if lintEnabled.PHP && strings.HasSuffix(fileName, ".php") {
 		log.WriteString(fmt.Sprintf("PHPLint '%s'\n", fileName))
 		var errlog string
-		lints, errlog, lintErr = PHPLint(filepath.Join(repoPath, fileName), repoPath)
+		lints, errlog, lintErr = PHPLint(ref, filepath.Join(repoPath, fileName), repoPath)
 		if errlog != "" {
 			log.WriteString(errlog + "\n")
 		}
@@ -329,7 +329,7 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 		strings.HasSuffix(fileName, ".tsx")) {
 		log.WriteString(fmt.Sprintf("TSLint '%s'\n", fileName))
 		var errlog string
-		lints, errlog, lintErr = TSLint(filepath.Join(repoPath, fileName), repoPath)
+		lints, errlog, lintErr = TSLint(ref, filepath.Join(repoPath, fileName), repoPath)
 		if errlog != "" {
 			log.WriteString(errlog + "\n")
 		}
@@ -337,14 +337,14 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 		strings.HasSuffix(fileName, ".css")) {
 		log.WriteString(fmt.Sprintf("SCSSLint '%s'\n", fileName))
 		var errlog string
-		lints, errlog, lintErr = SCSSLint(filepath.Join(repoPath, fileName), repoPath)
+		lints, errlog, lintErr = SCSSLint(ref, filepath.Join(repoPath, fileName), repoPath)
 		if errlog != "" {
 			log.WriteString(errlog + "\n")
 		}
 	} else if lintEnabled.JS != "" && strings.HasSuffix(fileName, ".js") {
 		log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
 		var errlog string
-		lints, errlog, lintErr = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
+		lints, errlog, lintErr = ESLint(ref, filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
 		if errlog != "" {
 			log.WriteString(errlog + "\n")
 		}
@@ -352,7 +352,7 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 		strings.HasSuffix(fileName, ".esx") || strings.HasSuffix(fileName, ".jsx")) {
 		log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
 		var errlog string
-		lints, errlog, lintErr = ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.ES)
+		lints, errlog, lintErr = ESLint(ref, filepath.Join(repoPath, fileName), repoPath, lintEnabled.ES)
 		if errlog != "" {
 			log.WriteString(errlog + "\n")
 		}
@@ -364,7 +364,7 @@ func handleSingleFile(repoPath string, d *diff.FileDiff, lintEnabled LintEnabled
 		strings.HasSuffix(fileName, ".php")) {
 		// ESLint for HTML & PHP files (ES5)
 		log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
-		lints2, errlog, err := ESLint(filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
+		lints2, errlog, err := ESLint(ref, filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
 		if errlog != "" {
 			log.WriteString(errlog + "\n")
 		}
@@ -472,11 +472,18 @@ func HandleMessage(ctx context.Context, message string) error {
 
 	// ref to be checked in the owner/repo
 	ref := GithubRef{
-		checkType: s[2],
-		owner:     s[0],
-		repo:      s[1],
-		Sha:       commitSha,
+		owner: s[0],
+		repo:  s[1],
+		Sha:   commitSha,
 	}
+	if checkType == "tree" {
+		ref.checkType = CheckTypeBranch
+		ref.checkRef = pull
+	} else {
+		ref.checkType = CheckTypePRHead
+		ref.checkRef = "pr/" + pull
+	}
+
 	targetURL := ""
 	if len(Conf.Core.CheckLogURI) > 0 {
 		targetURL = Conf.Core.CheckLogURI + repository + "/" + ref.Sha + ".log"
@@ -791,7 +798,7 @@ func checkLints(ctx context.Context, client *github.Client, gpull *github.PullRe
 	}
 	checkRunID := checkRun.GetID()
 
-	notes, annotations, failedLints, err := GenerateAnnotations(ctx, repoPath, diffs, lintEnabled, ignoredPath, log)
+	notes, annotations, failedLints, err := GenerateAnnotations(ctx, ref, repoPath, diffs, lintEnabled, ignoredPath, log)
 	if err != nil {
 		UpdateCheckRunWithError(ctx, client, gpull, checkRunID, "linter", "linter", err)
 		return 0, err
@@ -851,7 +858,7 @@ func checkTests(ctx context.Context, repoPath string, tests map[string]goTestsCo
 	var headCoverage sync.Map
 	failedTests, passedTests, errTests = runTests(tests, t, &headCoverage)
 
-	if ref.checkType == "pull" {
+	if ref.isTree() {
 		// compare test coverage with base
 		baseSHA, err := util.GetBaseSHA(ctx, client, ref.owner, ref.repo, gpull.GetNumber())
 		if err != nil {
@@ -1044,6 +1051,10 @@ func (t *baseTestAndSave) Run(testName string, testConfig goTestsConfig) (string
 	var buf bytes.Buffer
 	ref := t.Ref
 	ref.Sha = t.BaseSHA
+
+	if ref.checkType == CheckTypePRHead {
+		ref.checkType = CheckTypePRBase
+	}
 	_, reportMessage, _ := testAndSaveCoverage(context.TODO(), ref,
 		testName, testConfig.Cmds, testConfig.Coverage, t.RepoPath, t.Pull, true, &buf)
 	t.lm.Lock()

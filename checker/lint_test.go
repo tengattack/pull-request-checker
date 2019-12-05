@@ -13,7 +13,8 @@ func TestParseAPIDocCommands(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	words, err := parseAPIDocCommands("../testdata/go")
+	ref := GithubRef{}
+	words, err := parseAPIDocCommands(ref, "../testdata/go")
 	require.NoError(err)
 	assert.Equal(
 		[]string{"apidoc", "-f", "file-filters", "-e", "exclude-filters", "-i", "input"},
