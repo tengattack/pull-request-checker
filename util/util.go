@@ -8,16 +8,20 @@ import (
 )
 
 // ParseFloatPercent converts percentages string to float number
-func ParseFloatPercent(s string, bitSize int) (f float64, err error) {
+func ParseFloatPercent(s string, bitSize int) (f float64, norm string, err error) {
 	i := strings.Index(s, "%")
-	if i < 0 {
-		return 0, fmt.Errorf("ParseFloatPercent: percentage sign not found")
+	if i >= 0 {
+		s = s[:i]
 	}
-	f, err = strconv.ParseFloat(s[:i], bitSize)
+
+	f, err = strconv.ParseFloat(s, bitSize)
 	if err != nil {
-		return 0, err
+		return 0, "", fmt.Errorf("ParseFloatPercent %q: percent sign not found and not a number", s)
 	}
-	return f / 100, nil
+	// normalization
+	s += "%"
+
+	return f / 100, s, nil
 }
 
 // FormatFloatPercent converts f to percentages string

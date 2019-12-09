@@ -37,8 +37,8 @@ func DiffCoverage(headCoverage, baseCoverage *sync.Map) string {
 		interfaceValue, _ := baseCoverage.Load(testName)
 		baseResult, _ := interfaceValue.(string)
 
-		currentPercentage, err1 := ParseFloatPercent(currentResult, 64)
-		basePercentage, err2 := ParseFloatPercent(baseResult, 64)
+		currentPercentage, _, err1 := ParseFloatPercent(currentResult, 64)
+		basePercentage, _, err2 := ParseFloatPercent(baseResult, 64)
 		if err1 != nil || err2 != nil {
 			output.WriteString("  ")
 		} else if currentPercentage > basePercentage {

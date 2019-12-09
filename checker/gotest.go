@@ -115,10 +115,11 @@ func parseCoverage(pattern, output string) (string, float64, error) {
 	if len(match) > 1 {
 		coverage = match[1]
 	}
-	pct, err := util.ParseFloatPercent(coverage, 64)
+	pct, norm, err := util.ParseFloatPercent(coverage, 64)
 	if err != nil {
 		return coverage, 0, err
 	}
+	coverage = norm
 	return coverage, pct, nil
 }
 

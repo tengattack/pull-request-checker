@@ -7,12 +7,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFloatPercent(t *testing.T) {
-	pct, err := ParseFloatPercent("1.2% 3.14159", 64)
-	require.NoError(t, err)
-	assert.InDelta(t, 0.012, pct, 0.0001)
+func TestParseFloatPercent(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
 
-	assert.Equal(t, "58.78%", FormatFloatPercent(.5878))
+	pct, norm, err := ParseFloatPercent("1.2% 3.14159", 64)
+	require.NoError(err)
+	assert.Equal("1.2%", norm)
+	assert.InDelta(0.012, pct, 0.0001)
+
+	pct, norm, err = ParseFloatPercent("12.3", 64)
+	require.NoError(err)
+	assert.Equal("12.3%", norm)
+	assert.InDelta(0.123, pct, 0.0001)
+
+	assert.Equal("58.78%", FormatFloatPercent(.5878))
 }
 
 func TestUnquote(t *testing.T) {
