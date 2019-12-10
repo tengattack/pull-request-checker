@@ -195,8 +195,8 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 }
 
 // CPPLint lints the cpp language files using github.com/cpplint/cpplint
-func CPPLint(filePath string, repoPath string) (lints []LintMessage, err error) {
-	parser := NewShellParser(repoPath)
+func CPPLint(ref GithubRef, filePath string, cwd string) (lints []LintMessage, err error) {
+	parser := NewShellParser(cwd, ref)
 	words, err := parser.Parse(Conf.Core.CPPLint)
 	if err != nil {
 		LogError.Error("CPPLint: " + err.Error())
@@ -204,7 +204,7 @@ func CPPLint(filePath string, repoPath string) (lints []LintMessage, err error) 
 	}
 	words = append(words, "--quiet", filePath)
 	cmd := exec.Command(words[0], words[1:]...)
-	cmd.Dir = repoPath
+	cmd.Dir = cwd
 
 	var output bytes.Buffer
 	cmd.Stderr = &output
@@ -278,8 +278,8 @@ type oclintViolation struct {
 }
 
 // OCLint lints objective-c files
-func OCLint(ctx context.Context, filePath string, cwd string) (lints []LintMessage, err error) {
-	parser := NewShellParser(cwd)
+func OCLint(ctx context.Context, ref GithubRef, filePath string, cwd string) (lints []LintMessage, err error) {
+	parser := NewShellParser(cwd, ref)
 	words, _ := parser.Parse(Conf.Core.OCLint)
 	if len(words) < 1 {
 		return nil, errors.New("Invalid `oclint` configuration")
@@ -325,10 +325,10 @@ func OCLint(ctx context.Context, filePath string, cwd string) (lints []LintMessa
 }
 
 // PHPLint lints the php files
-func PHPLint(fileName, cwd string) ([]LintMessage, string, error) {
+func PHPLint(ref GithubRef, fileName, cwd string) ([]LintMessage, string, error) {
 	var stderr bytes.Buffer
 
-	parser := NewShellParser(cwd)
+	parser := NewShellParser(cwd, ref)
 	words, err := parser.Parse(Conf.Core.PHPLint)
 	if err != nil {
 		LogError.Error("PHPLint: " + err.Error())
@@ -358,10 +358,10 @@ func PHPLint(fileName, cwd string) ([]LintMessage, string, error) {
 }
 
 // ESLint lints the js, jsx, es, esx files
-func ESLint(fileName, cwd, eslintrc string) ([]LintMessage, string, error) {
+func ESLint(ref GithubRef, fileName, cwd, eslintrc string) ([]LintMessage, string, error) {
 	var stderr bytes.Buffer
 
-	parser := NewShellParser(cwd)
+	parser := NewShellParser(cwd, ref)
 	words, err := parser.Parse(Conf.Core.ESLint)
 	if err != nil {
 		LogError.Error("ESLint: " + err.Error())
@@ -397,10 +397,10 @@ func ESLint(fileName, cwd, eslintrc string) ([]LintMessage, string, error) {
 }
 
 // TSLint lints the ts and tsx files
-func TSLint(fileName, cwd string) ([]LintMessage, string, error) {
+func TSLint(ref GithubRef, fileName, cwd string) ([]LintMessage, string, error) {
 	var stderr bytes.Buffer
 
-	parser := NewShellParser(cwd)
+	parser := NewShellParser(cwd, ref)
 	words, err := parser.Parse(Conf.Core.TSLint)
 	if err != nil {
 		LogError.Error("TSLint: " + err.Error())
@@ -449,10 +449,10 @@ func TSLint(fileName, cwd string) ([]LintMessage, string, error) {
 }
 
 // SCSSLint lints the scss files
-func SCSSLint(fileName, cwd string) ([]LintMessage, string, error) {
+func SCSSLint(ref GithubRef, fileName, cwd string) ([]LintMessage, string, error) {
 	var stderr bytes.Buffer
 
-	parser := NewShellParser(cwd)
+	parser := NewShellParser(cwd, ref)
 	words, err := parser.Parse(Conf.Core.SCSSLint)
 	if err != nil {
 		LogError.Error("SCSSLint: " + err.Error())
@@ -515,8 +515,8 @@ type CodeClimate struct {
 }
 
 // GolangCILint runs `golangci-lint run --out-format code-climate`
-func GolangCILint(ctx context.Context, cwd string) ([]CodeClimate, string, error) {
-	parser := NewShellParser(cwd)
+func GolangCILint(ctx context.Context, ref GithubRef, cwd string) ([]CodeClimate, string, error) {
+	parser := NewShellParser(cwd, ref)
 	words, err := parser.Parse(Conf.Core.GolangCILint)
 	if err == nil && len(words) < 1 {
 		err = errors.New("GolangCILint command is not configured")
@@ -683,8 +683,8 @@ type remarkMessage struct {
 	RuleID string
 }
 
-func remark(fileName string, repoPath string) (reports []remarkReport, out []byte, err error) {
-	parser := NewShellParser(repoPath)
+func remark(ref GithubRef, fileName string, cwd string) (reports []remarkReport, out []byte, err error) {
+	parser := NewShellParser(cwd, ref)
 	words, err := parser.Parse(Conf.Core.RemarkLint)
 	if err != nil {
 		LogError.Error("RemarkLint: " + err.Error())
@@ -692,7 +692,7 @@ func remark(fileName string, repoPath string) (reports []remarkReport, out []byt
 	}
 	words = append(words, "--quiet", "--report", "json", fileName)
 	cmd := exec.Command(words[0], words[1:]...)
-	cmd.Dir = repoPath
+	cmd.Dir = cwd
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		return nil, nil, err
@@ -773,10 +773,10 @@ type apiDocJSON struct {
 	Input          string `json:"input"`
 }
 
-func parseAPIDocCommands(repoPath string) ([]string, error) {
+func parseAPIDocCommands(ref GithubRef, cwd string) ([]string, error) {
 	var args apiDocJSON
 
-	fileName := path.Join(repoPath, "apidoc.json")
+	fileName := path.Join(cwd, "apidoc.json")
 	if util.FileExists(fileName) {
 		config, err := ioutil.ReadFile(fileName)
 		if err != nil {
@@ -789,7 +789,7 @@ func parseAPIDocCommands(repoPath string) ([]string, error) {
 		}
 	}
 
-	parser := NewShellParser(repoPath)
+	parser := NewShellParser(cwd, ref)
 	words, err := parser.Parse(Conf.Core.APIDoc)
 	if err == nil && len(words) < 1 {
 		err = errors.New("APIDoc command is not configured")
@@ -812,13 +812,13 @@ func parseAPIDocCommands(repoPath string) ([]string, error) {
 }
 
 // APIDoc generates apidoc
-func APIDoc(ctx context.Context, repoPath string) (string, error) {
-	words, err := parseAPIDocCommands(repoPath)
+func APIDoc(ctx context.Context, ref GithubRef, cwd string) (string, error) {
+	words, err := parseAPIDocCommands(ref, cwd)
 	if err != nil {
 		return "parseAPIDocCommands error\n", err
 	}
 	cmd := exec.CommandContext(ctx, words[0], words[1:]...)
-	cmd.Dir = repoPath
+	cmd.Dir = cwd
 	output, err := cmd.CombinedOutput()
 	return string(output) + "\n", err
 }
@@ -873,8 +873,8 @@ type Issue struct {
 }
 
 // AndroidLint Android (Gradle) Lint, returns either issues or message
-func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) {
-	parser := NewShellParser(repoPath)
+func AndroidLint(ctx context.Context, ref GithubRef, cwd string) (*Issues, string, error) {
+	parser := NewShellParser(cwd, ref)
 	words, err := parser.Parse(Conf.Core.AndroidLint)
 	if len(words) < 1 && err == nil {
 		err = errors.New("Android lint command is not configured")
@@ -884,10 +884,10 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 		return nil, "", err
 	}
 	if runtime.GOOS == "windows" {
-		words[0] = path.Join(repoPath, words[0])
+		words[0] = path.Join(cwd, words[0])
 	}
 
-	basePath, err := filepath.Abs(repoPath)
+	basePath, err := filepath.Abs(cwd)
 	if err != nil {
 		err = fmt.Errorf("Can not get absolute repo path: %v", err)
 		LogError.Error(err)
@@ -913,7 +913,7 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 	if doCheckstyle {
 		outputs.WriteString("checkstyle:\n")
 		cmd := exec.Command(checkstyleWords[0], checkstyleWords[1:]...)
-		cmd.Dir = repoPath
+		cmd.Dir = cwd
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			outputs.WriteString(err.Error() + "\n")
@@ -922,11 +922,11 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 			// PASS
 		} else {
 			outputs.Write(output)
-			fileName := path.Join(repoPath, "build/reports/checkstyle/checkstyle.xml")
+			fileName := path.Join(cwd, "build/reports/checkstyle/checkstyle.xml")
 			if !util.FileExists(fileName) {
 				msg := fmt.Sprintf("Can not find checkstyle result file: %s\n", fileName)
 				LogAccess.Warn(msg)
-				fileName = path.Join(repoPath, "app/build/reports/checkstyle/checkstyle.xml")
+				fileName = path.Join(cwd, "app/build/reports/checkstyle/checkstyle.xml")
 			}
 			if !util.FileExists(fileName) {
 				msg := fmt.Sprintf("Can not find checkstyle result file: %s\n", fileName)
@@ -974,7 +974,7 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 
 	outputs.WriteString("lint:\n")
 	cmd := exec.Command(words[0], words[1:]...)
-	cmd.Dir = repoPath
+	cmd.Dir = cwd
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		outputs.WriteString(err.Error() + "\n")
@@ -985,7 +985,7 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 	outputs.Write(output)
 
 	var issues Issues
-	fileName := path.Join(repoPath, "app/build/reports/lint-results.xml")
+	fileName := path.Join(cwd, "app/build/reports/lint-results.xml")
 	if !util.FileExists(fileName) {
 		err = fmt.Errorf("Can not find %s", fileName)
 		LogError.Error(err)
@@ -1048,8 +1048,8 @@ func AndroidLint(ctx context.Context, repoPath string) (*Issues, string, error) 
 }
 
 // ClangLint runs the clang-format lint
-func ClangLint(ctx context.Context, repoPath string, filePath string) (lints []LintMessage, err error) {
-	parser := NewShellParser(repoPath)
+func ClangLint(ctx context.Context, ref GithubRef, cwd string, filePath string) (lints []LintMessage, err error) {
+	parser := NewShellParser(cwd, ref)
 	words, err := parser.Parse(Conf.Core.ClangLint)
 	if err != nil {
 		return nil, err
@@ -1059,7 +1059,7 @@ func ClangLint(ctx context.Context, repoPath string, filePath string) (lints []L
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, words[0], words[1:]...)
-	cmd.Dir = repoPath
+	cmd.Dir = cwd
 
 	out, err := cmd.Output()
 	if err != nil {

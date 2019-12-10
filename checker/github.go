@@ -43,8 +43,10 @@ type GithubPull struct {
 
 type GithubRef struct {
 	checkType string
-	owner     string
-	repo      string
+	checkRef  string
+
+	owner string
+	repo  string
 
 	Repo struct {
 		Name     string     `json:"name"`
@@ -57,6 +59,11 @@ type GithubRef struct {
 	Ref   string     `json:"ref"`
 	Sha   string     `json:"sha"`
 	User  githubUser `json:"user"`
+}
+
+// IsBranch returns true if the checked type is checking of named branch such as master, stable.
+func (ref GithubRef) IsBranch() bool {
+	return ref.checkType == CheckTypeBranch
 }
 
 type GithubRefReviewResponse struct {
