@@ -61,7 +61,8 @@ type GithubRef struct {
 	User  githubUser `json:"user"`
 }
 
-func (ref GithubRef) isTree() bool {
+// IsBranch returns true if the checked type is checking of named branch such as master, stable.
+func (ref GithubRef) IsBranch() bool {
 	return ref.checkType == CheckTypeBranch
 }
 
