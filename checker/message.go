@@ -858,7 +858,7 @@ func checkTests(ctx context.Context, repoPath string, tests map[string]goTestsCo
 	var headCoverage sync.Map
 	failedTests, passedTests, errTests = runTests(tests, t, &headCoverage)
 
-	if ref.isTree() {
+	if ref.IsBranch() {
 		// compare test coverage with base
 		baseSHA, err := util.GetBaseSHA(ctx, client, ref.owner, ref.repo, gpull.GetNumber())
 		if err != nil {

@@ -51,7 +51,7 @@ func ReportTestResults(testName string, repoPath string, cmds []string, coverage
 	t := github.Timestamp{Time: time.Now()}
 
 	var checkRunID int64
-	if ref.isTree() {
+	if ref.IsBranch() {
 		err := ref.UpdateState(client, outputTitle, "pending", targetURL, "running")
 		if err != nil {
 			msg := fmt.Sprintf("Update commit state %s failed: %v", outputTitle, err)
@@ -79,7 +79,7 @@ func ReportTestResults(testName string, repoPath string, cmds []string, coverage
 	} else {
 		title = "coverage: " + reportMessage
 	}
-	if ref.isTree() {
+	if ref.IsBranch() {
 		state := "success"
 		if conclusion == "failure" {
 			state = "error"
@@ -155,7 +155,7 @@ func testAndSaveCoverage(ctx context.Context, ref GithubRef, testName string, cm
 			_, _ = io.WriteString(log, msg)
 			// PASS
 		}
-		if err == nil || ref.isTree() {
+		if err == nil || ref.IsBranch() {
 			c := store.CommitsInfo{
 				Owner:    ref.owner,
 				Repo:     ref.repo,
@@ -167,7 +167,7 @@ func testAndSaveCoverage(ctx context.Context, ref GithubRef, testName string, cm
 			if conclusion == "success" {
 				c.Passing = 1
 			}
-			if ref.isTree() {
+			if ref.IsBranch() {
 				// always save for tree test check
 				c.Status = 1
 				if err != nil {
@@ -185,7 +185,7 @@ func testAndSaveCoverage(ctx context.Context, ref GithubRef, testName string, cm
 
 		outputSummary += ("Test coverage: " + percentage + "\n")
 		reportMessage = percentage
-	} else if coveragePattern == "" && ref.isTree() {
+	} else if coveragePattern == "" && ref.IsBranch() {
 		// saving build state with NULL coverage
 		c := store.CommitsInfo{
 			Owner:    ref.owner,
