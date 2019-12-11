@@ -187,14 +187,15 @@ func testAndSaveCoverage(ctx context.Context, ref GithubRef, testName string, cm
 		outputSummary += ("Test coverage: " + percentage + "\n")
 		reportMessage = percentage
 	} else if coveragePattern == "" && ref.IsBranch() {
-		// saving build state with NULL coverage
+		pct := float64(-1)
+		// saving build state with -1 coverage
 		c := store.CommitsInfo{
 			Owner:    ref.owner,
 			Repo:     ref.repo,
 			Sha:      ref.Sha,
 			Author:   gpull.GetHead().GetUser().GetLogin(),
 			Test:     testName,
-			Coverage: nil,
+			Coverage: &pct,
 			Passing:  0,
 			Status:   1,
 		}

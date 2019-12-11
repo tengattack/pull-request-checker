@@ -118,7 +118,8 @@ func GetLatestCommitsInfo(owner, repo string) ([]CommitsInfo, error) {
 	defer rwCommitsInfo.RUnlock()
 	var c CommitsInfo
 	status := 1
-	err := db.Get(&c, "SELECT * FROM commits_tests WHERE owner = ? AND repo = ? AND status = ? ORDER BY create_time DESC LIMIT 1",
+	err := db.Get(&c, "SELECT * FROM commits_tests WHERE owner = ? AND repo = ? AND status = ?"+
+		" ORDER BY create_time DESC LIMIT 1",
 		owner, repo, status)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -127,7 +128,8 @@ func GetLatestCommitsInfo(owner, repo string) ([]CommitsInfo, error) {
 		return nil, err
 	}
 	var cs []CommitsInfo
-	err = db.Select(&cs, "SELECT * FROM commits_tests WHERE owner = ? AND repo = ? AND sha = ? AND status = ?",
+	err = db.Select(&cs, "SELECT * FROM commits_tests WHERE owner = ? AND repo = ? AND sha = ? AND status = ?"+
+		" AND (coverage >= 0 OR coverage IS NULL)",
 		owner, repo, c.Sha, status)
 	if err != nil {
 		return nil, err
