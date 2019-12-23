@@ -94,7 +94,7 @@ func UpdateCheckRunWithError(ctx context.Context, client *github.Client, gpull *
 
 		owner := gpull.GetBase().GetRepo().GetOwner().GetLogin()
 		repo := gpull.GetBase().GetRepo().GetName()
-		_, _, eror := client.Checks.UpdateCheckRun(ctx, owner, repo, checkRunID, github.UpdateCheckRunOptions{
+		_, _, erro := client.Checks.UpdateCheckRun(ctx, owner, repo, checkRunID, github.UpdateCheckRunOptions{
 			Name:        checkName,
 			Status:      &checkRunStatus,
 			Conclusion:  &conclusion,
@@ -104,8 +104,8 @@ func UpdateCheckRunWithError(ctx context.Context, client *github.Client, gpull *
 				Summary: &outputSummary,
 			},
 		})
-		if eror != nil {
-			LogError.Errorf("github update check run with error failed: %v", eror)
+		if erro != nil {
+			LogError.Errorf("github update check run with error failed: %v", erro)
 		}
 	}
 }

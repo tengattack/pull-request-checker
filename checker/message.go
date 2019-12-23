@@ -678,12 +678,14 @@ func HandleMessage(ctx context.Context, message string) error {
 	if err != nil {
 		err = fmt.Errorf("ReadProjectConfig error: %v", err)
 		outputTitle := "wrong ci config"
+		log.WriteString(err.Error() + "\n")
+		LogError.Error(err)
 		if ref.IsBranch() {
 			// Update state to error
 			erro := ref.UpdateState(client, AppName, "error", targetURL, outputTitle)
 			if erro != nil {
-				log.WriteString(err.Error() + "\n")
-				LogError.Error(err)
+				LogError.Errorf("Failed to update state to error: %v", erro)
+				// PASS
 			}
 		} else {
 			// Can not get tests from config: report action_required instead.
