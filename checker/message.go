@@ -679,7 +679,6 @@ func HandleMessage(ctx context.Context, message string) error {
 		err = fmt.Errorf("ReadProjectConfig error: %v", err)
 		outputTitle := "wrong ci config"
 		log.WriteString(err.Error() + "\n")
-		LogError.Error(err)
 		if ref.IsBranch() {
 			// Update state to error
 			erro := ref.UpdateState(client, AppName, "error", targetURL, outputTitle)
