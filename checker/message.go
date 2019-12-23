@@ -536,7 +536,7 @@ func HandleMessage(ctx context.Context, message string) error {
 
 	log.WriteString(UserAgent() + " Date: " + time.Now().Format(time.RFC1123) + "\n\n")
 
-	if checkType == "tree" {
+	if ref.IsBranch() {
 		log.WriteString(fmt.Sprintf("Start fetching %s/tree/%s\n", repository, pull))
 	} else {
 		log.WriteString(fmt.Sprintf("Start fetching %s/pull/%s\n", repository, pull))
@@ -585,7 +585,7 @@ func HandleMessage(ctx context.Context, message string) error {
 	}
 
 	var cloneURL string
-	if checkType == "tree" {
+	if ref.IsBranch() {
 		// branchs
 		// TODO: using GetBranch api
 		cloneURL = "https://github.com/" + ref.owner + "/" + ref.repo + ".git"
@@ -600,7 +600,7 @@ func HandleMessage(ctx context.Context, message string) error {
 	originURL.User = url.UserPassword("x-access-token", installationToken.GetToken())
 
 	fetchURL := originURL.String()
-	if checkType == "tree" {
+	if ref.IsBranch() {
 		localBranch := pull
 
 		log.WriteString("$ git fetch -f -u " + cloneURL +
@@ -678,10 +678,12 @@ func HandleMessage(ctx context.Context, message string) error {
 	if err != nil {
 		err = fmt.Errorf("ReadProjectConfig error: %v", err)
 		outputTitle := "wrong ci config"
-		if checkType == "tree" {
+		log.WriteString(err.Error() + "\n")
+		if ref.IsBranch() {
 			// Update state to error
 			erro := ref.UpdateState(client, AppName, "error", targetURL, outputTitle)
 			if erro != nil {
+				LogError.Errorf("Failed to update state to error: %v", erro)
 				// PASS
 			}
 		} else {
@@ -706,7 +708,7 @@ func HandleMessage(ctx context.Context, message string) error {
 	)
 	noTest := true
 
-	if checkType == "tree" {
+	if ref.IsBranch() {
 		// only tests
 		failedLints = 0
 		failedTests, passedTests, errTests, testMsg = checkTests(ctx, repoPath, repoConf.Tests, client, gpull, ref, targetURL, log)
@@ -858,7 +860,7 @@ func checkTests(ctx context.Context, repoPath string, tests map[string]goTestsCo
 	var headCoverage sync.Map
 	failedTests, passedTests, errTests = runTests(tests, t, &headCoverage)
 
-	if ref.IsBranch() {
+	if !ref.IsBranch() {
 		// compare test coverage with base
 		baseSHA, err := util.GetBaseSHA(ctx, client, ref.owner, ref.repo, gpull.GetNumber())
 		if err != nil {
