@@ -680,7 +680,11 @@ func HandleMessage(ctx context.Context, message string) error {
 		outputTitle := "wrong ci config"
 		if ref.IsBranch() {
 			// Update state to error
-			_ = ref.UpdateState(client, AppName, "error", targetURL, outputTitle)
+			erro := ref.UpdateState(client, AppName, "error", targetURL, outputTitle)
+			if erro != nil {
+				log.WriteString(err.Error() + "\n")
+				LogError.Error(err)
+			}
 		} else {
 			// Can not get tests from config: report action_required instead.
 			checkRun, erro := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
