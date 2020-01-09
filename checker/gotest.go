@@ -65,7 +65,7 @@ func ReportTestResults(testName string, repoPath string, cmds []string, coverage
 			msg := fmt.Sprintf("Creating %s check run failed: %v", outputTitle, err)
 			_, _ = io.WriteString(log, msg+"\n")
 			LogError.Error(msg)
-			return "", err
+			// PASS
 		}
 		checkRunID = checkRun.GetID()
 	}
@@ -92,10 +92,12 @@ func ReportTestResults(testName string, repoPath string, cmds []string, coverage
 			// PASS
 		}
 	} else {
-		err := UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, title, "```\n"+outputSummary+"\n```", nil)
-		if err != nil {
-			LogError.Errorf("report test results to github failed: %v", err)
-			// PASS
+		if checkRunID != 0 {
+			err := UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, title, "```\n"+outputSummary+"\n```", nil)
+			if err != nil {
+				LogError.Errorf("report test results to github failed: %v", err)
+				// PASS
+			}
 		}
 	}
 	if conclusion == "failure" {
