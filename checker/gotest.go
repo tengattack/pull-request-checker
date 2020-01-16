@@ -92,6 +92,18 @@ func ReportTestResults(testName string, repoPath string, cmds []string, coverage
 			// PASS
 		}
 	} else {
+		if checkRunID == 0 {
+			// create check run now if it failed before
+			checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
+			if err != nil {
+				msg := fmt.Sprintf("Creating %s check run failed: %v", outputTitle, err)
+				_, _ = io.WriteString(log, msg+"\n")
+				LogError.Error(msg)
+				// PASS
+			}
+			checkRunID = checkRun.GetID()
+		}
+
 		if checkRunID != 0 {
 			err := UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, title, "```\n"+outputSummary+"\n```", nil)
 			if err != nil {
