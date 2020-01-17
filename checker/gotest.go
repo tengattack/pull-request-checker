@@ -66,8 +66,9 @@ func ReportTestResults(testName string, repoPath string, cmds []string, coverage
 			_, _ = io.WriteString(log, msg+"\n")
 			LogError.Error(msg)
 			// PASS
+		} else {
+			checkRunID = checkRun.GetID()
 		}
-		checkRunID = checkRun.GetID()
 	}
 
 	conclusion, reportMessage, outputSummary := testAndSaveCoverage(ctx, ref, testName, cmds,
@@ -100,8 +101,9 @@ func ReportTestResults(testName string, repoPath string, cmds []string, coverage
 				_, _ = io.WriteString(log, msg+"\n")
 				LogError.Error(msg)
 				// PASS
+			} else {
+				checkRunID = checkRun.GetID()
 			}
-			checkRunID = checkRun.GetID()
 		}
 
 		if checkRunID != 0 {
