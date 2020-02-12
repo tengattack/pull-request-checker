@@ -65,9 +65,10 @@ func ReportTestResults(testName string, repoPath string, cmds []string, coverage
 			msg := fmt.Sprintf("Creating %s check run failed: %v", outputTitle, err)
 			_, _ = io.WriteString(log, msg+"\n")
 			LogError.Error(msg)
-			return "", err
+			// PASS
+		} else {
+			checkRunID = checkRun.GetID()
 		}
-		checkRunID = checkRun.GetID()
 	}
 
 	conclusion, reportMessage, outputSummary := testAndSaveCoverage(ctx, ref, testName, cmds,
@@ -92,10 +93,25 @@ func ReportTestResults(testName string, repoPath string, cmds []string, coverage
 			// PASS
 		}
 	} else {
-		err := UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, title, "```\n"+outputSummary+"\n```", nil)
-		if err != nil {
-			LogError.Errorf("report test results to github failed: %v", err)
-			// PASS
+		if checkRunID == 0 {
+			// create check run now if it failed before
+			checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
+			if err != nil {
+				msg := fmt.Sprintf("Creating %s check run failed: %v", outputTitle, err)
+				_, _ = io.WriteString(log, msg+"\n")
+				LogError.Error(msg)
+				// PASS
+			} else {
+				checkRunID = checkRun.GetID()
+			}
+		}
+
+		if checkRunID != 0 {
+			err := UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, title, "```\n"+outputSummary+"\n```", nil)
+			if err != nil {
+				LogError.Errorf("report test results to github failed: %v", err)
+				// PASS
+			}
 		}
 	}
 	if conclusion == "failure" {
