@@ -2,6 +2,8 @@
 core:
   enable_retries: true
   max_retries: 50
+  socks5_proxy: ''
+  git_command: 'git'
 
   db_file: 'file.db'
   work_dir: 'tmp'

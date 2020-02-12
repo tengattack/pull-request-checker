@@ -22,6 +22,7 @@ import (
 	"github.com/sourcegraph/go-diff/diff"
 	"github.com/tengattack/unified-ci/store"
 	"github.com/tengattack/unified-ci/util"
+	"golang.org/x/net/proxy"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -504,7 +505,21 @@ func HandleMessage(ctx context.Context, message string) error {
 	// TODO: add installation ID to db
 	installationID, ok := Conf.GitHub.Installations[ref.owner]
 	if ok {
-		tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
+		var tr http.RoundTripper
+		if Conf.Core.Socks5Proxy != "" {
+			dialSocksProxy, err := proxy.SOCKS5("tcp", Conf.Core.Socks5Proxy, nil, proxy.Direct)
+			if err != nil {
+				msg := "Setup proxy failed: " + err.Error()
+				// close log manually
+				log.WriteString(msg + "\n")
+				log.Close()
+				return errors.New(msg)
+			}
+			tr = &http.Transport{Dial: dialSocksProxy.Dial}
+		} else {
+			tr = http.DefaultTransport
+		}
+		tr, err := ghinstallation.NewKeyFromFile(tr,
 			Conf.GitHub.AppID, installationID, Conf.GitHub.PrivateKey)
 		if err != nil {
 			msg := "Load private key failed: " + err.Error()
@@ -571,8 +586,18 @@ func HandleMessage(ctx context.Context, message string) error {
 	repoPath := filepath.Join(Conf.Core.WorkDir, repository)
 	_ = os.MkdirAll(repoPath, os.ModePerm)
 
+	parser := NewShellParser(repoPath, ref)
+	words, err := parser.Parse(Conf.Core.GitCommand)
+	if err != nil {
+		err = fmt.Errorf("parse git command error: %v", err)
+		return err
+	}
+
 	log.WriteString("$ git init\n")
-	cmd := exec.CommandContext(ctx, "git", "init")
+	gitCmds := make([]string, len(words))
+	copy(gitCmds, words)
+	gitCmds = append(gitCmds, "init")
+	cmd := exec.CommandContext(ctx, gitCmds[0], gitCmds[1:]...)
 	cmd.Dir = repoPath
 	err = cmd.Run()
 	if err != nil {
@@ -605,8 +630,11 @@ func HandleMessage(ctx context.Context, message string) error {
 
 		log.WriteString("$ git fetch -f -u " + cloneURL +
 			fmt.Sprintf(" %s:%s\n", pull, localBranch))
-		cmd = exec.CommandContext(ctx, "git", "fetch", "-f", "-u", fetchURL,
+		gitCmds = make([]string, len(words))
+		copy(gitCmds, words)
+		gitCmds = append(gitCmds, "fetch", "-f", "-u", fetchURL,
 			fmt.Sprintf("%s:%s", pull, localBranch))
+		cmd = exec.CommandContext(ctx, gitCmds[0], gitCmds[1:]...)
 	} else {
 		localBranch := fmt.Sprintf("pull-%d", prNum)
 
@@ -615,8 +643,11 @@ func HandleMessage(ctx context.Context, message string) error {
 		// link: https://stackoverflow.com/a/32561463/4213218
 		log.WriteString("$ git fetch -f -u " + cloneURL +
 			fmt.Sprintf(" pull/%d/head:%s\n", prNum, localBranch))
-		cmd = exec.CommandContext(ctx, "git", "fetch", "-f", "-u", fetchURL,
+		gitCmds = make([]string, len(words))
+		copy(gitCmds, words)
+		gitCmds = append(gitCmds, "fetch", "-f", "-u", fetchURL,
 			fmt.Sprintf("pull/%d/head:%s", prNum, localBranch))
+		cmd = exec.CommandContext(ctx, gitCmds[0], gitCmds[1:]...)
 	}
 	cmd.Dir = repoPath
 	cmd.Stdout = log
@@ -628,7 +659,10 @@ func HandleMessage(ctx context.Context, message string) error {
 
 	// git checkout -f <commits>/<branch>
 	log.WriteString("$ git checkout -f " + ref.Sha + "\n")
-	cmd = exec.CommandContext(ctx, "git", "checkout", "-f", ref.Sha)
+	gitCmds = make([]string, len(words))
+	copy(gitCmds, words)
+	gitCmds = append(gitCmds, "checkout", "-f", ref.Sha)
+	cmd = exec.CommandContext(ctx, gitCmds[0], gitCmds[1:]...)
 	cmd.Dir = repoPath
 	cmd.Stdout = log
 	cmd.Stderr = log
@@ -998,9 +1032,19 @@ func findBaseCoverage(baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun m
 		}
 	}
 
+	parser := NewShellParser(repoPath, ref)
+	words, err := parser.Parse(Conf.Core.GitCommand)
+	if err != nil {
+		err = fmt.Errorf("parse git command error: %v", err)
+		return err
+	}
+
 	if len(baseTestsNeedToRun) > 0 {
 		io.WriteString(log, "$ git checkout -f "+baseSHA+"\n")
-		cmd := exec.Command("git", "checkout", "-f", baseSHA)
+		gitCmds := make([]string, len(words))
+		copy(gitCmds, words)
+		gitCmds = append(gitCmds, "checkout", "-f", baseSHA)
+		cmd := exec.Command(gitCmds[0], gitCmds[1:]...)
 		cmd.Dir = repoPath
 		cmd.Stdout = log
 		cmd.Stderr = log
@@ -1024,7 +1068,10 @@ func findBaseCoverage(baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun m
 		runTests(baseTestsNeedToRun, t, baseCoverage)
 
 		io.WriteString(log, "$ git checkout -f "+ref.Sha+"\n")
-		cmd = exec.Command("git", "checkout", "-f", ref.Sha)
+		gitCmds = make([]string, len(words))
+		copy(gitCmds, words)
+		gitCmds = append(gitCmds, "checkout", "-f", ref.Sha)
+		cmd = exec.Command(gitCmds[0], gitCmds[1:]...)
 		cmd.Dir = repoPath
 		cmd.Stdout = log
 		cmd.Stderr = log
