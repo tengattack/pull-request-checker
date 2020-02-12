@@ -17,9 +17,9 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const (
+var (
 	// Version is the version of unified-ci
-	Version = "0.1.3"
+	Version = "0.1.5-dev"
 )
 
 func main() {
@@ -36,7 +36,7 @@ func main() {
 		return
 	}
 	if *showVersion {
-		fmt.Printf(checker.UserAgent() + "\n\n")
+		fmt.Printf(checker.UserAgent() + "\n")
 		return
 	}
 	if *configPath == "" {
