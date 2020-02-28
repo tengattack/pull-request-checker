@@ -232,14 +232,25 @@ func testAndSaveCoverage(ctx context.Context, ref GithubRef, testName string, cm
 }
 
 type logDivider struct {
-	bufferedLog bool
-	Log         io.Writer
-	lm          *sync.Mutex
+	buffered bool
+	Log      io.Writer
+	lm       *sync.Mutex
+}
+
+func NewLogDrivider(buffered bool, log io.Writer) *logDivider {
+	lg := &logDivider{
+		buffered: buffered,
+		Log:      log,
+	}
+	if buffered {
+		lg.lm = new(sync.Mutex)
+	}
+	return lg
 }
 
 func (lg *logDivider) log(f func(io.Writer)) {
 	var w io.Writer
-	if lg.bufferedLog {
+	if lg.buffered {
 		w = new(bytes.Buffer)
 	} else {
 		w = lg.Log
@@ -247,7 +258,7 @@ func (lg *logDivider) log(f func(io.Writer)) {
 
 	f(w)
 
-	if lg.bufferedLog {
+	if lg.buffered {
 		lg.lm.Lock()
 		defer lg.lm.Unlock()
 		lg.Log.Write(w.(*bytes.Buffer).Bytes())

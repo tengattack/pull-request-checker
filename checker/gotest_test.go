@@ -7,7 +7,6 @@ import (
 	"path"
 	"runtime"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
@@ -57,11 +56,7 @@ func TestLogDivider(t *testing.T) {
 	assert := assert.New(t)
 
 	var b bytes.Buffer
-	lg := logDivider{
-		bufferedLog: true,
-		Log:         &b,
-		lm:          new(sync.Mutex),
-	}
+	lg := NewLogDrivider(true, &b)
 	var eg errgroup.Group
 	eg.Go(func() error {
 		lg.log(
@@ -107,7 +102,7 @@ func TestLogDivider(t *testing.T) {
 	assert.Contains(s, "789")
 
 	b.Reset()
-	lg.bufferedLog = false
+	lg = NewLogDrivider(false, &b)
 	c := make(chan int)
 
 	go lg.log(func(w io.Writer) {
