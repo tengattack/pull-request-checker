@@ -231,16 +231,18 @@ func testAndSaveCoverage(ctx context.Context, ref GithubRef, testName string, cm
 	return
 }
 
-type logDivider struct {
+// LogDivider provides the method to log stuff in parallel
+type LogDivider struct {
 	buffered bool
-	Log      io.Writer
+	log      io.Writer
 	lm       *sync.Mutex
 }
 
-func NewLogDrivider(buffered bool, log io.Writer) *logDivider {
-	lg := &logDivider{
+// NewLogDivider returns a new LogDivider
+func NewLogDivider(buffered bool, log io.Writer) *LogDivider {
+	lg := &LogDivider{
 		buffered: buffered,
-		Log:      log,
+		log:      log,
 	}
 	if buffered {
 		lg.lm = new(sync.Mutex)
@@ -248,12 +250,13 @@ func NewLogDrivider(buffered bool, log io.Writer) *logDivider {
 	return lg
 }
 
-func (lg *logDivider) log(f func(io.Writer)) {
+// Log logs the given function f using LogDivider lg
+func (lg *LogDivider) Log(f func(io.Writer)) {
 	var w io.Writer
 	if lg.buffered {
 		w = new(bytes.Buffer)
 	} else {
-		w = lg.Log
+		w = lg.log
 	}
 
 	f(w)
@@ -261,6 +264,6 @@ func (lg *logDivider) log(f func(io.Writer)) {
 	if lg.buffered {
 		lg.lm.Lock()
 		defer lg.lm.Unlock()
-		lg.Log.Write(w.(*bytes.Buffer).Bytes())
+		lg.log.Write(w.(*bytes.Buffer).Bytes())
 	}
 }

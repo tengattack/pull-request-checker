@@ -893,7 +893,7 @@ func checkTests(ctx context.Context, repoPath string, tests map[string]goTestsCo
 	if len(tests) > 1 {
 		bufferedLog = true
 	}
-	t.logDivider = NewLogDrivider(bufferedLog, log)
+	t.LogDivider = NewLogDivider(bufferedLog, log)
 	var headCoverage sync.Map
 	failedTests, passedTests, errTests = runTests(tests, t, &headCoverage)
 
@@ -919,7 +919,7 @@ type testRunner interface {
 }
 
 type testReporter struct {
-	*logDivider
+	*LogDivider
 
 	RepoPath  string
 	Client    *github.Client
@@ -929,7 +929,7 @@ type testReporter struct {
 }
 
 func (t *testReporter) Run(testName string, testConfig goTestsConfig) (reportMessage string, err error) {
-	t.log(func(w io.Writer) {
+	t.Log(func(w io.Writer) {
 		reportMessage, err = ReportTestResults(testName, t.RepoPath, testConfig.Cmds, testConfig.Coverage, t.Client, t.Pull,
 			t.Ref, t.TargetURL, w)
 	})
@@ -1066,7 +1066,7 @@ func findBaseCoverage(baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun m
 		if len(baseTestsNeedToRun) > 1 {
 			bufferedLog = true
 		}
-		t.logDivider = NewLogDrivider(bufferedLog, log)
+		t.LogDivider = NewLogDivider(bufferedLog, log)
 		runTests(baseTestsNeedToRun, t, baseCoverage)
 
 		io.WriteString(log, "$ git checkout -f "+ref.Sha+"\n")
@@ -1089,7 +1089,7 @@ func findBaseCoverage(baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun m
 }
 
 type baseTestAndSave struct {
-	*logDivider
+	*LogDivider
 
 	Ref      GithubRef
 	BaseSHA  string
@@ -1099,7 +1099,7 @@ type baseTestAndSave struct {
 
 func (t *baseTestAndSave) Run(testName string, testConfig goTestsConfig) (string, error) {
 	var reportMessage string
-	t.log(func(w io.Writer) {
+	t.Log(func(w io.Writer) {
 		ref := t.Ref
 		ref.Sha = t.BaseSHA
 		if ref.checkType == CheckTypePRHead {

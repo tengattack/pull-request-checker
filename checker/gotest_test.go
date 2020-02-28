@@ -56,10 +56,10 @@ func TestLogDivider(t *testing.T) {
 	assert := assert.New(t)
 
 	var b bytes.Buffer
-	lg := NewLogDrivider(true, &b)
+	lg := NewLogDivider(true, &b)
 	var eg errgroup.Group
 	eg.Go(func() error {
-		lg.log(
+		lg.Log(
 			func(w io.Writer) {
 				_, _ = w.Write([]byte{byte('1')})
 				time.Sleep(1 * time.Millisecond)
@@ -71,7 +71,7 @@ func TestLogDivider(t *testing.T) {
 		return nil
 	})
 	eg.Go(func() error {
-		lg.log(
+		lg.Log(
 			func(w io.Writer) {
 				_, _ = w.Write([]byte{byte('4')})
 				time.Sleep(1 * time.Millisecond)
@@ -83,7 +83,7 @@ func TestLogDivider(t *testing.T) {
 		return nil
 	})
 	eg.Go(func() error {
-		lg.log(
+		lg.Log(
 			func(w io.Writer) {
 				_, _ = w.Write([]byte{byte('7')})
 				time.Sleep(1 * time.Millisecond)
@@ -102,10 +102,10 @@ func TestLogDivider(t *testing.T) {
 	assert.Contains(s, "789")
 
 	b.Reset()
-	lg = NewLogDrivider(false, &b)
+	lg = NewLogDivider(false, &b)
 	c := make(chan int)
 
-	go lg.log(func(w io.Writer) {
+	go lg.Log(func(w io.Writer) {
 		for i := 1; i <= 2; i++ {
 			_, _ = w.Write([]byte(strconv.Itoa(i)))
 			_, _ = w.Write([]byte{byte('\n')})
