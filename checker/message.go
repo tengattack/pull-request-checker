@@ -884,12 +884,14 @@ func checkTests(ctx context.Context, repoPath string, tests map[string]goTestsCo
 
 	t := &testReporter{
 		Log:       log,
-		lm:        new(sync.Mutex),
 		RepoPath:  repoPath,
 		Client:    client,
 		Pull:      gpull,
 		Ref:       ref,
 		TargetURL: targetURL,
+	}
+	if len(tests) > 1 {
+		t.bufferedLog = true
 	}
 	var headCoverage sync.Map
 	failedTests, passedTests, errTests = runTests(tests, t, &headCoverage)
@@ -916,8 +918,9 @@ type testRunner interface {
 }
 
 type testReporter struct {
-	Log io.Writer
-	lm  *sync.Mutex
+	bufferedLog bool
+	Log         io.Writer
+	lm          *sync.Mutex
 
 	RepoPath  string
 	Client    *github.Client
@@ -927,12 +930,23 @@ type testReporter struct {
 }
 
 func (t *testReporter) Run(testName string, testConfig goTestsConfig) (string, error) {
-	var buf bytes.Buffer
+	var w io.Writer
+	if t.bufferedLog {
+		w = new(bytes.Buffer)
+		t.lm = new(sync.Mutex)
+	} else {
+		w = t.Log
+	}
+
 	reportMessage, err := ReportTestResults(testName, t.RepoPath, testConfig.Cmds, testConfig.Coverage, t.Client, t.Pull,
-		t.Ref, t.TargetURL, &buf)
-	t.lm.Lock()
-	defer t.lm.Unlock()
-	t.Log.Write(buf.Bytes())
+		t.Ref, t.TargetURL, w)
+
+	if t.bufferedLog {
+		t.lm.Lock()
+		defer t.lm.Unlock()
+		t.Log.Write(w.(*bytes.Buffer).Bytes())
+	}
+
 	return reportMessage, err
 }
 
@@ -1065,6 +1079,9 @@ func findBaseCoverage(baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun m
 			RepoPath: repoPath,
 			Pull:     gpull,
 		}
+		if len(baseTestsNeedToRun) > 1 {
+			t.bufferedLog = true
+		}
 		runTests(baseTestsNeedToRun, t, baseCoverage)
 
 		io.WriteString(log, "$ git checkout -f "+ref.Sha+"\n")
@@ -1087,8 +1104,9 @@ func findBaseCoverage(baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun m
 }
 
 type baseTestAndSave struct {
-	Log io.Writer
-	lm  *sync.Mutex
+	bufferedLog bool
+	Log         io.Writer
+	lm          *sync.Mutex
 
 	Ref      GithubRef
 	BaseSHA  string
@@ -1097,17 +1115,28 @@ type baseTestAndSave struct {
 }
 
 func (t *baseTestAndSave) Run(testName string, testConfig goTestsConfig) (string, error) {
-	var buf bytes.Buffer
+	var w io.Writer
+	if t.bufferedLog {
+		w = new(bytes.Buffer)
+		t.lm = new(sync.Mutex)
+	} else {
+		w = t.Log
+	}
+
 	ref := t.Ref
 	ref.Sha = t.BaseSHA
-
 	if ref.checkType == CheckTypePRHead {
 		ref.checkType = CheckTypePRBase
 	}
+
 	_, reportMessage, _ := testAndSaveCoverage(context.TODO(), ref,
-		testName, testConfig.Cmds, testConfig.Coverage, t.RepoPath, t.Pull, true, &buf)
-	t.lm.Lock()
-	defer t.lm.Unlock()
-	t.Log.Write(buf.Bytes())
+		testName, testConfig.Cmds, testConfig.Coverage, t.RepoPath, t.Pull, true, w)
+
+	if t.bufferedLog {
+		t.lm.Lock()
+		defer t.lm.Unlock()
+		t.Log.Write(w.(*bytes.Buffer).Bytes())
+	}
+
 	return reportMessage, nil
 }
