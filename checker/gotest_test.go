@@ -7,6 +7,7 @@ import (
 	"path"
 	"runtime"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,10 +39,13 @@ func TestCoverRegex(t *testing.T) {
 	var result string
 	var output string
 	var pct float64
+	log := new(strings.Builder)
 	for _, cmd := range test.Cmds {
-		out, errCmd := carry(context.Background(), parser, repo, cmd)
+		out := new(strings.Builder)
+		w := io.MultiWriter(log, out)
+		errCmd := carry(context.Background(), parser, repo, cmd, w)
 		assert.NoError(errCmd)
-		output += ("\n" + out)
+		output += ("\n" + out.String())
 	}
 
 	if test.Coverage != "" {

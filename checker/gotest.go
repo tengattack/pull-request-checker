@@ -8,6 +8,7 @@ import (
 	"io"
 	"os/exec"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 
@@ -28,19 +29,21 @@ func (t *testNotPass) Error() (s string) {
 	return
 }
 
-func carry(ctx context.Context, p *shellwords.Parser, repo, cmd string) (string, error) {
+func carry(ctx context.Context, p *shellwords.Parser, repo, cmd string, log io.Writer) error {
 	words, err := p.Parse(cmd)
 	if err != nil {
-		return "", err
+		return err
 	}
 	if len(words) < 1 {
-		return "", errors.New("invalid command")
+		return errors.New("invalid command")
 	}
 
 	cmds := exec.CommandContext(ctx, words[0], words[1:]...)
 	cmds.Dir = repo
-	out, err := cmds.CombinedOutput()
-	return string(out), err
+	cmds.Stdout = log
+	cmds.Stderr = log
+
+	return cmds.Run()
 }
 
 // ReportTestResults reports the test results to github
@@ -149,14 +152,17 @@ func testAndSaveCoverage(ctx context.Context, ref GithubRef, testName string, cm
 	conclusion = "success"
 	for _, cmd := range cmds {
 		if cmd != "" {
-			out, errCmd := carry(ctx, parser, repoPath, cmd)
-			msg := cmd + "\n" + out + "\n"
+			_, _ = io.WriteString(log, cmd+"\n")
+			out := new(strings.Builder)
+			tee := io.MultiWriter(log, out)
+			errCmd := carry(ctx, parser, repoPath, cmd, tee)
+			outputSummary += cmd + "\n" + out.String() + "\n"
 			if errCmd != nil {
-				msg += errCmd.Error() + "\n"
+				errMsg := errCmd.Error() + "\n"
+				outputSummary += errMsg
+				_, _ = io.WriteString(log, errMsg)
 			}
 
-			_, _ = io.WriteString(log, msg)
-			outputSummary += msg
 			if errCmd != nil {
 				conclusion = "failure"
 				if breakOnFails {
