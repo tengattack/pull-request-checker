@@ -97,7 +97,7 @@ func TestLogDivider(t *testing.T) {
 		)
 		return nil
 	})
-	eg.Wait()
+	_ = eg.Wait()
 
 	s := b.String()
 	assert.Contains(s, "123")
