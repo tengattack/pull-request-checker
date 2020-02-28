@@ -64,11 +64,11 @@ func TestLogDivider(t *testing.T) {
 	eg.Go(func() error {
 		lg.log(
 			func(w io.Writer) {
-				w.Write([]byte{byte('1')})
+				_, _ = w.Write([]byte{byte('1')})
 				time.Sleep(1 * time.Millisecond)
-				w.Write([]byte{byte('2')})
+				_, _ = w.Write([]byte{byte('2')})
 				time.Sleep(1 * time.Millisecond)
-				w.Write([]byte{byte('3')})
+				_, _ = w.Write([]byte{byte('3')})
 			},
 		)
 		return nil
@@ -76,11 +76,11 @@ func TestLogDivider(t *testing.T) {
 	eg.Go(func() error {
 		lg.log(
 			func(w io.Writer) {
-				w.Write([]byte{byte('4')})
+				_, _ = w.Write([]byte{byte('4')})
 				time.Sleep(1 * time.Millisecond)
-				w.Write([]byte{byte('5')})
+				_, _ = w.Write([]byte{byte('5')})
 				time.Sleep(1 * time.Millisecond)
-				w.Write([]byte{byte('6')})
+				_, _ = w.Write([]byte{byte('6')})
 			},
 		)
 		return nil
@@ -88,11 +88,11 @@ func TestLogDivider(t *testing.T) {
 	eg.Go(func() error {
 		lg.log(
 			func(w io.Writer) {
-				w.Write([]byte{byte('7')})
+				_, _ = w.Write([]byte{byte('7')})
 				time.Sleep(1 * time.Millisecond)
-				w.Write([]byte{byte('8')})
+				_, _ = w.Write([]byte{byte('8')})
 				time.Sleep(1 * time.Millisecond)
-				w.Write([]byte{byte('9')})
+				_, _ = w.Write([]byte{byte('9')})
 			},
 		)
 		return nil
@@ -110,8 +110,8 @@ func TestLogDivider(t *testing.T) {
 
 	go lg.log(func(w io.Writer) {
 		for i := 1; i <= 2; i++ {
-			w.Write([]byte(strconv.Itoa(i)))
-			w.Write([]byte{byte('\n')})
+			_, _ = w.Write([]byte(strconv.Itoa(i)))
+			_, _ = w.Write([]byte{byte('\n')})
 			c <- 0
 		}
 	})
