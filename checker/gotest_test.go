@@ -1,14 +1,19 @@
 package checker
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"path"
 	"runtime"
+	"strconv"
 	"testing"
+	"time"
 
 	shellwords "github.com/mattn/go-shellwords"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
 )
 
 func TestCoverRegex(t *testing.T) {
@@ -45,4 +50,74 @@ func TestCoverRegex(t *testing.T) {
 	}
 	assert.Regexp(percentageRegexp, result)
 	assert.True(pct > 0)
+}
+
+func TestLogDivider(t *testing.T) {
+	assert := assert.New(t)
+
+	var b bytes.Buffer
+	lg := logDivider{
+		bufferedLog: true,
+		Log:         &b,
+	}
+	var eg errgroup.Group
+	eg.Go(func() error {
+		lg.log(
+			func(w io.Writer) {
+				w.Write([]byte{byte('1')})
+				time.Sleep(1 * time.Millisecond)
+				w.Write([]byte{byte('2')})
+				time.Sleep(1 * time.Millisecond)
+				w.Write([]byte{byte('3')})
+			},
+		)
+		return nil
+	})
+	eg.Go(func() error {
+		lg.log(
+			func(w io.Writer) {
+				w.Write([]byte{byte('4')})
+				time.Sleep(1 * time.Millisecond)
+				w.Write([]byte{byte('5')})
+				time.Sleep(1 * time.Millisecond)
+				w.Write([]byte{byte('6')})
+			},
+		)
+		return nil
+	})
+	eg.Go(func() error {
+		lg.log(
+			func(w io.Writer) {
+				w.Write([]byte{byte('7')})
+				time.Sleep(1 * time.Millisecond)
+				w.Write([]byte{byte('8')})
+				time.Sleep(1 * time.Millisecond)
+				w.Write([]byte{byte('9')})
+			},
+		)
+		return nil
+	})
+	eg.Wait()
+
+	s := b.String()
+	assert.Contains(s, "123")
+	assert.Contains(s, "456")
+	assert.Contains(s, "789")
+
+	b.Reset()
+	lg.bufferedLog = false
+	c := make(chan int)
+
+	go lg.log(func(w io.Writer) {
+		for i := 1; i <= 2; i++ {
+			w.Write([]byte(strconv.Itoa(i)))
+			w.Write([]byte{byte('\n')})
+			c <- 0
+		}
+	})
+	for i := 1; i <= 2; i++ {
+		<-c
+		line, _ := b.ReadString('\n')
+		assert.Equal(strconv.Itoa(i)+"\n", line)
+	}
 }

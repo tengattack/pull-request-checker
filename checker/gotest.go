@@ -1,12 +1,14 @@
 package checker
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os/exec"
 	"regexp"
+	"sync"
 	"time"
 
 	"github.com/google/go-github/github"
@@ -227,4 +229,28 @@ func testAndSaveCoverage(ctx context.Context, ref GithubRef, testName string, cm
 	}
 	_, _ = io.WriteString(log, "\n")
 	return
+}
+
+type logDivider struct {
+	bufferedLog bool
+	Log         io.Writer
+	lm          *sync.Mutex
+}
+
+func (lg logDivider) log(f func(io.Writer)) {
+	var w io.Writer
+	if lg.bufferedLog {
+		w = new(bytes.Buffer)
+		lg.lm = new(sync.Mutex)
+	} else {
+		w = lg.Log
+	}
+
+	f(w)
+
+	if lg.bufferedLog {
+		lg.lm.Lock()
+		defer lg.lm.Unlock()
+		lg.Log.Write(w.(*bytes.Buffer).Bytes())
+	}
 }
