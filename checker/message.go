@@ -889,11 +889,7 @@ func checkTests(ctx context.Context, repoPath string, tests map[string]goTestsCo
 		Ref:       ref,
 		TargetURL: targetURL,
 	}
-	bufferedLog := false
-	if len(tests) > 1 {
-		bufferedLog = true
-	}
-	t.LogDivider = NewLogDivider(bufferedLog, log)
+	t.LogDivider = NewLogDivider(len(tests) > 1, log)
 	var headCoverage sync.Map
 	failedTests, passedTests, errTests = runTests(tests, t, &headCoverage)
 
@@ -1062,11 +1058,7 @@ func findBaseCoverage(baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun m
 			RepoPath: repoPath,
 			Pull:     gpull,
 		}
-		bufferedLog := false
-		if len(baseTestsNeedToRun) > 1 {
-			bufferedLog = true
-		}
-		t.LogDivider = NewLogDivider(bufferedLog, log)
+		t.LogDivider = NewLogDivider(len(baseTestsNeedToRun) > 1, log)
 		runTests(baseTestsNeedToRun, t, baseCoverage)
 
 		io.WriteString(log, "$ git checkout -f "+ref.Sha+"\n")
