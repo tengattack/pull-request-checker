@@ -7,6 +7,7 @@ import (
 	"path"
 	"runtime"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
@@ -59,6 +60,7 @@ func TestLogDivider(t *testing.T) {
 	lg := logDivider{
 		bufferedLog: true,
 		Log:         &b,
+		lm:          new(sync.Mutex),
 	}
 	var eg errgroup.Group
 	eg.Go(func() error {

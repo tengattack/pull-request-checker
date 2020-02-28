@@ -892,6 +892,7 @@ func checkTests(ctx context.Context, repoPath string, tests map[string]goTestsCo
 	}
 	if len(tests) > 1 {
 		t.bufferedLog = true
+		t.lm = new(sync.Mutex)
 	}
 	var headCoverage sync.Map
 	failedTests, passedTests, errTests = runTests(tests, t, &headCoverage)
@@ -1065,6 +1066,7 @@ func findBaseCoverage(baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun m
 		}
 		if len(baseTestsNeedToRun) > 1 {
 			t.bufferedLog = true
+			t.lm = new(sync.Mutex)
 		}
 		runTests(baseTestsNeedToRun, t, baseCoverage)
 

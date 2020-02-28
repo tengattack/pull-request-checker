@@ -19,6 +19,7 @@ require (
 	github.com/sirupsen/logrus v1.4.2
 	github.com/sourcegraph/go-diff v0.5.1
 	github.com/sqs/goreturns v0.0.0-20181028201513-538ac6014518
+	github.com/stretchr/testify v1.4.0
 	github.com/thoas/stats v0.0.0-20190407194641-965cb2de1678
 	golang.org/x/lint v0.0.0-20191125180803-fdd1cda4f05f
 	golang.org/x/net v0.0.0-20190620200207-3b0461eec859

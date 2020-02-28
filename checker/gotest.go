@@ -241,7 +241,6 @@ func (lg *logDivider) log(f func(io.Writer)) {
 	var w io.Writer
 	if lg.bufferedLog {
 		w = new(bytes.Buffer)
-		lg.lm = new(sync.Mutex)
 	} else {
 		w = lg.Log
 	}
