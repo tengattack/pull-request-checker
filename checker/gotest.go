@@ -237,7 +237,7 @@ type logDivider struct {
 	lm          *sync.Mutex
 }
 
-func (lg logDivider) log(f func(io.Writer)) {
+func (lg *logDivider) log(f func(io.Writer)) {
 	var w io.Writer
 	if lg.bufferedLog {
 		w = new(bytes.Buffer)
