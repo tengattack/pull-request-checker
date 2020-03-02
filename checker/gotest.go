@@ -154,8 +154,7 @@ func testAndSaveCoverage(ctx context.Context, ref GithubRef, testName string, cm
 		if cmd != "" {
 			_, _ = io.WriteString(log, cmd+"\n")
 			out := new(strings.Builder)
-			tee := io.MultiWriter(log, out)
-			errCmd := carry(ctx, parser, repoPath, cmd, tee)
+			errCmd := carry(ctx, parser, repoPath, cmd, io.MultiWriter(log, out))
 			outputSummary += cmd + "\n" + out.String() + "\n"
 			if errCmd != nil {
 				errMsg := errCmd.Error() + "\n"
