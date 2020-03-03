@@ -19,7 +19,7 @@ import (
 
 var (
 	// Version is the version of unified-ci
-	Version = "0.1.5-dev"
+	Version = "0.1.6-dev"
 )
 
 func main() {

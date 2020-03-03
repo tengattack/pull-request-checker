@@ -1,6 +1,9 @@
-*.git* text eol=lf
+.git* text eol=lf
+.docker* text eol=lf
 *.go text eol=lf
 *.md text eol=lf
 *.yml text eol=lf
 *.diff text eol=lf
 *.pem text eol=lf
+Dockerfile text eol=lf
+Makefile text eol=lf

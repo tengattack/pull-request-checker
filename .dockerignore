@@ -1,0 +1,7 @@
+.git*
+.docker*
+Dockerfile
+
+unified-ci
+
+config.yml
