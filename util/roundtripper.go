@@ -16,12 +16,15 @@ import (
 var JWTClient *github.Client
 
 // InitJWTClient initializes the jwtClient
-func InitJWTClient(id int64, privateKeyFile string) error {
+func InitJWTClient(id int64, privateKeyFile string, tr http.RoundTripper) error {
 	privateKey, err := ioutil.ReadFile(privateKeyFile)
 	if err != nil {
 		return fmt.Errorf("could not read private key: %s", err)
 	}
-	tr := newJWTRoundTripper(id, privateKey, http.DefaultTransport)
+	if tr == nil {
+		tr = http.DefaultTransport
+	}
+	tr = newJWTRoundTripper(id, privateKey, tr)
 	JWTClient = github.NewClient(&http.Client{Transport: tr})
 	return nil
 }

@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -14,6 +16,7 @@ import (
 	"github.com/tengattack/unified-ci/config"
 	"github.com/tengattack/unified-ci/store"
 	"github.com/tengattack/unified-ci/util"
+	"golang.org/x/net/proxy"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -61,7 +64,18 @@ func main() {
 		log.Fatalf("error: %v", err)
 	}
 
-	if err = util.InitJWTClient(conf.GitHub.AppID, conf.GitHub.PrivateKey); err != nil {
+	var tr http.RoundTripper
+	if checker.Conf.Core.Socks5Proxy != "" {
+		dialSocksProxy, err := proxy.SOCKS5("tcp", checker.Conf.Core.Socks5Proxy, nil, proxy.Direct)
+		if err != nil {
+			msg := "Setup proxy failed: " + err.Error()
+			err = errors.New(msg)
+			log.Fatalf("error: %v", err)
+		}
+		tr = &http.Transport{Dial: dialSocksProxy.Dial}
+	}
+
+	if err = util.InitJWTClient(conf.GitHub.AppID, conf.GitHub.PrivateKey, tr); err != nil {
 		log.Fatalf("error: %v", err)
 	}
 
