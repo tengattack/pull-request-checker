@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -821,6 +822,34 @@ func APIDoc(ctx context.Context, ref GithubRef, cwd string) (string, error) {
 	cmd.Dir = cwd
 	output, err := cmd.CombinedOutput()
 	return string(output) + "\n", err
+}
+
+// CheckFileMode checks repo's files' mode
+func CheckFileMode(log io.StringWriter, repoPath string, ignore ...string) (string, int, error) {
+	stats, err := walkRepo(log, repoPath, ignore...)
+	if err != nil {
+		return "", 0, err
+	}
+	problem := 0
+	var msg strings.Builder
+	for _, s := range stats {
+		switch strings.ToLower(filepath.Ext(s.Name())) {
+		case ".js", ".py", ".sh":
+			if s.Mode().Perm() != 0755 {
+				problem = 1
+				msg.WriteString(fmt.Sprintf("%s, %o\n", s.Name(), s.Mode().Perm()))
+			}
+		default:
+			if s.Mode().Perm() != 0644 {
+				problem = 1
+				msg.WriteString(fmt.Sprintf("%s, %o\n", s.Name(), s.Mode().Perm()))
+			}
+		}
+	}
+	if problem > 0 {
+		msg.WriteString("Found incorrect file modes.\n")
+	}
+	return msg.String(), problem, nil
 }
 
 // CheckstyleResult struct represents a list of gradle checkstyle files

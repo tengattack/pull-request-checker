@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -269,4 +270,27 @@ func getTrimmedNewName(d *diff.FileDiff) (string, bool) {
 		return newName[2:], true
 	}
 	return newName, false
+}
+
+func walkRepo(log io.StringWriter, root string, ignore ...string) (stats []os.FileInfo, err error) {
+	root, err = filepath.EvalSymlinks(root)
+	if err != nil {
+		return nil, err
+	}
+	for i, v := range ignore {
+		ignore[i] = filepath.Join(root, v)
+	}
+	err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.WriteString(fmt.Sprintf("%s: %v\n", path, err))
+		} else if MatchAny(ignore, path) {
+			return nil
+		} else if info != nil {
+			if info.Mode().IsRegular() {
+				stats = append(stats, info)
+			}
+		}
+		return nil
+	})
+	return stats, err
 }

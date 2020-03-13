@@ -3,6 +3,7 @@ package checker
 import (
 	"encoding/xml"
 	"io/ioutil"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -33,4 +34,14 @@ func TestOCLintResultXML(t *testing.T) {
 	err = xml.Unmarshal(out, &violations)
 	assert.NoError(err)
 	assert.NotEmpty(violations)
+}
+
+func TestCheckFileMode(t *testing.T) {
+	assert := assert.New(t)
+
+	var buf strings.Builder
+	msg, problems, err := CheckFileMode(&buf, "../testdata/src")
+	assert.NoError(err)
+	assert.Equal(problems, 0)
+	assert.Empty(msg)
 }
