@@ -837,8 +837,8 @@ func checkLints(ctx context.Context, client *github.Client, gpull *github.PullRe
 	repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled, ignoredPath []string, log *os.File) (problems int, err error) {
 
 	t := github.Timestamp{Time: time.Now()}
-	outputTitle := "linter"
-	checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
+	checkName := "linter"
+	checkRun, err := CreateCheckRun(ctx, client, gpull, checkName, ref, targetURL)
 	if err != nil {
 		return 0, err
 	}
@@ -861,20 +861,23 @@ func checkLints(ctx context.Context, client *github.Client, gpull *github.PullRe
 
 	var (
 		conclusion    string
+		outputTitle   string
 		outputSummary string
 	)
 
 	if failedLints > 0 {
 		conclusion = "failure"
+		outputTitle = fmt.Sprintf("%d problem(s) found", failedLints)
 		outputSummary = fmt.Sprintf("The lint check failed! %d problem(s) found.\n", failedLints)
 		if notes != "" {
 			outputSummary += "```\n" + notes + "\n```"
 		}
 	} else {
 		conclusion = "success"
+		outputTitle = "no problems found"
 		outputSummary = "The lint check succeed!"
 	}
-	err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, outputTitle, outputSummary, annotations)
+	err = UpdateCheckRun(ctx, client, gpull, checkRunID, checkName, conclusion, t, outputTitle, outputSummary, annotations)
 	return failedLints, err
 }
 
