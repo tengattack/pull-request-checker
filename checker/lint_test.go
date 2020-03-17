@@ -3,9 +3,11 @@ package checker
 import (
 	"encoding/xml"
 	"io/ioutil"
+	"path"
 	"strings"
 	"testing"
 
+	"github.com/sourcegraph/go-diff/diff"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -38,10 +40,19 @@ func TestOCLintResultXML(t *testing.T) {
 
 func TestCheckFileMode(t *testing.T) {
 	assert := assert.New(t)
+	require := require.New(t)
+
+	repoPath := "../testdata/src"
+	fileName := "src.diff"
+	out, err := ioutil.ReadFile(path.Join(repoPath, fileName))
+	require.NoError(err)
+
+	diffs, err := diff.ParseMultiFileDiff(out)
+	require.NoError(err)
 
 	var buf strings.Builder
-	msg, problems, err := CheckFileMode(&buf, "../testdata/src")
+	lints, problems, err := CheckFileMode(diffs, repoPath, &buf)
 	assert.NoError(err)
 	assert.Equal(problems, 0)
-	assert.Empty(msg)
+	assert.Empty(lints)
 }

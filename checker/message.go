@@ -59,16 +59,15 @@ func GenerateAnnotations(ctx context.Context, ref GithubRef, repoPath string, di
 	ignoredPath []string, log *os.File) (
 	outputSummary string, annotations []*github.CheckRunAnnotation, problems int, err error) {
 	var (
-		outputSummaryArr [2]string
-		annotationsArr   [2][]*github.CheckRunAnnotation
-		problemsArr      [3]int
-		bufArr           [3]strings.Builder
+		annotationsArr [3][]*github.CheckRunAnnotation
+		problemsArr    [3]int
+		bufArr         [3]strings.Builder
 	)
 
 	var eg errgroup.Group
 	eg.Go(func() error {
 		var err error
-		outputSummaryArr[0], annotationsArr[0], problemsArr[0], err = lintRepo(ctx, ref, repoPath, diffs, lintEnabled, &bufArr[0])
+		outputSummary, annotationsArr[0], problemsArr[0], err = lintRepo(ctx, ref, repoPath, diffs, lintEnabled, &bufArr[0])
 		return err
 	})
 	eg.Go(func() error {
@@ -78,12 +77,11 @@ func GenerateAnnotations(ctx context.Context, ref GithubRef, repoPath string, di
 	})
 	eg.Go(func() error {
 		var err error
-		outputSummaryArr[1], problemsArr[2], err = CheckFileMode(&bufArr[2], repoPath, append(ignoredPath, ".git")...)
+		annotationsArr[2], problemsArr[2], err = CheckFileMode(diffs, repoPath, &bufArr[2])
 		return err
 	})
 	err = eg.Wait()
 
-	outputSummary = outputSummaryArr[0] + outputSummaryArr[1]
 	annotations = append(annotations, annotationsArr[0]...)
 	annotations = append(annotations, annotationsArr[1]...)
 	problems += problemsArr[0]
