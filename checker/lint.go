@@ -825,6 +825,13 @@ func APIDoc(ctx context.Context, ref GithubRef, cwd string) (string, error) {
 	return string(output) + "\n", err
 }
 
+const (
+	fileModeCheckNormal      = "Normal file permission should be 0644"
+	fileModeCheckExecutable  = "Executable file permission should be 0755"
+	fileModeCheckShellScript = "Shell script file permission should be 0755"
+	shebangCheckShellScript  = "Shell script file should start with #!"
+)
+
 // CheckFileMode checks repo's files' mode
 func CheckFileMode(diffs []*diff.FileDiff, repoPath string, log io.StringWriter) ([]*github.CheckRunAnnotation, int, error) {
 	startLine := 1
@@ -836,17 +843,18 @@ func CheckFileMode(diffs []*diff.FileDiff, repoPath string, log io.StringWriter)
 	for _, d := range diffs {
 		fileName, _ := getTrimmedNewName(d)
 		filePath := filepath.Join(repoPath, fileName)
-		s, err := os.Stat(filePath)
-		if err != nil {
-			log.WriteString(fmt.Sprintf("Failed to access %s: %v\n", fileName, err))
+		mode, _ := parseFileMode(d.Extended)
+		mode10, _ := strconv.Atoi(mode)
+		if mode10 == 0 {
+			log.WriteString(fmt.Sprintf("Failed to parse file mode of %s.\n", fileName))
 			continue
 		}
 		comment := ""
 		switch strings.ToLower(filepath.Ext(fileName)) {
 		case ".sh":
-			if s.Mode().Perm() != 0755 {
+			if mode10 != 755 {
 				problem++
-				comment = "File permission of .sh files should be 0755"
+				comment = fileModeCheckShellScript
 			} else {
 				lines, err := headFile(filePath, 1)
 				if err != nil {
@@ -854,9 +862,9 @@ func CheckFileMode(diffs []*diff.FileDiff, repoPath string, log io.StringWriter)
 					continue
 				}
 				if len(lines) > 0 {
-					if !strings.HasPrefix(lines[0], "!#") {
+					if !strings.HasPrefix(lines[0], "#!") {
 						problem++
-						comment = ".sh files should start with !#"
+						comment = shebangCheckShellScript
 					}
 				}
 			}
@@ -866,21 +874,21 @@ func CheckFileMode(diffs []*diff.FileDiff, repoPath string, log io.StringWriter)
 				log.WriteString(fmt.Sprintf("Failed to read %s: %v\n", fileName, err))
 				continue
 			}
-			if len(lines) > 0 && strings.HasPrefix(lines[0], "!#") {
-				if s.Mode().Perm() != 0755 {
+			if len(lines) > 0 && strings.HasPrefix(lines[0], "#!") {
+				if mode10 != 755 {
 					problem++
-					comment = "File permission of executable should be 0755"
+					comment = fileModeCheckExecutable
 				}
 			} else {
-				if s.Mode().Perm() != 0644 {
+				if mode10 != 644 {
 					problem++
-					comment = "File permission should be 0644"
+					comment = fileModeCheckNormal
 				}
 			}
 		default:
-			if s.Mode().Perm() != 0644 {
+			if mode10 != 644 {
 				problem++
-				comment = "File permission should be 0644"
+				comment = fileModeCheckNormal
 			}
 		}
 		if comment != "" {

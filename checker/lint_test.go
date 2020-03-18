@@ -53,6 +53,17 @@ func TestCheckFileMode(t *testing.T) {
 	var buf strings.Builder
 	lints, problems, err := CheckFileMode(diffs, repoPath, &buf)
 	assert.NoError(err)
-	assert.Equal(problems, 0)
-	assert.Empty(lints)
+	assert.Equal(3, problems)
+	for _, v := range lints {
+		switch v.GetPath() {
+		case "c.sh":
+			assert.Equal(fileModeCheckShellScript, v.GetMessage())
+		case "d.sh":
+			assert.Equal(shebangCheckShellScript, v.GetMessage())
+		case "h.py":
+			assert.Equal(fileModeCheckExecutable, v.GetMessage())
+		default:
+			assert.Fail(v.GetPath() + " should be ok")
+		}
+	}
 }

@@ -285,3 +285,20 @@ func headFile(file string, n int) (lines []string, err error) {
 	}
 	return lines, s.Err()
 }
+
+func parseFileMode(extended []string) (string, error) {
+	for _, v := range extended {
+		if strings.HasPrefix(v, "index") {
+			subs := strings.Split(v, " ")
+			if len(subs) > 2 {
+				if len(subs[2]) > 3 {
+					return subs[2][len(subs[2])-3:], nil
+				}
+				return "", errors.New("Unknown extended lines in git diff")
+			}
+		} else if strings.HasPrefix(v, "new file mode") {
+			return v[len(v)-3:], nil
+		}
+	}
+	return "", nil
+}

@@ -101,3 +101,23 @@ func TestHeadFile(t *testing.T) {
 	assert.Equal("a", lines[0])
 	assert.Equal("b", lines[1])
 }
+
+func TestParseFileMode(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	extendedLines := []string{
+		"index 13fe0dc..2332010 100644",
+	}
+	mode, err := parseFileMode(extendedLines)
+	require.NoError(err)
+	assert.Equal("644", mode)
+
+	extendedLines = []string{
+		"new file mode 100755",
+		"index 0000000..b54741c",
+	}
+	mode, err = parseFileMode(extendedLines)
+	require.NoError(err)
+	assert.Equal("755", mode)
+}
