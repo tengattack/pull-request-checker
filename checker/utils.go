@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -286,19 +287,21 @@ func headFile(file string, n int) (lines []string, err error) {
 	return lines, s.Err()
 }
 
-func parseFileMode(extended []string) (string, error) {
+func parseFileMode(extended []string) (int, error) {
 	for _, v := range extended {
 		if strings.HasPrefix(v, "index") {
 			subs := strings.Split(v, " ")
 			if len(subs) > 2 {
 				if len(subs[2]) > 3 {
-					return subs[2][len(subs[2])-3:], nil
+					mode, err := strconv.ParseInt(subs[2][len(subs[2])-3:], 8, 32)
+					return int(mode), err
 				}
-				return "", errors.New("Unknown extended lines in git diff")
+				return 0, errors.New("Unknown extended lines in git diff")
 			}
 		} else if strings.HasPrefix(v, "new file mode") {
-			return v[len(v)-3:], nil
+			mode, err := strconv.ParseInt(v[len(v)-3:], 8, 32)
+			return int(mode), err
 		}
 	}
-	return "", nil
+	return 0, nil
 }

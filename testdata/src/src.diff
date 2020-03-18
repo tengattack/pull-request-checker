@@ -5,13 +5,13 @@ index 0000000..4ef30bb
 +++ b/a
 @@ -0,0 +1 @@
 +file a
-diff --git a/b b/b
-new file mode 100644
+diff --git a/b.py b/b.py
+new file mode 100755
 index 0000000..4f2e652
 --- /dev/null
-+++ b/b
++++ b/b.py
 @@ -0,0 +1 @@
-+file b
++print 1
 diff --git a/c.sh b/c.sh
 new file mode 100644
 index 0000000..b35efa3

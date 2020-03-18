@@ -111,7 +111,7 @@ func TestParseFileMode(t *testing.T) {
 	}
 	mode, err := parseFileMode(extendedLines)
 	require.NoError(err)
-	assert.Equal("644", mode)
+	assert.Equal(0644, mode)
 
 	extendedLines = []string{
 		"new file mode 100755",
@@ -119,5 +119,5 @@ func TestParseFileMode(t *testing.T) {
 	}
 	mode, err = parseFileMode(extendedLines)
 	require.NoError(err)
-	assert.Equal("755", mode)
+	assert.Equal(0755, mode)
 }

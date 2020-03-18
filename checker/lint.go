@@ -844,15 +844,14 @@ func CheckFileMode(diffs []*diff.FileDiff, repoPath string, log io.StringWriter)
 		fileName, _ := getTrimmedNewName(d)
 		filePath := filepath.Join(repoPath, fileName)
 		mode, _ := parseFileMode(d.Extended)
-		mode10, _ := strconv.Atoi(mode)
-		if mode10 == 0 {
+		if mode == 0 {
 			log.WriteString(fmt.Sprintf("Failed to parse file mode of %s.\n", fileName))
 			continue
 		}
 		comment := ""
 		switch strings.ToLower(filepath.Ext(fileName)) {
 		case ".sh":
-			if mode10 != 755 {
+			if mode != 0755 {
 				problem++
 				comment = fileModeCheckShellScript
 			} else {
@@ -875,18 +874,18 @@ func CheckFileMode(diffs []*diff.FileDiff, repoPath string, log io.StringWriter)
 				continue
 			}
 			if len(lines) > 0 && strings.HasPrefix(lines[0], "#!") {
-				if mode10 != 755 {
+				if mode != 0755 {
 					problem++
 					comment = fileModeCheckExecutable
 				}
 			} else {
-				if mode10 != 644 {
+				if mode != 0644 {
 					problem++
 					comment = fileModeCheckNormal
 				}
 			}
 		default:
-			if mode10 != 644 {
+			if mode != 0644 {
 				problem++
 				comment = fileModeCheckNormal
 			}
