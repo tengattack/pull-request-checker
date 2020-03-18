@@ -1,0 +1,16 @@
+diff --git a/a/b b/a/b
+new file mode 100644
+index 0000000..8d776cf
+--- /dev/null
++++ b/a/b
+@@ -0,0 +1 @@
++file b
+\ No newline at end of file
+diff --git a/a/c.sh b/a/c.sh
+new file mode 100755
+index 0000000..b54741c
+--- /dev/null
++++ b/a/c.sh
+@@ -0,0 +1 @@
++echo c
+\ No newline at end of file

@@ -1,6 +1,7 @@
 package checker
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -269,4 +270,18 @@ func getTrimmedNewName(d *diff.FileDiff) (string, bool) {
 		return newName[2:], true
 	}
 	return newName, false
+}
+
+func headFile(file string, n int) (lines []string, err error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	s := bufio.NewScanner(f)
+	s.Split(bufio.ScanLines)
+	for i := 1; s.Scan() && i <= n; i++ {
+		lines = append(lines, s.Text())
+	}
+	return lines, s.Err()
 }

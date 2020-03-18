@@ -835,17 +835,47 @@ func CheckFileMode(diffs []*diff.FileDiff, repoPath string, log io.StringWriter)
 	annotations := make([]*github.CheckRunAnnotation, 0, len(diffs))
 	for _, d := range diffs {
 		fileName, _ := getTrimmedNewName(d)
-		s, err := os.Stat(filepath.Join(repoPath, fileName))
+		filePath := filepath.Join(repoPath, fileName)
+		s, err := os.Stat(filePath)
 		if err != nil {
 			log.WriteString(fmt.Sprintf("Failed to access %s: %v\n", fileName, err))
 			continue
 		}
 		comment := ""
 		switch strings.ToLower(filepath.Ext(fileName)) {
-		case ".js", ".py", ".sh":
+		case ".sh":
 			if s.Mode().Perm() != 0755 {
 				problem++
-				comment = "File permission of executable should be 0755"
+				comment = "File permission of .sh files should be 0755"
+			} else {
+				lines, err := headFile(filePath, 1)
+				if err != nil {
+					log.WriteString(fmt.Sprintf("Failed to read %s: %v\n", fileName, err))
+					continue
+				}
+				if len(lines) > 0 {
+					if !strings.HasPrefix(lines[0], "!#") {
+						problem++
+						comment = ".sh files should start with !#"
+					}
+				}
+			}
+		case ".js", ".py":
+			lines, err := headFile(filePath, 1)
+			if err != nil {
+				log.WriteString(fmt.Sprintf("Failed to read %s: %v\n", fileName, err))
+				continue
+			}
+			if len(lines) > 0 && strings.HasPrefix(lines[0], "!#") {
+				if s.Mode().Perm() != 0755 {
+					problem++
+					comment = "File permission of executable should be 0755"
+				}
+			} else {
+				if s.Mode().Perm() != 0644 {
+					problem++
+					comment = "File permission should be 0644"
+				}
 			}
 		default:
 			if s.Mode().Perm() != 0644 {
