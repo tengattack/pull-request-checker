@@ -86,11 +86,11 @@ func TestHeadFile(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	lines, err := headFile("../testdata/lines", 0)
-	require.NoError(err)
-	assert.Empty(lines)
+	assert.Panics(func() {
+		headFile("../testdata/lines", 0)
+	})
 
-	lines, err = headFile("../testdata/lines", 1)
+	lines, err := headFile("../testdata/lines", 1)
 	require.NoError(err)
 	assert.Len(lines, 1)
 	assert.Equal("a", lines[0])

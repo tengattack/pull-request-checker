@@ -993,7 +993,7 @@ func AndroidLint(ctx context.Context, ref GithubRef, cwd string) (*Issues, strin
 	}
 	if doCheckstyle {
 		outputs.WriteString("checkstyle:\n")
-		cmd := exec.Command(checkstyleWords[0], checkstyleWords[1:]...)
+		cmd := exec.CommandContext(ctx, checkstyleWords[0], checkstyleWords[1:]...)
 		cmd.Dir = cwd
 		output, err := cmd.CombinedOutput()
 		if err != nil {
@@ -1054,7 +1054,7 @@ func AndroidLint(ctx context.Context, ref GithubRef, cwd string) (*Issues, strin
 	}
 
 	outputs.WriteString("lint:\n")
-	cmd := exec.Command(words[0], words[1:]...)
+	cmd := exec.CommandContext(ctx, words[0], words[1:]...)
 	cmd.Dir = cwd
 	output, err := cmd.CombinedOutput()
 	if err != nil {
