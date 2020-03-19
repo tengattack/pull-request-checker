@@ -87,7 +87,7 @@ func TestHeadFile(t *testing.T) {
 	require := require.New(t)
 
 	assert.Panics(func() {
-		headFile("../testdata/lines", 0)
+		_, _ = headFile("../testdata/lines", 0)
 	})
 
 	lines, err := headFile("../testdata/lines", 1)

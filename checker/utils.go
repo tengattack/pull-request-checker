@@ -274,8 +274,8 @@ func getTrimmedNewName(d *diff.FileDiff) (string, bool) {
 }
 
 func headFile(file string, n int) (lines []string, err error) {
-	if n <= 0 {
-		panic("n <= 0")
+	if n < 1 {
+		panic("n should not be less than 1")
 	}
 	f, err := os.Open(file)
 	if err != nil {
