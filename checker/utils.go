@@ -1,6 +1,7 @@
 package checker
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -269,4 +271,40 @@ func getTrimmedNewName(d *diff.FileDiff) (string, bool) {
 		return newName[2:], true
 	}
 	return newName, false
+}
+
+func headFile(file string, n int) (lines []string, err error) {
+	if n < 1 {
+		panic("n should not be less than 1")
+	}
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	s := bufio.NewScanner(f)
+	s.Split(bufio.ScanLines)
+	for i := 1; s.Scan() && i <= n; i++ {
+		lines = append(lines, s.Text())
+	}
+	return lines, s.Err()
+}
+
+func parseFileMode(extended []string) (int, error) {
+	for _, v := range extended {
+		if strings.HasPrefix(v, "index") {
+			subs := strings.Split(v, " ")
+			if len(subs) > 2 {
+				if len(subs[2]) > 3 {
+					mode, err := strconv.ParseInt(subs[2][len(subs[2])-3:], 8, 32)
+					return int(mode), err
+				}
+				return 0, errors.New("Unknown extended lines in git diff")
+			}
+		} else if strings.HasPrefix(v, "new file mode") {
+			mode, err := strconv.ParseInt(v[len(v)-3:], 8, 32)
+			return int(mode), err
+		}
+	}
+	return 0, nil
 }

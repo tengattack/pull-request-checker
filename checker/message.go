@@ -59,29 +59,37 @@ func GenerateAnnotations(ctx context.Context, ref GithubRef, repoPath string, di
 	ignoredPath []string, log *os.File) (
 	outputSummary string, annotations []*github.CheckRunAnnotation, problems int, err error) {
 	var (
-		annotations1, annotations2 []*github.CheckRunAnnotation
-		problems1, problems2       int
-		buf1, buf2                 strings.Builder
-		err1, err2                 error
+		annotationsArr [3][]*github.CheckRunAnnotation
+		problemsArr    [3]int
+		bufArr         [3]strings.Builder
 	)
 
 	var eg errgroup.Group
 	eg.Go(func() error {
-		outputSummary, annotations1, problems1, err1 = lintRepo(ctx, ref, repoPath, diffs, lintEnabled, &buf1)
-		return err1
+		var err error
+		outputSummary, annotationsArr[0], problemsArr[0], err = lintRepo(ctx, ref, repoPath, diffs, lintEnabled, &bufArr[0])
+		return err
 	})
 	eg.Go(func() error {
-		annotations2, problems2, err2 = lintIndividually(ref, repoPath, diffs, lintEnabled, ignoredPath, &buf2)
-		return err2
+		var err error
+		annotationsArr[1], problemsArr[1], err = lintIndividually(ref, repoPath, diffs, lintEnabled, ignoredPath, &bufArr[1])
+		return err
+	})
+	eg.Go(func() error {
+		var err error
+		annotationsArr[2], problemsArr[2], err = CheckFileMode(diffs, repoPath, &bufArr[2])
+		return err
 	})
 	err = eg.Wait()
 
-	annotations = append(annotations, annotations1...)
-	annotations = append(annotations, annotations2...)
-	problems += problems1
-	problems += problems2
-	log.WriteString(buf1.String())
-	log.WriteString(buf2.String())
+	annotations = append(annotations, annotationsArr[0]...)
+	annotations = append(annotations, annotationsArr[1]...)
+	problems += problemsArr[0]
+	problems += problemsArr[1]
+	problems += problemsArr[2]
+	log.WriteString(bufArr[0].String())
+	log.WriteString(bufArr[1].String())
+	log.WriteString(bufArr[2].String())
 
 	return
 }
@@ -827,8 +835,8 @@ func checkLints(ctx context.Context, client *github.Client, gpull *github.PullRe
 	repoPath string, diffs []*diff.FileDiff, lintEnabled LintEnabled, ignoredPath []string, log *os.File) (problems int, err error) {
 
 	t := github.Timestamp{Time: time.Now()}
-	outputTitle := "linter"
-	checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
+	checkName := "linter"
+	checkRun, err := CreateCheckRun(ctx, client, gpull, checkName, ref, targetURL)
 	if err != nil {
 		return 0, err
 	}
@@ -851,20 +859,23 @@ func checkLints(ctx context.Context, client *github.Client, gpull *github.PullRe
 
 	var (
 		conclusion    string
+		outputTitle   string
 		outputSummary string
 	)
 
 	if failedLints > 0 {
 		conclusion = "failure"
+		outputTitle = fmt.Sprintf("%d problem(s) found", failedLints)
 		outputSummary = fmt.Sprintf("The lint check failed! %d problem(s) found.\n", failedLints)
 		if notes != "" {
 			outputSummary += "```\n" + notes + "\n```"
 		}
 	} else {
 		conclusion = "success"
+		outputTitle = "no problems found"
 		outputSummary = "The lint check succeed!"
 	}
-	err = UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, outputTitle, outputSummary, annotations)
+	err = UpdateCheckRun(ctx, client, gpull, checkRunID, checkName, conclusion, t, outputTitle, outputSummary, annotations)
 	return failedLints, err
 }
 

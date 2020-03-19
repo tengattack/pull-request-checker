@@ -81,3 +81,43 @@ func TestGetTrimmedNewName(t *testing.T) {
 	assert.False(ok)
 	assert.Equal("name", name)
 }
+
+func TestHeadFile(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	assert.Panics(func() {
+		_, _ = headFile("../testdata/lines", 0)
+	})
+
+	lines, err := headFile("../testdata/lines", 1)
+	require.NoError(err)
+	assert.Len(lines, 1)
+	assert.Equal("a", lines[0])
+
+	lines, err = headFile("../testdata/lines", 3)
+	require.NoError(err)
+	assert.Len(lines, 2)
+	assert.Equal("a", lines[0])
+	assert.Equal("b", lines[1])
+}
+
+func TestParseFileMode(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	extendedLines := []string{
+		"index 13fe0dc..2332010 100644",
+	}
+	mode, err := parseFileMode(extendedLines)
+	require.NoError(err)
+	assert.Equal(0644, mode)
+
+	extendedLines = []string{
+		"new file mode 100755",
+		"index 0000000..b54741c",
+	}
+	mode, err = parseFileMode(extendedLines)
+	require.NoError(err)
+	assert.Equal(0755, mode)
+}

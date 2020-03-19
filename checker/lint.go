@@ -7,6 +7,7 @@ import (
 	"encoding/xml"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -18,6 +19,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/go-github/github"
 	"github.com/martinlindhe/go-difflib/difflib"
 	"github.com/sourcegraph/go-diff/diff"
 	"github.com/sqs/goreturns/returns"
@@ -823,6 +825,85 @@ func APIDoc(ctx context.Context, ref GithubRef, cwd string) (string, error) {
 	return string(output) + "\n", err
 }
 
+const (
+	fileModeCheckNormal      = "Normal file permission should be 0644"
+	fileModeCheckExecutable  = "Executable file permission should be 0755"
+	fileModeCheckShellScript = "Shell script file permission should be 0755"
+	shebangCheckShellScript  = "Shell script file should start with #!"
+)
+
+// CheckFileMode checks repo's files' mode
+func CheckFileMode(diffs []*diff.FileDiff, repoPath string, log io.StringWriter) ([]*github.CheckRunAnnotation, int, error) {
+	startLine := 1
+	endLine := 1
+	annotationLevel := "warning"
+
+	problem := 0
+	annotations := make([]*github.CheckRunAnnotation, 0, len(diffs))
+	for _, d := range diffs {
+		fileName, _ := getTrimmedNewName(d)
+		filePath := filepath.Join(repoPath, fileName)
+		mode, _ := parseFileMode(d.Extended)
+		if mode == 0 {
+			log.WriteString(fmt.Sprintf("Failed to parse file mode of %s.\n", fileName))
+			continue
+		}
+		comment := ""
+		switch strings.ToLower(filepath.Ext(fileName)) {
+		case ".sh":
+			if mode != 0755 {
+				problem++
+				comment = fileModeCheckShellScript
+			} else {
+				lines, err := headFile(filePath, 1)
+				if err != nil {
+					log.WriteString(fmt.Sprintf("Failed to read %s: %v\n", fileName, err))
+					continue
+				}
+				if len(lines) > 0 {
+					if !strings.HasPrefix(lines[0], "#!") {
+						problem++
+						comment = shebangCheckShellScript
+					}
+				}
+			}
+		case ".js", ".py":
+			lines, err := headFile(filePath, 1)
+			if err != nil {
+				log.WriteString(fmt.Sprintf("Failed to read %s: %v\n", fileName, err))
+				continue
+			}
+			if len(lines) > 0 && strings.HasPrefix(lines[0], "#!") {
+				if mode != 0755 {
+					problem++
+					comment = fileModeCheckExecutable
+				}
+			} else {
+				if mode != 0644 {
+					problem++
+					comment = fileModeCheckNormal
+				}
+			}
+		default:
+			if mode != 0644 {
+				problem++
+				comment = fileModeCheckNormal
+			}
+		}
+		if comment != "" {
+			annotations = append(annotations, &github.CheckRunAnnotation{
+				Path:            &fileName,
+				StartLine:       &startLine,
+				EndLine:         &endLine,
+				AnnotationLevel: &annotationLevel,
+				Message:         &comment,
+			})
+		}
+	}
+
+	return annotations, problem, nil
+}
+
 // CheckstyleResult struct represents a list of gradle checkstyle files
 type CheckstyleResult struct {
 	XMLName xml.Name `xml:"checkstyle"`
@@ -912,7 +993,7 @@ func AndroidLint(ctx context.Context, ref GithubRef, cwd string) (*Issues, strin
 	}
 	if doCheckstyle {
 		outputs.WriteString("checkstyle:\n")
-		cmd := exec.Command(checkstyleWords[0], checkstyleWords[1:]...)
+		cmd := exec.CommandContext(ctx, checkstyleWords[0], checkstyleWords[1:]...)
 		cmd.Dir = cwd
 		output, err := cmd.CombinedOutput()
 		if err != nil {
@@ -973,7 +1054,7 @@ func AndroidLint(ctx context.Context, ref GithubRef, cwd string) (*Issues, strin
 	}
 
 	outputs.WriteString("lint:\n")
-	cmd := exec.Command(words[0], words[1:]...)
+	cmd := exec.CommandContext(ctx, words[0], words[1:]...)
 	cmd.Dir = cwd
 	output, err := cmd.CombinedOutput()
 	if err != nil {
