@@ -84,6 +84,7 @@ func GenerateAnnotations(ctx context.Context, ref GithubRef, repoPath string, di
 
 	annotations = append(annotations, annotationsArr[0]...)
 	annotations = append(annotations, annotationsArr[1]...)
+	annotations = append(annotations, annotationsArr[2]...)
 	problems += problemsArr[0]
 	problems += problemsArr[1]
 	problems += problemsArr[2]
@@ -872,7 +873,7 @@ func checkLints(ctx context.Context, client *github.Client, gpull *github.PullRe
 		}
 	} else {
 		conclusion = "success"
-		outputTitle = "no problems found"
+		outputTitle = "no problems found."
 		outputSummary = "The lint check succeed!"
 	}
 	err = UpdateCheckRun(ctx, client, gpull, checkRunID, checkName, conclusion, t, outputTitle, outputSummary, annotations)
