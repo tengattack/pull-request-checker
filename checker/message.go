@@ -84,6 +84,7 @@ func GenerateAnnotations(ctx context.Context, ref GithubRef, repoPath string, di
 
 	annotations = append(annotations, annotationsArr[0]...)
 	annotations = append(annotations, annotationsArr[1]...)
+	annotations = append(annotations, annotationsArr[2]...)
 	problems += problemsArr[0]
 	problems += problemsArr[1]
 	problems += problemsArr[2]
@@ -865,14 +866,14 @@ func checkLints(ctx context.Context, client *github.Client, gpull *github.PullRe
 
 	if failedLints > 0 {
 		conclusion = "failure"
-		outputTitle = fmt.Sprintf("%d problem(s) found", failedLints)
+		outputTitle = fmt.Sprintf("%d problem(s) found.", failedLints)
 		outputSummary = fmt.Sprintf("The lint check failed! %d problem(s) found.\n", failedLints)
 		if notes != "" {
 			outputSummary += "```\n" + notes + "\n```"
 		}
 	} else {
 		conclusion = "success"
-		outputTitle = "no problems found"
+		outputTitle = "No problems found."
 		outputSummary = "The lint check succeed!"
 	}
 	err = UpdateCheckRun(ctx, client, gpull, checkRunID, checkName, conclusion, t, outputTitle, outputSummary, annotations)
