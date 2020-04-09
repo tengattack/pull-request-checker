@@ -505,25 +505,32 @@ func SCSSLint(ref GithubRef, fileName, cwd string) ([]LintMessage, string, error
 	return messages, stderr.String(), nil
 }
 
-// CodeClimate --out-format code-climate
-type CodeClimate struct {
-	Description string `json:"description"`
-	Location    struct {
-		Path  string `json:"path"`
-		Lines struct {
-			Begin int `json:"begin"`
-		} `json:"lines"`
-	} `json:"location"`
+// GolangCILintResult golangci-lint json out format
+type GolangCILintResult struct {
+	Issues []struct {
+		FromLinter string `json:"FromLinter"`
+		Text       string `json:"Text"`
+		// SourceLines []string
+		// Replacement *struct{}
+		// LineRange struct{From:, To:}
+		Pos struct {
+			Filename string `json:"Filename"`
+			Offset   int64  `json:"Offset"`
+			Line     int    `json:"Line"`
+			Column   int    `json:"Column"`
+		} `json:"Pos"`
+	} `json:"Issues"`
+	// Report struct{} `json:"Report"`
 }
 
-// GolangCILint runs `golangci-lint run --out-format code-climate`
-func GolangCILint(ctx context.Context, ref GithubRef, cwd string) ([]CodeClimate, string, error) {
+// GolangCILint runs `golangci-lint run --out-format json`
+func GolangCILint(ctx context.Context, ref GithubRef, cwd string) (*GolangCILintResult, string, error) {
 	parser := NewShellParser(cwd, ref)
 	words, err := parser.Parse(Conf.Core.GolangCILint)
 	if err == nil && len(words) < 1 {
 		err = errors.New("GolangCILint command is not configured")
 	}
-	words = append(words, "run", "--out-format", "code-climate")
+	words = append(words, "run", "--out-format", "json")
 
 	if err != nil {
 		LogError.Error("GolangCILint: " + err.Error())
@@ -542,18 +549,18 @@ func GolangCILint(ctx context.Context, ref GithubRef, cwd string) ([]CodeClimate
 	LogAccess.Debugf("GolangCILint Output:\n%s", out)
 	LogAccess.Debugf("GolangCILint Errput:\n%s", stderr.String())
 
-	var suggestions []CodeClimate
-	err = json.Unmarshal(out, &suggestions)
+	var result GolangCILintResult
+	err = json.Unmarshal(out, &result)
 	if err != nil {
 		LogError.Error("GolangCILint: " + err.Error())
 		return nil, stderr.String(), err
 	}
 	if runtime.GOOS == "windows" {
-		for i, v := range suggestions {
-			suggestions[i].Location.Path = filepath.ToSlash(v.Location.Path)
+		for i, v := range result.Issues {
+			result.Issues[i].Pos.Filename = filepath.ToSlash(v.Pos.Filename)
 		}
 	}
-	return suggestions, stderr.String(), nil
+	return &result, stderr.String(), nil
 }
 
 // Goreturns formats the go code

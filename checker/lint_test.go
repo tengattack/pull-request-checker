@@ -1,9 +1,11 @@
 package checker
 
 import (
+	"context"
 	"encoding/xml"
 	"io/ioutil"
 	"path"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -36,6 +38,26 @@ func TestOCLintResultXML(t *testing.T) {
 	err = xml.Unmarshal(out, &violations)
 	assert.NoError(err)
 	assert.NotEmpty(violations)
+}
+
+func TestGolangCILint(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	_, filename, _, ok := runtime.Caller(0)
+	require.True(ok)
+	currentDir := path.Dir(filename)
+
+	Conf.Core.GolangCILint = "golangci-lint"
+
+	projectPath := path.Join(currentDir, "../testdata/go")
+	ref := GithubRef{}
+	result, msg, err := GolangCILint(context.TODO(), ref, projectPath)
+	require.NoError(err)
+	assert.Empty(msg)
+	assert.NotNil(result)
+	assert.NotEmpty(result.Issues)
+	assert.Equal("deadcode", result.Issues[0].FromLinter)
 }
 
 func TestCheckFileMode(t *testing.T) {
