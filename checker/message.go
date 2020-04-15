@@ -187,7 +187,7 @@ func lintRepo(ctx context.Context, ref GithubRef, repoPath string, diffs []*diff
 	}
 	if lintEnabled.Go {
 		log.WriteString(fmt.Sprintf("GolangCILint '%s'\n", repoPath))
-		lints, msg, err := GolangCILint(ctx, ref, repoPath)
+		result, msg, err := GolangCILint(ctx, ref, repoPath)
 		if err != nil {
 			log.WriteString(fmt.Sprintf("GolangCILint error: %v\n%s\n", err, msg))
 			if msg != "" {
@@ -207,13 +207,13 @@ func lintRepo(ctx context.Context, ref GithubRef, repoPath string, diffs []*diff
 			if !strings.HasSuffix(fileName, ".go") {
 				continue
 			}
-			for _, v := range lints {
-				if fileName == v.Location.Path {
-					startLine := v.Location.Lines.Begin
+			for _, v := range result.Issues {
+				if fileName == v.Pos.Filename {
+					startLine := v.Pos.Line
 					for _, hunk := range d.Hunks {
 						if int32(startLine) >= hunk.NewStartLine && int32(startLine) < hunk.NewStartLine+hunk.NewLines {
 							comment := fmt.Sprintf("%s:%d  %s",
-								fileName, startLine, v.Description)
+								fileName, startLine, v.Text)
 							annotations = append(annotations, &github.CheckRunAnnotation{
 								Path:            &fileName,
 								Message:         &comment,
