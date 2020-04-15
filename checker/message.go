@@ -72,6 +72,7 @@ func GenerateAnnotations(ctx context.Context, ref GithubRef, repoPath string, di
 	})
 	eg.Go(func() error {
 		var err error
+		// TODO: use ctx
 		annotationsArr[1], problemsArr[1], err = lintIndividually(ref, repoPath, diffs, lintEnabled, ignoredPath, &bufArr[1])
 		return err
 	})
@@ -903,7 +904,7 @@ func checkTests(ctx context.Context, repoPath string, tests map[string]goTestsCo
 	}
 	t.LogDivider = NewLogDivider(len(tests) > 1, log)
 	var headCoverage sync.Map
-	failedTests, passedTests, errTests = runTests(tests, t, &headCoverage)
+	failedTests, passedTests, errTests = runTests(ctx, tests, t, &headCoverage)
 
 	if !ref.IsBranch() {
 		// compare test coverage with base
@@ -916,14 +917,14 @@ func checkTests(ctx context.Context, repoPath string, tests map[string]goTestsCo
 		}
 		baseSavedRecords, baseTestsNeedToRun := loadBaseFromStore(ref, baseSHA, tests, log)
 		var baseCoverage sync.Map
-		_ = findBaseCoverage(baseSavedRecords, baseTestsNeedToRun, repoPath, baseSHA, gpull, ref, log, &baseCoverage)
+		_ = findBaseCoverage(ctx, baseSavedRecords, baseTestsNeedToRun, repoPath, baseSHA, gpull, ref, log, &baseCoverage)
 		testMsg = util.DiffCoverage(&headCoverage, &baseCoverage)
 	}
 	return
 }
 
 type testRunner interface {
-	Run(testName string, testConfig goTestsConfig) (string, error)
+	Run(ctx context.Context, testName string, testConfig goTestsConfig) (string, error)
 }
 
 type testReporter struct {
@@ -936,15 +937,15 @@ type testReporter struct {
 	TargetURL string
 }
 
-func (t *testReporter) Run(testName string, testConfig goTestsConfig) (reportMessage string, err error) {
+func (t *testReporter) Run(ctx context.Context, testName string, testConfig goTestsConfig) (reportMessage string, err error) {
 	t.Log(func(w io.Writer) {
-		reportMessage, err = ReportTestResults(testName, t.RepoPath, testConfig.Cmds, testConfig.Coverage, t.Client, t.Pull,
+		reportMessage, err = ReportTestResults(ctx, testName, t.RepoPath, testConfig.Cmds, testConfig.Coverage, t.Client, t.Pull,
 			t.Ref, t.TargetURL, w)
 	})
 	return
 }
 
-func runTests(tests map[string]goTestsConfig, t testRunner, coverageMap *sync.Map) (failedTests, passedTests, errTests int) {
+func runTests(ctx context.Context, tests map[string]goTestsConfig, t testRunner, coverageMap *sync.Map) (failedTests, passedTests, errTests int) {
 	maxPendingTests := Conf.Concurrency.Test
 	if maxPendingTests < 1 {
 		maxPendingTests = 1
@@ -975,7 +976,7 @@ func runTests(tests map[string]goTestsConfig, t testRunner, coverageMap *sync.Ma
 				wg.Done()
 				<-pendingTests
 			}()
-			percentage, err := t.Run(testName, testConfig)
+			percentage, err := t.Run(ctx, testName, testConfig)
 			if testConfig.Coverage != "" {
 				coverageMap.Store(testName, percentage)
 			}
@@ -1030,7 +1031,7 @@ func loadBaseFromStore(ref GithubRef, baseSHA string, tests map[string]goTestsCo
 	return baseSavedRecords, baseTestsNeedToRun
 }
 
-func findBaseCoverage(baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun map[string]goTestsConfig, repoPath string,
+func findBaseCoverage(ctx context.Context, baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun map[string]goTestsConfig, repoPath string,
 	baseSHA string, gpull *github.PullRequest, ref GithubRef, log io.Writer, baseCoverage *sync.Map) error {
 	for _, v := range baseSavedRecords {
 		if v.Coverage == nil {
@@ -1071,7 +1072,7 @@ func findBaseCoverage(baseSavedRecords []store.CommitsInfo, baseTestsNeedToRun m
 			Pull:     gpull,
 		}
 		t.LogDivider = NewLogDivider(len(baseTestsNeedToRun) > 1, log)
-		runTests(baseTestsNeedToRun, t, baseCoverage)
+		runTests(ctx, baseTestsNeedToRun, t, baseCoverage)
 
 		io.WriteString(log, "$ git checkout -f "+ref.Sha+"\n")
 		gitCmds = make([]string, len(words))
@@ -1101,7 +1102,7 @@ type baseTestAndSave struct {
 	Pull     *github.PullRequest
 }
 
-func (t *baseTestAndSave) Run(testName string, testConfig goTestsConfig) (string, error) {
+func (t *baseTestAndSave) Run(ctx context.Context, testName string, testConfig goTestsConfig) (string, error) {
 	var reportMessage string
 	t.Log(func(w io.Writer) {
 		ref := t.Ref
@@ -1110,7 +1111,7 @@ func (t *baseTestAndSave) Run(testName string, testConfig goTestsConfig) (string
 			ref.checkType = CheckTypePRBase
 		}
 
-		_, reportMessage, _ = testAndSaveCoverage(context.TODO(), ref,
+		_, reportMessage, _ = testAndSaveCoverage(ctx, ref,
 			testName, testConfig.Cmds, testConfig.Coverage, t.RepoPath, t.Pull, true, w)
 	})
 	return reportMessage, nil
