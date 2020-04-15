@@ -47,11 +47,9 @@ func carry(ctx context.Context, p *shellwords.Parser, repo, cmd string, log io.W
 }
 
 // ReportTestResults reports the test results to github
-func ReportTestResults(testName string, repoPath string, cmds []string, coveragePattern string, client *github.Client, gpull *github.PullRequest,
+func ReportTestResults(ctx context.Context, testName string, repoPath string, cmds []string, coveragePattern string, client *github.Client, gpull *github.PullRequest,
 	ref GithubRef, targetURL string, log io.Writer) (string, error) {
 	outputTitle := testName + " test"
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-	defer cancel()
 
 	t := github.Timestamp{Time: time.Now()}
 

@@ -1,0 +1,55 @@
+# a config for unified-ci
+core:
+  enable_retries: true
+  max_retries: 50
+  socks5_proxy: ''
+  git_command: 'git'
+
+  db_file: 'file.db'
+  work_dir: 'tmp'
+  logs_dir: 'logs'
+  check_log_uri: 'http://example.com/checker/logs/'
+
+  apidoc: 'apidoc'
+  golangcilint: 'golangci-lint'
+  remarklint: 'remark'
+  cpplint: 'cpplint'
+  oclint: 'oclint-json-compilation-database'
+  clanglint: 'clang-format'
+  phplint: 'phplint'
+  eslint: './node_modules/.bin/eslint'
+  tslint: './node_modules/.bin/tslint'
+  scsslint: 'scss-lint'
+  androidlint: './gradlew lint'
+
+api:
+  enabled: false
+  mode: 'release'
+  address: '' # ip address to bind (default: any)
+  port: 8098
+  webhook_uri: "/api/webhook"
+
+github:
+  app_id: 35105
+  private_key: '../testdata/unified-ci-test.2019-07-09.private-key.pem'
+  installations:
+    tengattack: 1248133
+
+
+log:
+  format: "string" # string or json
+  access_log: "stdout" # stdout: output to console, or define log path like "log/access_log"
+  access_level: "debug"
+  error_log: "stderr" # stderr: output to console, or define log path like "log/error_log"
+  error_level: "error"
+
+mq:
+  engine: 'redis'
+  redis:
+    addr: "localhost:6379"
+    password: ""
+    db: 0
+
+concurrency:
+  lint: 4
+  test: 1

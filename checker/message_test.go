@@ -3,6 +3,7 @@ package checker
 import (
 	"context"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"os/exec"
 	"path"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/go-github/github"
 	"github.com/sourcegraph/go-diff/diff"
@@ -17,7 +19,28 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tengattack/unified-ci/config"
 	"github.com/tengattack/unified-ci/store"
+	"github.com/tengattack/unified-ci/util"
 )
+
+func TestHandleMessage(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	conf, err := config.LoadConfig("../testdata/config.yml")
+	require.NoError(err)
+	Conf = conf
+
+	err = util.InitJWTClient(conf.GitHub.AppID, conf.GitHub.PrivateKey, &http.Transport{})
+	require.NoError(err)
+
+	start := time.Now()
+	duration := 15 * time.Second
+	ctx, cancel := context.WithTimeout(context.Background(), duration)
+	defer cancel()
+	_ = HandleMessage(ctx, "tengattack/playground/pull/2/commits/ae26afcc1d5c268ba751a5903828e0423bd87cf2")
+	assert.True(time.Since(start) < 20*time.Second)
+	assert.True(time.Since(start) > 15*time.Second)
+}
 
 // CheckAnnotation contains path & position for github comment
 type CheckAnnotation struct {
@@ -156,7 +179,7 @@ func TestGetBaseCoverage(t *testing.T) {
 	assert.Empty(baseSavedRecords)
 	assert.Equal(len(tests), len(baseTestsNeedToRun))
 	var baseCoverage sync.Map
-	err = findBaseCoverage(baseSavedRecords, baseTestsNeedToRun, repoPath, baseSHA,
+	err = findBaseCoverage(context.TODO(), baseSavedRecords, baseTestsNeedToRun, repoPath, baseSHA,
 		&github.PullRequest{
 			Head: &github.PullRequestBranch{
 				User: &github.User{
