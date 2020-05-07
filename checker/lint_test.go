@@ -40,6 +40,17 @@ func TestOCLintResultXML(t *testing.T) {
 	assert.NotEmpty(violations)
 }
 
+func TestKtlint(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	Conf.Core.Ktlint = "ktlint"
+	ref := GithubRef{}
+	lints, err := Ktlint(context.TODO(), ref, "example.kt", "../testdata")
+	require.NoError(err)
+	assert.NotEmpty(lints)
+}
+
 func TestGolangCILint(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)

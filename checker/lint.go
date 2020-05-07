@@ -326,6 +326,53 @@ func OCLint(ctx context.Context, ref GithubRef, filePath string, cwd string) (li
 	return lints, nil
 }
 
+// KtlintJSONReport is used for capturing the json output of ktlint
+type KtlintJSONReport struct {
+	File   string `json:"file"`
+	Errors []struct {
+		Line    int    `json:"line"`
+		Column  int    `json:"column"`
+		Message string `json:"message"`
+		Rule    string `json:"rule"`
+	} `json:"errors"`
+}
+
+// Ktlint runs ktlint configuration
+func Ktlint(ctx context.Context, ref GithubRef, filepath, cwd string) ([]LintMessage, error) {
+	parser := NewShellParser(cwd, ref)
+	words, _ := parser.Parse(Conf.Core.Ktlint)
+	if len(words) < 1 {
+		return nil, errors.New("Invalid `ktlint` configuration")
+	}
+	words = append(words, "-a", "--relative", "--reporter=json")
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
+	defer cancel()
+
+	// The provided context is used to kill the process (by calling os.Process.Kill)
+	cmd := exec.CommandContext(ctx, words[0], words[1:]...)
+	cmd.Dir = cwd
+	out, _ := cmd.Output()
+	LogAccess.Debugf("Ktlint Output:\n%s", out)
+	var reports []KtlintJSONReport
+	err := json.Unmarshal(out, &reports)
+	if err != nil {
+		return nil, err
+	}
+	results := make([]LintMessage, 0, len(reports))
+	for _, f := range reports {
+		for _, v := range f.Errors {
+			results = append(results, LintMessage{
+				RuleID:   v.Rule,
+				Severity: severityLevelWarning,
+				Line:     v.Line,
+				Column:   v.Column,
+				Message:  v.Message,
+			})
+		}
+	}
+	return results, err
+}
+
 // PHPLint lints the php files
 func PHPLint(ref GithubRef, fileName, cwd string) ([]LintMessage, string, error) {
 	var stderr bytes.Buffer

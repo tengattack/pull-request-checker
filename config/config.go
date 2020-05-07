@@ -32,6 +32,7 @@ type SectionCore struct {
 	CPPLint       string `yaml:"cpplint"`
 	OCLint        string `yaml:"oclint"`
 	ClangLint     string `yaml:"clanglint"`
+	Ktlint        string `yaml:"ktlint"`
 	PHPLint       string `yaml:"phplint"`
 	ESLint        string `yaml:"eslint"`
 	TSLint        string `yaml:"tslint"`
@@ -94,6 +95,7 @@ func BuildDefaultConf() Config {
 	conf.Core.RemarkLint = "remark"
 	conf.Core.CPPLint = "cpplint"
 	conf.Core.ClangLint = "clang-format"
+	conf.Core.Ktlint = "ktlint"
 	conf.Core.PHPLint = "phplint"
 	conf.Core.ESLint = ""
 	conf.Core.TSLint = ""
