@@ -44,7 +44,7 @@ func TestKtlint(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	Conf.Core.Ktlint = "ktlint"
+	Conf.Core.Ktlint = "/usr/local/bin/ktlint"
 	ref := GithubRef{}
 	lints, err := Ktlint(context.TODO(), ref, "example.kt", "../testdata")
 	require.NoError(err)
