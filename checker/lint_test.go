@@ -48,7 +48,7 @@ func TestKtlint(t *testing.T) {
 	ref := GithubRef{}
 	lints, err := Ktlint(context.TODO(), ref, "example.kt", "../testdata")
 	require.NoError(err)
-	assert.NotEmpty(lints)
+	assert.Len(lints, 2)
 }
 
 func TestGolangCILint(t *testing.T) {
