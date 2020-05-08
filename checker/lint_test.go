@@ -68,7 +68,7 @@ func TestGolangCILint(t *testing.T) {
 	assert.Empty(msg)
 	assert.NotNil(result)
 	assert.NotEmpty(result.Issues)
-	assert.Equal("deadcode", result.Issues[0].FromLinter)
+	assert.Equal(3, result.Issues[0].Pos.Line)
 }
 
 func TestCheckFileMode(t *testing.T) {
