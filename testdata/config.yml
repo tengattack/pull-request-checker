@@ -16,6 +16,7 @@ core:
   cpplint: 'cpplint'
   oclint: 'oclint-json-compilation-database'
   clanglint: 'clang-format'
+  ktlint: 'ktlint'
   phplint: 'phplint'
   eslint: './node_modules/.bin/eslint'
   tslint: './node_modules/.bin/tslint'
