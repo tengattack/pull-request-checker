@@ -344,7 +344,7 @@ func Ktlint(ctx context.Context, ref GithubRef, filepath, cwd string) ([]LintMes
 	if len(words) < 1 {
 		return nil, errors.New("Invalid `ktlint` configuration")
 	}
-	words = append(words, "-a", "--relative", "--reporter=json")
+	words = append(words, "-a", "--relative", "--reporter=json", filepath)
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
@@ -352,7 +352,6 @@ func Ktlint(ctx context.Context, ref GithubRef, filepath, cwd string) ([]LintMes
 	cmd := exec.CommandContext(ctx, words[0], words[1:]...)
 	cmd.Dir = cwd
 	out, err := cmd.Output()
-	LogAccess.Debugf("%v Output:\n%s", cmd.Args, out)
 	if err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
 			if ee.ExitCode() == 1 {
@@ -361,7 +360,7 @@ func Ktlint(ctx context.Context, ref GithubRef, filepath, cwd string) ([]LintMes
 		}
 	}
 	if err != nil {
-		LogError.Errorf("Error:\n%v", err)
+		LogError.Errorf("Ktlint: %v\n%s", err, out)
 	}
 	var reports []KtlintJSONReport
 	err = json.Unmarshal(out, &reports)
