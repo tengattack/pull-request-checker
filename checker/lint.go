@@ -351,9 +351,18 @@ func Ktlint(ctx context.Context, ref GithubRef, filepath, cwd string) ([]LintMes
 	// The provided context is used to kill the process (by calling os.Process.Kill)
 	cmd := exec.CommandContext(ctx, words[0], words[1:]...)
 	cmd.Dir = cwd
-	LogAccess.Debug(cmd.Args)
 	out, err := cmd.Output()
-	LogAccess.Debugf("Ktlint (%v) Output:\n%s", err, out)
+	LogAccess.Debugf("%v Output:\n%s", cmd.Args, out)
+	if err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			if ee.ExitCode() == 1 {
+				err = nil
+			}
+		}
+	}
+	if err != nil {
+		LogError.Errorf("Error:\n%v", err)
+	}
 	var reports []KtlintJSONReport
 	err = json.Unmarshal(out, &reports)
 	if err != nil {
