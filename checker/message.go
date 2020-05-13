@@ -320,6 +320,8 @@ func handleSingleFile(ref GithubRef, repoPath string, d *diff.FileDiff, lintEnab
 			}
 			pickDiffLintMessages(lintsDiff, d, annotations, problems, log, fileName)
 		}
+	} else if strings.HasSuffix(fileName, ".kt") {
+		lints, lintErr = Ktlint(context.TODO(), ref, fileName, repoPath)
 	} else if lintEnabled.Go && strings.HasSuffix(fileName, ".go") {
 		log.WriteString(fmt.Sprintf("Goreturns '%s'\n", fileName))
 		lintsGoreturns, err := Goreturns(filepath.Join(repoPath, fileName), repoPath)

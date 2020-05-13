@@ -40,6 +40,19 @@ func TestOCLintResultXML(t *testing.T) {
 	assert.NotEmpty(violations)
 }
 
+func TestKtlint(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	Conf.Core.Ktlint = "ktlint"
+	ref := GithubRef{}
+	lints, err := Ktlint(context.TODO(), ref, "example.kt", "../testdata")
+	require.NoError(err)
+	require.Len(lints, 2)
+	assert.Equal(1, lints[0].Line)
+	assert.Equal(22, lints[1].Line)
+}
+
 func TestGolangCILint(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
@@ -57,7 +70,7 @@ func TestGolangCILint(t *testing.T) {
 	assert.Empty(msg)
 	assert.NotNil(result)
 	assert.NotEmpty(result.Issues)
-	assert.Equal("deadcode", result.Issues[0].FromLinter)
+	assert.Equal(3, result.Issues[0].Pos.Line)
 }
 
 func TestCheckFileMode(t *testing.T) {
