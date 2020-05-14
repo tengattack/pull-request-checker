@@ -19,6 +19,13 @@ index 0000000..b35efa3
 +++ b/c.sh
 @@ -0,0 +1 @@
 +echo c
+diff --git a/d b/d
+deleted file mode 100644
+index c8b1b42..0000000
+--- a/d
++++ /dev/null
+@@ -1 +0,0 @@
+-delete
 diff --git a/d.sh b/d.sh
 new file mode 100755
 index 0000000..85a69f5

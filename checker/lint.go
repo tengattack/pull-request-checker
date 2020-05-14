@@ -906,6 +906,9 @@ func CheckFileMode(diffs []*diff.FileDiff, repoPath string, log io.StringWriter)
 	for _, d := range diffs {
 		fileName, _ := getTrimmedNewName(d)
 		filePath := filepath.Join(repoPath, fileName)
+		if fileName == "/dev/null" {
+			continue
+		}
 		mode, _ := parseFileMode(d.Extended)
 		if mode == 0 {
 			log.WriteString(fmt.Sprintf("Failed to parse file mode of %s.\n", fileName))
