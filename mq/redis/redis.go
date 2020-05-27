@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/tengattack/unified-ci/mq"
@@ -61,8 +62,29 @@ func (s *MessageQueue) Reset() {
 
 // Push message to queue
 func (s *MessageQueue) Push(message string) error {
-	_, err := redisClient.LPush(mq.SyncChannelKey, message).Result()
-	return err
+	list, err := redisClient.LRange(mq.SyncChannelKey, 0, -1).Result()
+	if err != nil {
+		return err
+	}
+	var prefix string
+	strs := strings.SplitAfter(message, "/commits/")
+	if len(strs) > 0 {
+		prefix = strings.Join(strs[:len(strs)-1], "")
+	}
+	found := false
+	for _, v := range list {
+		if strings.HasPrefix(v, prefix) {
+			if v == message && !found {
+				found = true
+			} else {
+				redisClient.LRem(mq.SyncChannelKey, 1, v)
+			}
+		}
+	}
+	if !found {
+		return redisClient.LPush(mq.SyncChannelKey, message).Err()
+	}
+	return nil
 }
 
 // Subscribe message from queue.
