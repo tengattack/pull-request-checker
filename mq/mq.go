@@ -18,7 +18,7 @@ const (
 type MessageQueue interface {
 	Init() error
 	Reset()
-	Push(message string) error
+	Push(message string, removePrefix string) error
 	Subscribe(ctx context.Context) (string, error)
 	Finish(message string) error
 	Error(message string) error
