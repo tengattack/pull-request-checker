@@ -308,11 +308,8 @@ func webhookHandler(c *gin.Context) {
 			return
 		}
 		// opend or synchronized
-		message := fmt.Sprintf("%s/pull/%d/commits/%s",
-			payload.Repository.FullName,
-			payload.PullRequest.Number,
-			payload.PullRequest.Head.Sha,
-		)
+		messagePrefix := fmt.Sprintf("%s/pull/%d/commits/", payload.Repository.FullName, payload.PullRequest.Number)
+		message := messagePrefix + payload.PullRequest.Head.Sha
 		LogAccess.WithField("entry", "webhook").Info("Push message: " + message)
 		ref := GithubRef{
 			owner: payload.Repository.Owner.Login,
@@ -320,7 +317,7 @@ func webhookHandler(c *gin.Context) {
 
 			Sha: payload.PullRequest.Head.Sha,
 		}
-		err = MQ.Push(message)
+		err = MQ.Push(message, messagePrefix)
 		if err != nil {
 			LogAccess.Error("Add message to queue error: " + err.Error())
 			abortWithError(c, 500, "add to queue error: "+err.Error())
@@ -374,11 +371,8 @@ func webhookHandler(c *gin.Context) {
 			}
 		}
 
-		message := fmt.Sprintf("%s/pull/%d/commits/%s",
-			payload.Repository.FullName,
-			prNum,
-			*payload.CheckRun.HeadSHA,
-		)
+		messagePrefix := fmt.Sprintf("%s/pull/%d/commits/", payload.Repository.FullName, prNum)
+		message := messagePrefix + *payload.CheckRun.HeadSHA
 		LogAccess.WithField("entry", "webhook").Info("Push message: " + message)
 		ref := GithubRef{
 			owner: payload.Repository.Owner.Login,
@@ -386,7 +380,7 @@ func webhookHandler(c *gin.Context) {
 
 			Sha: *payload.CheckRun.HeadSHA,
 		}
-		err = MQ.Push(message)
+		err = MQ.Push(message, messagePrefix)
 		if err != nil {
 			LogAccess.Error("Add message to queue error: " + err.Error())
 			abortWithError(c, 500, "add to queue error: "+err.Error())
@@ -577,7 +571,8 @@ func WatchLocalRepo(ctx context.Context) error {
 
 										Sha: masterCommitSHA,
 									}
-									message := fmt.Sprintf("%s/%s/tree/%s/commits/%s", ref.owner, ref.repo, "master", masterCommitSHA)
+									messagePrefix := fmt.Sprintf("%s/%s/tree/%s/commits/", ref.owner, ref.repo, "master")
+									message := messagePrefix + masterCommitSHA
 									needCheck, err := needPRChecking(client, &ref, message, MQ)
 									if err != nil {
 										LogError.Errorf("WatchLocalRepo:NeedPRChecking for master error: %v", err)
@@ -586,7 +581,7 @@ func WatchLocalRepo(ctx context.Context) error {
 									if needCheck {
 										// no statuses, need check
 										LogAccess.WithField("entry", "local").Info("Push message: " + message)
-										err = MQ.Push(message)
+										err = MQ.Push(message, messagePrefix)
 										if err == nil {
 											markAsPending(client, ref)
 										} else {
@@ -615,7 +610,8 @@ func WatchLocalRepo(ctx context.Context) error {
 
 								Sha: pull.GetHead().GetSHA(),
 							}
-							message := fmt.Sprintf("%s/%s/pull/%d/commits/%s", ref.owner, ref.repo, pull.GetNumber(), ref.Sha)
+							messagePrefix := fmt.Sprintf("%s/%s/pull/%d/commits/", ref.owner, ref.repo, pull.GetNumber())
+							message := messagePrefix + ref.Sha
 							needCheck, err := needPRChecking(client, &ref, message, MQ)
 							if err != nil {
 								LogError.Errorf("WatchLocalRepo:NeedPRChecking error: %v", err)
@@ -624,7 +620,7 @@ func WatchLocalRepo(ctx context.Context) error {
 							if needCheck {
 								// no statuses, need check
 								LogAccess.WithField("entry", "local").Info("Push message: " + message)
-								err = MQ.Push(message)
+								err = MQ.Push(message, messagePrefix)
 								if err == nil {
 									markAsPending(client, ref)
 								} else {
