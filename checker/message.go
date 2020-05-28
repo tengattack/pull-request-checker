@@ -20,6 +20,7 @@ import (
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/github"
 	"github.com/sourcegraph/go-diff/diff"
+	"github.com/tengattack/unified-ci/checks/security"
 	"github.com/tengattack/unified-ci/store"
 	"github.com/tengattack/unified-ci/util"
 	"golang.org/x/net/proxy"
@@ -81,6 +82,23 @@ func GenerateAnnotations(ctx context.Context, ref GithubRef, repoPath string, di
 		annotationsArr[2], problemsArr[2], err = CheckFileMode(diffs, repoPath, &bufArr[2])
 		return err
 	})
+
+	secure := true
+	securityMessage := ""
+	if util.FileExists(filepath.Join(repoPath, "go.sum")) {
+		eg.Go(func() error {
+			ok, err := security.ScanPKG(security.Golang, ref.repo, repoPath, "go.sum")
+			if err != nil {
+				return err
+			}
+			if !ok {
+				secure = false
+				securityMessage = "Found package vulnerabilities.\n"
+			}
+			return nil
+		})
+	}
+
 	err = eg.Wait()
 
 	annotations = append(annotations, annotationsArr[0]...)
@@ -92,6 +110,12 @@ func GenerateAnnotations(ctx context.Context, ref GithubRef, repoPath string, di
 	log.WriteString(bufArr[0].String())
 	log.WriteString(bufArr[1].String())
 	log.WriteString(bufArr[2].String())
+
+	if !secure {
+		problems++
+		log.WriteString(securityMessage)
+		outputSummary += securityMessage
+	}
 
 	return
 }
