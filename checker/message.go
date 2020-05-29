@@ -21,6 +21,7 @@ import (
 	"github.com/google/go-github/github"
 	"github.com/sourcegraph/go-diff/diff"
 	"github.com/tengattack/unified-ci/checks/vulnerability"
+	"github.com/tengattack/unified-ci/checks/vulnerability/riki"
 	"github.com/tengattack/unified-ci/store"
 	"github.com/tengattack/unified-ci/util"
 	"golang.org/x/net/proxy"
@@ -87,7 +88,7 @@ func GenerateAnnotations(ctx context.Context, ref GithubRef, repoPath string, di
 	securityMessage := ""
 	if util.FileExists(filepath.Join(repoPath, "go.sum")) {
 		eg.Go(func() error {
-			ok, err := vulnerability.Riki{}.CheckPackages(vulnerability.Golang, ref.repo, repoPath, "go.sum")
+			ok, err := riki.NewScanner().CheckPackages(vulnerability.Golang, ref.repo, repoPath, "go.sum")
 			if err != nil {
 				return err
 			}
