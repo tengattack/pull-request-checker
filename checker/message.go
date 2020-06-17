@@ -20,8 +20,8 @@ import (
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/github"
 	"github.com/sourcegraph/go-diff/diff"
-	"github.com/tengattack/unified-ci/checks/vulnerability"
 	"github.com/tengattack/unified-ci/checks/vulnerability/common"
+	"github.com/tengattack/unified-ci/checks/vulnerability/riki"
 	"github.com/tengattack/unified-ci/store"
 	"github.com/tengattack/unified-ci/util"
 	"golang.org/x/net/proxy"
@@ -86,20 +86,27 @@ func GenerateAnnotations(ctx context.Context, ref GithubRef, repoPath string, di
 
 	secure := true
 	securityMessage := ""
-	gomod := filepath.Join(repoPath, "go.sum")
-	if util.FileExists(gomod) {
-		eg.Go(func() error {
-			ok, err := vulnerability.NewRikiScanner().CheckPackages(common.Golang, ref.repo, gomod)
+	eg.Go(func() error {
+		scanner := riki.Scanner{ProjectName: ref.repo}
+		gomod := filepath.Join(repoPath, "go.sum")
+		if util.FileExists(gomod) {
+			_, err := scanner.CheckPackages(common.Golang, gomod)
+			if err != nil {
+				return err
+			}
+			time.Sleep(20 * time.Second)
+			ok, url, err := scanner.Query()
 			if err != nil {
 				return err
 			}
 			if !ok {
 				secure = false
-				securityMessage = "Found package vulnerabilities.\n"
+				securityMessage = fmt.Sprintf("Found package vulnerabilities: %s\n", url)
 			}
 			return nil
-		})
-	}
+		}
+		return nil
+	})
 
 	err = eg.Wait()
 
