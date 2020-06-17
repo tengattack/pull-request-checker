@@ -94,14 +94,31 @@ func GenerateAnnotations(ctx context.Context, ref GithubRef, repoPath string, di
 			if err != nil {
 				return err
 			}
-			time.Sleep(20 * time.Second)
+			scanner.WaitForQuery()
 			ok, url, err := scanner.Query()
 			if err != nil {
 				return err
 			}
 			if !ok {
 				secure = false
-				securityMessage = fmt.Sprintf("Found package vulnerabilities: %s\n", url)
+				securityMessage += fmt.Sprintf("Found package vulnerabilities: %s\n", url)
+			}
+			return nil
+		}
+		composer := filepath.Join(repoPath, "composer.lock")
+		if util.FileExists(composer) {
+			_, err := scanner.CheckPackages(common.PHP, composer)
+			if err != nil {
+				return err
+			}
+			scanner.WaitForQuery()
+			ok, url, err := scanner.Query()
+			if err != nil {
+				return err
+			}
+			if !ok {
+				secure = false
+				securityMessage += fmt.Sprintf("Found package vulnerabilities: %s\n", url)
 			}
 			return nil
 		}
