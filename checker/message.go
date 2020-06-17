@@ -20,6 +20,8 @@ import (
 	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/github"
 	"github.com/sourcegraph/go-diff/diff"
+	"github.com/tengattack/unified-ci/checks/vulnerability/common"
+	"github.com/tengattack/unified-ci/checks/vulnerability/riki"
 	"github.com/tengattack/unified-ci/store"
 	"github.com/tengattack/unified-ci/util"
 	"golang.org/x/net/proxy"
@@ -81,6 +83,48 @@ func GenerateAnnotations(ctx context.Context, ref GithubRef, repoPath string, di
 		annotationsArr[2], problemsArr[2], err = CheckFileMode(diffs, repoPath, &bufArr[2])
 		return err
 	})
+
+	secure := true
+	securityMessage := ""
+	eg.Go(func() error {
+		scanner := riki.Scanner{ProjectName: ref.repo}
+		gomod := filepath.Join(repoPath, "go.sum")
+		if util.FileExists(gomod) {
+			_, err := scanner.CheckPackages(common.Golang, gomod)
+			if err != nil {
+				return err
+			}
+			scanner.WaitForQuery()
+			ok, url, err := scanner.Query()
+			if err != nil {
+				return err
+			}
+			if !ok {
+				secure = false
+				securityMessage += fmt.Sprintf("Found package vulnerabilities: %s\n", url)
+			}
+			return nil
+		}
+		composer := filepath.Join(repoPath, "composer.lock")
+		if util.FileExists(composer) {
+			_, err := scanner.CheckPackages(common.PHP, composer)
+			if err != nil {
+				return err
+			}
+			scanner.WaitForQuery()
+			ok, url, err := scanner.Query()
+			if err != nil {
+				return err
+			}
+			if !ok {
+				secure = false
+				securityMessage += fmt.Sprintf("Found package vulnerabilities: %s\n", url)
+			}
+			return nil
+		}
+		return nil
+	})
+
 	err = eg.Wait()
 
 	annotations = append(annotations, annotationsArr[0]...)
@@ -92,6 +136,12 @@ func GenerateAnnotations(ctx context.Context, ref GithubRef, repoPath string, di
 	log.WriteString(bufArr[0].String())
 	log.WriteString(bufArr[1].String())
 	log.WriteString(bufArr[2].String())
+
+	if !secure {
+		problems++
+		log.WriteString(securityMessage)
+		outputSummary += securityMessage
+	}
 
 	return
 }
