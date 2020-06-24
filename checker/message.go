@@ -785,7 +785,7 @@ func HandleMessage(ctx context.Context, message string) error {
 			noTest = false
 		}
 	}
-	go VulnerabilityCheckRun(ctx, client, gpull, ref, repoPath, targetURL, log)
+	VulnerabilityCheckRun(ctx, client, gpull, ref, repoPath, targetURL, log)
 
 	mark := '✔'
 	sumCount := failedLints + failedTests
