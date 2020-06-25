@@ -12,6 +12,7 @@ A unified continuous integration tool for coding style check.
 * [eslint](https://github.com/eslint/eslint)
   - [eslint-plugin-html](https://github.com/BenoitZugmeyer/eslint-plugin-html)
 * [golangci](https://github.com/golangci/golangci-lint)
+* [ktlint](https://github.com/pinterest/ktlint)
 * [phplint](https://github.com/tengattack/phplint)
 * [scss-lint](https://github.com/brigade/scss-lint)
 * [tslint](https://github.com/palantir/tslint)
@@ -56,9 +57,11 @@ It will read linter's configuration file from the root path of repository:
   - `.html`, `.php`
 7. JavaScript: [eslint](https://github.com/eslint/eslint)
   - `.es`, `.js` ...
-8. PHP: [phplint](https://github.com/tengattack/phplint)
+8. Kotlin: [ktlint](https://github.com/pinterest/ktlint)
+  - `.kt`
+9. PHP: [phplint](https://github.com/tengattack/phplint)
   - `.php`
-9. TypeScript: [tslint](https://github.com/palantir/tslint)
+10. TypeScript: [tslint](https://github.com/palantir/tslint)
   - `.ts` ...
-10. Markdown: [remark-lint](https://github.com/remarkjs/remark-lint), [remark-pangu](https://github.com/VincentBel/remark-pangu)
+11. Markdown: [remark-lint](https://github.com/remarkjs/remark-lint), [remark-pangu](https://github.com/VincentBel/remark-pangu)
   - `.md`
