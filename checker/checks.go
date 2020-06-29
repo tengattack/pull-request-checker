@@ -46,18 +46,31 @@ func VulnerabilityCheckRun(ctx context.Context, client *github.Client, gpull *gi
 		msg := fmt.Sprintf("Creating %s check run failed: %v", checkName, err)
 		_, _ = io.WriteString(log, msg+"\n")
 		LogError.Error(msg)
-		return 0, err
+		// PASS
 	}
+	checkRunID := checkRun.GetID()
 
 	ok, data, err := CheckVulnerability(ref.repo, repoPath)
 	if err != nil {
 		msg := fmt.Sprintf("checks package vulnerabilities failed: %v", err)
 		_, _ = io.WriteString(log, msg+"\n")
 		LogError.Error(msg)
+		if checkRunID != 0 {
+			UpdateCheckRunWithError(ctx, client, gpull, checkRunID, checkName, checkName, err)
+		}
 		return 0, err
 	}
 
-	checkRunID := checkRun.GetID()
+	if checkRunID == 0 {
+		checkRun, err := CreateCheckRun(ctx, client, gpull, checkName, ref, targetURL)
+		if err != nil {
+			msg := fmt.Sprintf("Creating %s check run failed: %v", checkName, err)
+			_, _ = io.WriteString(log, msg+"\n")
+			LogError.Error(msg)
+			return 0, err
+		}
+		checkRunID = checkRun.GetID()
+	}
 	conclusion := "success"
 	if !ok {
 		conclusion = "failure"
