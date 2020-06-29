@@ -78,7 +78,7 @@ func VulnerabilityCheckRun(ctx context.Context, client *github.Client, gpull *gi
 	t := github.Timestamp{Time: time.Now()}
 	message := riki.Data{}.MDTitle()
 	for _, v := range data {
-		message += v.ToMDTable()
+		message += v.MDTableRow()
 	}
 	err = UpdateCheckRun(ctx, client, gpull, checkRunID, checkName, conclusion, t, conclusion, message, nil)
 	if err != nil {

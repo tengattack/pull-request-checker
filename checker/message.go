@@ -785,7 +785,7 @@ func HandleMessage(ctx context.Context, message string) error {
 			noTest = false
 		}
 	}
-	vulnerabilitiesCount, errVul := VulnerabilityCheckRun(ctx, client, gpull, ref, repoPath, targetURL, log)
+	vulnerabilitiesCount, _ := VulnerabilityCheckRun(ctx, client, gpull, ref, repoPath, targetURL, log)
 
 	mark := '✔'
 	sumCount := failedLints + failedTests + vulnerabilitiesCount
@@ -821,11 +821,7 @@ func HandleMessage(ctx context.Context, message string) error {
 				comment += fmt.Sprintf("**test**: %d problem(s) found.\n\n", failedTests)
 				comment += testMsg
 			}
-			if errVul != nil {
-				comment += "**vulnerabilities**: action required.\n"
-			} else {
-				comment += fmt.Sprintf("**vulnerabilities**: %d problem(s) found.\n", vulnerabilitiesCount)
-			}
+			comment += fmt.Sprintf("**vulnerabilities**: %d problem(s) found.\n", vulnerabilitiesCount)
 			err = ref.CreateReview(client, prNum, "REQUEST_CHANGES", comment, nil)
 		} else {
 			comment := "**check**: no problems found.\n"
