@@ -817,11 +817,11 @@ func HandleMessage(ctx context.Context, message string) error {
 		// create review
 		if sumCount > 0 {
 			comment := fmt.Sprintf("**lint**: %d problem(s) found.\n", failedLints)
+			comment += fmt.Sprintf("**vulnerabilities**: %d problem(s) found.\n", vulnerabilitiesCount)
 			if !noTest {
 				comment += fmt.Sprintf("**test**: %d problem(s) found.\n\n", failedTests)
 				comment += testMsg
 			}
-			comment += fmt.Sprintf("**vulnerabilities**: %d problem(s) found.\n", vulnerabilitiesCount)
 			err = ref.CreateReview(client, prNum, "REQUEST_CHANGES", comment, nil)
 		} else {
 			comment := "**check**: no problems found.\n"
