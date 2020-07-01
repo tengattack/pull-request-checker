@@ -40,15 +40,17 @@ func CheckVulnerability(projectName, repoPath string) (bool, []riki.Data, error)
 // VulnerabilityCheckRun checks and reports package vulnerabilities.
 func VulnerabilityCheckRun(ctx context.Context, client *github.Client, gpull *github.PullRequest, ref GithubRef,
 	repoPath string, targetURL string, log io.Writer) (int, error) {
-	checkName := "vulnerability"
+	const checkName = "vulnerability"
+	var checkRunID int64
 	checkRun, err := CreateCheckRun(ctx, client, gpull, checkName, ref, targetURL)
 	if err != nil {
 		msg := fmt.Sprintf("Creating %s check run failed: %v", checkName, err)
 		_, _ = io.WriteString(log, msg+"\n")
 		LogError.Error(msg)
 		// PASS
+	} else {
+		checkRunID = checkRun.GetID()
 	}
-	checkRunID := checkRun.GetID()
 
 	ok, data, err := CheckVulnerability(ref.repo, repoPath)
 	if err != nil {
