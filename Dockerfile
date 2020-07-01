@@ -2,7 +2,7 @@ FROM golang:1.13-alpine3.10 AS builder
 
 ARG version
 
-ENV GO111MODULES=on GOPROXY=https://goproxy.cn,direct
+ENV GO111MODULES=on GOPROXY=https://goproxy.io,direct
 
 # Download packages from aliyun mirrors
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories \
@@ -71,7 +71,7 @@ RUN adduser -D ci && \
     apk del --no-network .build-deps && \
     rm -rf ~/.gem/ && \
 # golangci-lint
-    wget -O- -nv https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.22.2 && \
+    wget -O- -nv https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.24.0 && \
     ln -s /go/bin/golangci-lint /usr/local/bin/ && \
     golangci-lint --version
 
