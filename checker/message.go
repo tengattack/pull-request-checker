@@ -817,7 +817,7 @@ func HandleMessage(ctx context.Context, message string) error {
 		// create review
 		if sumCount > 0 {
 			comment := fmt.Sprintf("**lint**: %d problem(s) found.\n", failedLints)
-			comment += fmt.Sprintf("**vulnerabilities**: %d problem(s) found.\n", vulnerabilitiesCount)
+			comment += fmt.Sprintf("**vulnerability**: %d problem(s) found.\n", vulnerabilitiesCount)
 			if !noTest {
 				comment += fmt.Sprintf("**test**: %d problem(s) found.\n\n", failedTests)
 				comment += testMsg

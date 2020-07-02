@@ -34,10 +34,19 @@ func CheckVulnerability(projectName, repoPath string) (bool, []riki.Data, error)
 		scanner.WaitForQuery()
 		return scanner.Query()
 	}
+	nodePackage := filepath.Join(repoPath, "package.json")
+	if util.FileExists(nodePackage) {
+		_, err := scanner.CheckPackages(common.NodeJS, nodePackage)
+		if err != nil {
+			return true, nil, err
+		}
+		scanner.WaitForQuery()
+		return scanner.Query()
+	}
 	return true, nil, nil
 }
 
-// VulnerabilityCheckRun checks and reports package vulnerabilities.
+// VulnerabilityCheckRun checks and reports package vulnerability.
 func VulnerabilityCheckRun(ctx context.Context, client *github.Client, gpull *github.PullRequest, ref GithubRef,
 	repoPath string, targetURL string, log io.Writer) (int, error) {
 	const checkName = "vulnerability"
@@ -54,7 +63,7 @@ func VulnerabilityCheckRun(ctx context.Context, client *github.Client, gpull *gi
 
 	ok, data, err := CheckVulnerability(ref.repo, repoPath)
 	if err != nil {
-		msg := fmt.Sprintf("checks package vulnerabilities failed: %v", err)
+		msg := fmt.Sprintf("checks package vulnerability failed: %v", err)
 		_, _ = io.WriteString(log, msg+"\n")
 		LogError.Error(msg)
 		if checkRunID != 0 {
@@ -84,7 +93,7 @@ func VulnerabilityCheckRun(ctx context.Context, client *github.Client, gpull *gi
 	}
 	err = UpdateCheckRun(ctx, client, gpull, checkRunID, checkName, conclusion, t, conclusion, message, nil)
 	if err != nil {
-		msg := fmt.Sprintf("report package vulnerabilities to github failed: %v", err)
+		msg := fmt.Sprintf("report package vulnerability to github failed: %v", err)
 		_, _ = io.WriteString(log, msg+"\n")
 		LogError.Error(msg)
 		return 0, err
