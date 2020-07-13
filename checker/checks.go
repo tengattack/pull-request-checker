@@ -23,7 +23,7 @@ func CheckVulnerability(projectName, repoPath string) (bool, []riki.Data, error)
 			return true, nil, err
 		}
 		scanner.WaitForQuery()
-		return scanner.Query()
+		return scanner.Query(common.Golang)
 	}
 	composer := filepath.Join(repoPath, "composer.lock")
 	if util.FileExists(composer) {
@@ -32,7 +32,7 @@ func CheckVulnerability(projectName, repoPath string) (bool, []riki.Data, error)
 			return true, nil, err
 		}
 		scanner.WaitForQuery()
-		return scanner.Query()
+		return scanner.Query(common.PHP)
 	}
 	nodePackage := filepath.Join(repoPath, "package.json")
 	if util.FileExists(nodePackage) {
@@ -41,7 +41,7 @@ func CheckVulnerability(projectName, repoPath string) (bool, []riki.Data, error)
 			return true, nil, err
 		}
 		scanner.WaitForQuery()
-		return scanner.Query()
+		return scanner.Query(common.NodeJS)
 	}
 	return true, nil, nil
 }
