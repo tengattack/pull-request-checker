@@ -93,14 +93,15 @@ func VulnerabilityCheckRun(ctx context.Context, client *github.Client, gpull *gi
 		checkRunID = checkRun.GetID()
 	}
 	conclusion := "success"
-	message := ""
+	message := "no vulnerabilities"
 	if len(data) > 0 {
 		conclusion = "failure"
 		message = data[0].MDTitle()
+		for _, v := range data {
+			message += v.MDTableRow()
+		}
 	}
-	for _, v := range data {
-		message += v.MDTableRow()
-	}
+
 	t := github.Timestamp{Time: time.Now()}
 	err = UpdateCheckRun(ctx, client, gpull, checkRunID, checkName, conclusion, t, conclusion, message, nil)
 	if err != nil {
