@@ -15,19 +15,16 @@ import (
 
 // CheckVulnerability checks the package vulnerability of repo
 func CheckVulnerability(projectName, repoPath string) (result []riki.Data, err error) {
+	var lang []common.Language
 	scanner := riki.Scanner{ProjectName: projectName}
+
 	gomod := filepath.Join(repoPath, "go.sum")
 	if util.FileExists(gomod) {
 		_, err := scanner.CheckPackages(common.Golang, gomod)
 		if err != nil {
 			return nil, err
 		}
-		scanner.WaitForQuery()
-		data, err := scanner.Query(common.Golang)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, data...)
+		lang = append(lang, common.Golang)
 	}
 	composer := filepath.Join(repoPath, "composer.lock")
 	if util.FileExists(composer) {
@@ -35,12 +32,7 @@ func CheckVulnerability(projectName, repoPath string) (result []riki.Data, err e
 		if err != nil {
 			return nil, err
 		}
-		scanner.WaitForQuery()
-		data, err := scanner.Query(common.PHP)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, data...)
+		lang = append(lang, common.PHP)
 	}
 	nodePackage := filepath.Join(repoPath, "package.json")
 	if util.FileExists(nodePackage) {
@@ -48,12 +40,18 @@ func CheckVulnerability(projectName, repoPath string) (result []riki.Data, err e
 		if err != nil {
 			return nil, err
 		}
+		lang = append(lang, common.NodeJS)
+	}
+
+	if len(lang) > 0 {
 		scanner.WaitForQuery()
-		data, err := scanner.Query(common.NodeJS)
-		if err != nil {
-			return nil, err
+		for _, v := range lang {
+			data, err := scanner.Query(v)
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, data...)
 		}
-		result = append(result, data...)
 	}
 	return result, nil
 }
