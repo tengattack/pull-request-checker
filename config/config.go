@@ -9,12 +9,13 @@ import (
 
 // Config is the main config struct.
 type Config struct {
-	Core         SectionCore         `yaml:"core"`
-	API          SectionAPI          `yaml:"api"`
-	GitHub       SectionGitHub       `yaml:"github"`
-	Log          SectionLog          `yaml:"log"`
-	MessageQueue SectionMessageQueue `yaml:"mq"`
-	Concurrency  SectionConcurrency  `yaml:"concurrency"`
+	Core          SectionCore          `yaml:"core"`
+	API           SectionAPI           `yaml:"api"`
+	GitHub        SectionGitHub        `yaml:"github"`
+	Log           SectionLog           `yaml:"log"`
+	MessageQueue  SectionMessageQueue  `yaml:"mq"`
+	Vulnerability SectionVulnerability `yaml:"vulnerability"`
+	Concurrency   SectionConcurrency   `yaml:"concurrency"`
 }
 
 // SectionCore is a sub section of config.
@@ -73,6 +74,12 @@ type SectionMessageQueue struct {
 	Redis  mqredis.Config `yaml:"redis"`
 }
 
+// SectionVulnerability is a sub section of config.
+type SectionVulnerability struct {
+	Provider      string `yaml:"riki"`
+	AppNamePrefix string `yaml:"app_name_prefix"`
+}
+
 // SectionConcurrency is a sub section of config.
 type SectionConcurrency struct {
 	Lint int `yaml:"lint"`
@@ -128,6 +135,10 @@ func BuildDefaultConf() Config {
 	conf.MessageQueue.Redis.Password = ""
 	conf.MessageQueue.Redis.DB = 0
 	conf.MessageQueue.Redis.PoolSize = 10
+
+	// Vulnerability
+	conf.Vulnerability.Provider = "riki" // current support `riki` only
+	conf.Vulnerability.AppNamePrefix = ""
 
 	// Concurrency
 	conf.Concurrency.Lint = 4

@@ -8,39 +8,39 @@ import (
 	"time"
 
 	"github.com/google/go-github/github"
-	"github.com/tengattack/unified-ci/checks/vulnerability/common"
-	"github.com/tengattack/unified-ci/checks/vulnerability/riki"
+	vul "github.com/tengattack/unified-ci/checks/vulnerability"
+	vulcommon "github.com/tengattack/unified-ci/checks/vulnerability/common"
 	"github.com/tengattack/unified-ci/util"
 )
 
 // CheckVulnerability checks the package vulnerability of repo
-func CheckVulnerability(projectName, repoPath string) (result []riki.Data, err error) {
-	var lang []common.Language
-	scanner := riki.Scanner{ProjectName: projectName}
+func CheckVulnerability(projectName, repoPath string) (result []vulcommon.Data, err error) {
+	var lang []vulcommon.Language
+	scanner := vul.NewScanner(projectName, Conf.Vulnerability)
 
 	gomod := filepath.Join(repoPath, "go.sum")
 	if util.FileExists(gomod) {
-		_, err := scanner.CheckPackages(common.Golang, gomod)
+		_, err := scanner.CheckPackages(vulcommon.Golang, gomod)
 		if err != nil {
 			return nil, err
 		}
-		lang = append(lang, common.Golang)
+		lang = append(lang, vulcommon.Golang)
 	}
 	composer := filepath.Join(repoPath, "composer.lock")
 	if util.FileExists(composer) {
-		_, err := scanner.CheckPackages(common.PHP, composer)
+		_, err := scanner.CheckPackages(vulcommon.PHP, composer)
 		if err != nil {
 			return nil, err
 		}
-		lang = append(lang, common.PHP)
+		lang = append(lang, vulcommon.PHP)
 	}
 	nodePackage := filepath.Join(repoPath, "package.json")
 	if util.FileExists(nodePackage) {
-		_, err := scanner.CheckPackages(common.NodeJS, nodePackage)
+		_, err := scanner.CheckPackages(vulcommon.NodeJS, nodePackage)
 		if err != nil {
 			return nil, err
 		}
-		lang = append(lang, common.NodeJS)
+		lang = append(lang, vulcommon.NodeJS)
 	}
 
 	if len(lang) > 0 {

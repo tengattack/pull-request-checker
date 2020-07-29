@@ -49,6 +49,10 @@ mq:
     password: ""
     db: 0
 
+vulnerability:
+  provider: riki
+  app_name_prefix: ''
+
 concurrency:
   lint: 4
   test: 1
