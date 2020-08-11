@@ -52,6 +52,7 @@ mq:
 vulnerability:
   provider: riki
   app_name_prefix: ''
+  app_from: ''
 
 concurrency:
   lint: 4

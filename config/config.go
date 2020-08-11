@@ -78,6 +78,7 @@ type SectionMessageQueue struct {
 type SectionVulnerability struct {
 	Provider      string `yaml:"riki"`
 	AppNamePrefix string `yaml:"app_name_prefix"`
+	AppFrom       string `yaml:"app_from"`
 }
 
 // SectionConcurrency is a sub section of config.
@@ -139,6 +140,7 @@ func BuildDefaultConf() Config {
 	// Vulnerability
 	conf.Vulnerability.Provider = "riki" // current support `riki` only
 	conf.Vulnerability.AppNamePrefix = ""
+	conf.Vulnerability.AppFrom = ""
 
 	// Concurrency
 	conf.Concurrency.Lint = 4

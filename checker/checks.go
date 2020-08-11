@@ -14,9 +14,11 @@ import (
 )
 
 // CheckVulnerability checks the package vulnerability of repo
-func CheckVulnerability(projectName, repoPath string) (result []vulcommon.Data, err error) {
+func CheckVulnerability(projectName, repoPath, commitID, context string) (result []vulcommon.Data, err error) {
 	var lang []vulcommon.Language
 	scanner := vul.NewScanner(projectName, Conf.Vulnerability)
+	scanner.SetCommitID(commitID)
+	scanner.SetContext(context)
 
 	gomod := filepath.Join(repoPath, "go.sum")
 	if util.FileExists(gomod) {
@@ -61,54 +63,92 @@ func VulnerabilityCheckRun(ctx context.Context, client *github.Client, gpull *gi
 	repoPath string, targetURL string, log io.Writer) (int, error) {
 	const checkName = "vulnerability"
 	var checkRunID int64
-	checkRun, err := CreateCheckRun(ctx, client, gpull, checkName, ref, targetURL)
-	if err != nil {
-		msg := fmt.Sprintf("Creating %s check run failed: %v", checkName, err)
-		_, _ = io.WriteString(log, msg+"\n")
-		LogError.Error(msg)
-		// PASS
-	} else {
-		checkRunID = checkRun.GetID()
-	}
 
-	data, err := CheckVulnerability(ref.repo, repoPath)
-	if err != nil {
-		msg := fmt.Sprintf("checks package vulnerability failed: %v", err)
-		_, _ = io.WriteString(log, msg+"\n")
-		LogError.Error(msg)
-		if checkRunID != 0 {
-			UpdateCheckRunWithError(ctx, client, gpull, checkRunID, checkName, checkName, err)
+	if ref.IsBranch() {
+		err := ref.UpdateState(client, checkName, "pending", targetURL, "running")
+		if err != nil {
+			msg := fmt.Sprintf("Update commit state %s failed: %v", checkName, err)
+			_, _ = io.WriteString(log, msg+"\n")
+			LogError.Error(msg)
+			// PASS
 		}
-		return 0, err
-	}
-
-	if checkRunID == 0 {
+	} else {
 		checkRun, err := CreateCheckRun(ctx, client, gpull, checkName, ref, targetURL)
 		if err != nil {
 			msg := fmt.Sprintf("Creating %s check run failed: %v", checkName, err)
 			_, _ = io.WriteString(log, msg+"\n")
 			LogError.Error(msg)
-			return 0, err
-		}
-		checkRunID = checkRun.GetID()
-	}
-	conclusion := "success"
-	message := "no vulnerabilities"
-	if len(data) > 0 {
-		conclusion = "failure"
-		message = data[0].MDTitle()
-		for _, v := range data {
-			message += v.MDTableRow()
+			// PASS
+		} else {
+			checkRunID = checkRun.GetID()
 		}
 	}
 
-	t := github.Timestamp{Time: time.Now()}
-	err = UpdateCheckRun(ctx, client, gpull, checkRunID, checkName, conclusion, t, conclusion, message, nil)
+	data, err := CheckVulnerability(ref.repo, repoPath, ref.Sha, ref.checkRef)
 	if err != nil {
-		msg := fmt.Sprintf("report package vulnerability to github failed: %v", err)
+		msg := fmt.Sprintf("checks package vulnerability failed: %v", err)
 		_, _ = io.WriteString(log, msg+"\n")
 		LogError.Error(msg)
+		if ref.IsBranch() {
+			err := ref.UpdateState(client, checkName, "failure", targetURL, "")
+			if err != nil {
+				msg := fmt.Sprintf("Update commit state %s failed: %v", checkName, err)
+				_, _ = io.WriteString(log, msg+"\n")
+				LogError.Error(msg)
+				// PASS
+			}
+		} else {
+			if checkRunID != 0 {
+				UpdateCheckRunWithError(ctx, client, gpull, checkRunID, checkName, checkName, err)
+			}
+		}
 		return 0, err
+	}
+
+	if ref.IsBranch() {
+		state := "success"
+		title := "no vulnerabilities"
+		if len(data) > 0 {
+			state = "error"
+			title = fmt.Sprintf("%d problem(s) found.", len(data))
+		}
+		err := ref.UpdateState(client, checkName, state, targetURL, title)
+		if err != nil {
+			msg := fmt.Sprintf("Update commit state %s failed: %v", checkName, err)
+			_, _ = io.WriteString(log, msg+"\n")
+			LogError.Error(msg)
+			// PASS
+		}
+	} else {
+		if checkRunID == 0 {
+			checkRun, err := CreateCheckRun(ctx, client, gpull, checkName, ref, targetURL)
+			if err != nil {
+				msg := fmt.Sprintf("Creating %s check run failed: %v", checkName, err)
+				_, _ = io.WriteString(log, msg+"\n")
+				LogError.Error(msg)
+				return 0, err
+			}
+			checkRunID = checkRun.GetID()
+		}
+
+		conclusion := "success"
+		message := "no vulnerabilities"
+		if len(data) > 0 {
+			conclusion = "failure"
+			message = data[0].MDTitle()
+			for _, v := range data {
+				message += v.MDTableRow()
+			}
+		}
+
+		t := github.Timestamp{Time: time.Now()}
+		err = UpdateCheckRun(ctx, client, gpull, checkRunID, checkName, conclusion, t, conclusion, message, nil)
+		if err != nil {
+			msg := fmt.Sprintf("report package vulnerability to github failed: %v", err)
+			_, _ = io.WriteString(log, msg+"\n")
+			LogError.Error(msg)
+			return 0, err
+		}
 	}
 	return len(data), nil
 }
