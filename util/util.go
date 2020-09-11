@@ -2,9 +2,10 @@ package util
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
+
+	"github.com/bmatcuk/doublestar"
 )
 
 // ParseFloatPercent converts percentages string to float number
@@ -38,15 +39,6 @@ func Unquote(input string) string {
 	return newName
 }
 
-// FileExists returns true if filename exists and is not a directory
-func FileExists(filename string) bool {
-	info, err := os.Stat(filename)
-	if os.IsNotExist(err) {
-		return false
-	}
-	return !info.IsDir()
-}
-
 // Truncated returns whether the truncation is performed and the result of s:
 // e.g. Truncated("1200 0000 0000 0034", " ... ", 9) = (true, "12 ... 34")
 func Truncated(s string, t string, n int) (bool, string) {
@@ -67,4 +59,15 @@ func Truncated(s string, t string, n int) (bool, string) {
 	b := p / 2
 	e := p - b
 	return true, s[:b] + t + s[len(s)-e:]
+}
+
+// MatchAny checks if path matches any of the given patterns
+func MatchAny(patterns []string, path string) bool {
+	for _, pattern := range patterns {
+		match, _ := doublestar.Match(pattern, path)
+		if match {
+			return true
+		}
+	}
+	return false
 }

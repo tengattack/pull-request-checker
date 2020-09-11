@@ -14,6 +14,7 @@ import (
 
 	"github.com/google/go-github/github"
 	shellwords "github.com/mattn/go-shellwords"
+	"github.com/tengattack/unified-ci/common"
 	"github.com/tengattack/unified-ci/store"
 	"github.com/tengattack/unified-ci/util"
 )
@@ -48,7 +49,7 @@ func carry(ctx context.Context, p *shellwords.Parser, repo, cmd string, log io.W
 
 // ReportTestResults reports the test results to github
 func ReportTestResults(ctx context.Context, testName string, repoPath string, cmds []string, coveragePattern string, client *github.Client, gpull *github.PullRequest,
-	ref GithubRef, targetURL string, log io.Writer) (string, error) {
+	ref common.GithubRef, targetURL string, log io.Writer) (string, error) {
 	outputTitle := testName + " test"
 
 	t := github.Timestamp{Time: time.Now()}
@@ -59,7 +60,7 @@ func ReportTestResults(ctx context.Context, testName string, repoPath string, cm
 		if err != nil {
 			msg := fmt.Sprintf("Update commit state %s failed: %v", outputTitle, err)
 			_, _ = io.WriteString(log, msg+"\n")
-			LogError.Error(msg)
+			common.LogError.Error(msg)
 			// PASS
 		}
 	} else {
@@ -67,7 +68,7 @@ func ReportTestResults(ctx context.Context, testName string, repoPath string, cm
 		if err != nil {
 			msg := fmt.Sprintf("Creating %s check run failed: %v", outputTitle, err)
 			_, _ = io.WriteString(log, msg+"\n")
-			LogError.Error(msg)
+			common.LogError.Error(msg)
 			// PASS
 		} else {
 			checkRunID = checkRun.GetID()
@@ -92,7 +93,7 @@ func ReportTestResults(ctx context.Context, testName string, repoPath string, cm
 		if err != nil {
 			msg := fmt.Sprintf("Update commit state %s failed: %v", outputTitle, err)
 			_, _ = io.WriteString(log, msg+"\n")
-			LogError.Error(msg)
+			common.LogError.Error(msg)
 			// PASS
 		}
 	} else {
@@ -102,7 +103,7 @@ func ReportTestResults(ctx context.Context, testName string, repoPath string, cm
 			if err != nil {
 				msg := fmt.Sprintf("Creating %s check run failed: %v", outputTitle, err)
 				_, _ = io.WriteString(log, msg+"\n")
-				LogError.Error(msg)
+				common.LogError.Error(msg)
 				// PASS
 			} else {
 				checkRunID = checkRun.GetID()
@@ -112,7 +113,7 @@ func ReportTestResults(ctx context.Context, testName string, repoPath string, cm
 		if checkRunID != 0 {
 			err := UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, title, "```\n"+outputSummary+"\n```", nil)
 			if err != nil {
-				LogError.Errorf("report test results to github failed: %v", err)
+				common.LogError.Errorf("report test results to github failed: %v", err)
 				// PASS
 			}
 		}
@@ -142,9 +143,9 @@ func parseCoverage(pattern, output string) (string, float64, error) {
 	return coverage, pct, nil
 }
 
-func testAndSaveCoverage(ctx context.Context, ref GithubRef, testName string, cmds []string, coveragePattern string,
+func testAndSaveCoverage(ctx context.Context, ref common.GithubRef, testName string, cmds []string, coveragePattern string,
 	repoPath string, gpull *github.PullRequest, breakOnFails bool, log io.Writer) (conclusion, reportMessage, outputSummary string) {
-	parser := NewShellParser(repoPath, ref)
+	parser := util.NewShellParser(repoPath, ref)
 
 	_, _ = io.WriteString(log, fmt.Sprintf("Testing '%s'\n", testName))
 	conclusion = "success"
@@ -173,14 +174,14 @@ func testAndSaveCoverage(ctx context.Context, ref GithubRef, testName string, cm
 		percentage, pct, err := parseCoverage(coveragePattern, outputSummary)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to parse %s test coverage: %v\n", testName, err)
-			LogError.Error(msg)
+			common.LogError.Error(msg)
 			_, _ = io.WriteString(log, msg)
 			// PASS
 		}
 		if err == nil || ref.IsBranch() {
 			c := store.CommitsInfo{
-				Owner:    ref.owner,
-				Repo:     ref.repo,
+				Owner:    ref.Owner,
+				Repo:     ref.RepoName,
 				Sha:      ref.Sha,
 				Author:   gpull.GetHead().GetUser().GetLogin(),
 				Test:     testName,
@@ -200,7 +201,7 @@ func testAndSaveCoverage(ctx context.Context, ref GithubRef, testName string, cm
 			if err != nil {
 				msg := fmt.Sprintf("Error: %v. Failed to save %v\n", err, c)
 				outputSummary += msg
-				LogError.Error(msg)
+				common.LogError.Error(msg)
 				_, _ = io.WriteString(log, msg)
 			}
 		}
@@ -211,8 +212,8 @@ func testAndSaveCoverage(ctx context.Context, ref GithubRef, testName string, cm
 		pct := float64(-1)
 		// saving build state with -1 coverage
 		c := store.CommitsInfo{
-			Owner:    ref.owner,
-			Repo:     ref.repo,
+			Owner:    ref.Owner,
+			Repo:     ref.RepoName,
 			Sha:      ref.Sha,
 			Author:   gpull.GetHead().GetUser().GetLogin(),
 			Test:     testName,
@@ -226,7 +227,7 @@ func testAndSaveCoverage(ctx context.Context, ref GithubRef, testName string, cm
 		err := c.Save()
 		if err != nil {
 			msg := fmt.Sprintf("Error: %v. Failed to save %v\n", err, c)
-			LogError.Error(msg)
+			common.LogError.Error(msg)
 			_, _ = io.WriteString(log, msg)
 		}
 	}

@@ -1,9 +1,4 @@
-package checker
-
-const (
-	// AppName is a string label
-	AppName = "unified-ci"
-)
+package common
 
 // Check Types
 const (

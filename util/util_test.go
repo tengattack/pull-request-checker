@@ -30,13 +30,6 @@ func TestUnquote(t *testing.T) {
 	assert.Equal(`hello world`, Unquote(`hello world`))
 }
 
-func TestFileExists(t *testing.T) {
-	assert := assert.New(t)
-
-	assert.False(FileExists("../testdata"))
-	assert.True(FileExists("./util_test.go"))
-}
-
 func TestTruncated(t *testing.T) {
 	assert := assert.New(t)
 
@@ -55,4 +48,11 @@ func TestTruncated(t *testing.T) {
 	b, s = Truncated("abc", "", 3)
 	assert.False(b)
 	assert.Equal("abc", s)
+}
+
+func TestMatchAny(t *testing.T) {
+	assert := assert.New(t)
+
+	assert.True(MatchAny([]string{"sdk/**"}, "sdk/v2/x"))
+	assert.False(MatchAny([]string{"sdk/*"}, "sdk/v2/x"))
 }

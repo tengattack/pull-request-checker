@@ -5,22 +5,23 @@ import (
 	"errors"
 	"time"
 
+	"github.com/tengattack/unified-ci/common"
 	"github.com/tengattack/unified-ci/mq/redis"
 )
 
 // InitMessageQueue for initialize message queue
 func InitMessageQueue() error {
-	LogAccess.Debug("Init Message Queue Engine as ", Conf.MessageQueue.Engine)
-	switch Conf.MessageQueue.Engine {
+	common.LogAccess.Debug("Init Message Queue Engine as ", common.Conf.MessageQueue.Engine)
+	switch common.Conf.MessageQueue.Engine {
 	case "redis":
-		MQ = redis.New(Conf.MessageQueue.Redis)
+		common.MQ = redis.New(common.Conf.MessageQueue.Redis)
 	default:
-		LogError.Error("mq error: can't find mq driver")
+		common.LogError.Error("mq error: can't find mq driver")
 		return errors.New("can't find mq driver")
 	}
 
-	if err := MQ.Init(); err != nil {
-		LogError.Error("mq error: " + err.Error())
+	if err := common.MQ.Init(); err != nil {
+		common.LogError.Error("mq error: " + err.Error())
 
 		return err
 	}
@@ -30,39 +31,39 @@ func InitMessageQueue() error {
 
 // StartMessageSubscription for main message subscription and process message
 func StartMessageSubscription(ctx context.Context) {
-	LogAccess.Info("Start Message Subscription")
+	common.LogAccess.Info("Start Message Subscription")
 
 	for {
 		select {
 		case <-ctx.Done():
-			LogAccess.Warn("StartMessageSubscription canceled.")
+			common.LogAccess.Warn("StartMessageSubscription canceled.")
 			return
 		default:
 		}
-		LogAccess.Info("Waiting for message...")
-		message, err := MQ.Subscribe(ctx)
+		common.LogAccess.Info("Waiting for message...")
+		message, err := common.MQ.Subscribe(ctx)
 		if err != nil && err != context.Canceled {
-			LogError.Error("mq subscribe error: " + err.Error())
+			common.LogError.Error("mq subscribe error: " + err.Error())
 			continue
 		}
 		if message == "" {
 			continue
 		}
-		LogAccess.Info("Got message: " + message)
+		common.LogAccess.Info("Got message: " + message)
 
 		err = HandleMessage(ctx, message)
 		if err != nil {
-			LogError.Error("handle message error: " + err.Error())
-			err = MQ.Error(message)
+			common.LogError.Error("handle message error: " + err.Error())
+			err = common.MQ.Error(message)
 			if err != nil {
-				LogError.Error("mark message error failed: " + err.Error())
+				common.LogError.Error("mark message error failed: " + err.Error())
 			}
 			continue
 		}
 
-		err = MQ.Finish(message)
+		err = common.MQ.Finish(message)
 		if err != nil {
-			LogError.Error("mq finish error: " + err.Error())
+			common.LogError.Error("mq finish error: " + err.Error())
 		}
 	}
 }
@@ -70,25 +71,25 @@ func StartMessageSubscription(ctx context.Context) {
 // RetryErrorMessages helps retry error messages
 func RetryErrorMessages(ctx context.Context) {
 	// move pending message to error channel
-	count, _ := MQ.MoveAllPendingToError()
+	count, _ := common.MQ.MoveAllPendingToError()
 	if count > 0 {
-		LogAccess.Infof("Move %d pending message(s) to error channel", count)
+		common.LogAccess.Infof("Move %d pending message(s) to error channel", count)
 	}
 
 	for {
 		select {
 		case <-ctx.Done():
-			LogAccess.Warn("RetryErrorMessages canceled.")
+			common.LogAccess.Warn("RetryErrorMessages canceled.")
 			return
 		case <-time.After(60 * time.Second):
 		}
-		s, err := MQ.MoveErrorToPending()
+		s, err := common.MQ.MoveErrorToPending()
 		if err != nil || len(s) <= 0 {
 			continue
 		}
-		retries, _ := MQ.GetErrorTimes(s)
-		LogAccess.Infof("Retry message: '%s', retries: %d", s, retries)
-		if retries <= Conf.Core.MaxRetries {
+		retries, _ := common.MQ.GetErrorTimes(s)
+		common.LogAccess.Infof("Retry message: '%s', retries: %d", s, retries)
+		if retries <= common.Conf.Core.MaxRetries {
 			go retryMessage(s, retries)
 		}
 	}
@@ -96,5 +97,5 @@ func RetryErrorMessages(ctx context.Context) {
 
 func retryMessage(message string, retries int64) {
 	time.Sleep(time.Duration(FibonacciBinet(retries)*60) * time.Second)
-	MQ.Retry(message)
+	common.MQ.Retry(message)
 }

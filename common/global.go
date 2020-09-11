@@ -1,9 +1,14 @@
-package checker
+package common
 
 import (
 	"github.com/sirupsen/logrus"
 	"github.com/tengattack/unified-ci/config"
 	"github.com/tengattack/unified-ci/mq"
+)
+
+const (
+	// AppName is a string label
+	AppName = "unified-ci"
 )
 
 var (
