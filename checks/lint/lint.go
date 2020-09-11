@@ -202,6 +202,23 @@ func LintIndividually(ctx context.Context, ref common.GithubRef, repoPath string
 	return annotations, problems, err
 }
 
+func findTsConfig(fileName string, repoPath string) string {
+	const tsConfig = "tsconfig.json"
+	fullPath := filepath.Join(repoPath, fileName)
+	dir := filepath.Dir(fullPath)
+	for len(dir) >= len(repoPath) {
+		tryTsConfigFile := filepath.Join(dir, tsConfig)
+		if util.FileExists(tryTsConfigFile) {
+			return tryTsConfigFile
+		}
+		if dir == repoPath {
+			break
+		}
+		dir = filepath.Dir(dir)
+	}
+	return ""
+}
+
 func handleSingleFile(ref common.GithubRef, repoPath string, d *diff.FileDiff, lintEnabled LintEnabled, annotationLevel string, log *bytes.Buffer, annotations *[]*github.CheckRunAnnotation, problems *int) error {
 	fileName, ok := util.GetTrimmedNewName(d)
 	if !ok {
@@ -262,7 +279,9 @@ func handleSingleFile(ref common.GithubRef, repoPath string, d *diff.FileDiff, l
 		strings.HasSuffix(fileName, ".tsx")) {
 		log.WriteString(fmt.Sprintf("TSLint '%s'\n", fileName))
 		var errlog string
-		lints, errlog, lintErr = TSLint(ref, filepath.Join(repoPath, fileName), repoPath)
+		tsConfigFile := findTsConfig(fileName, repoPath)
+		lints, errlog, lintErr = TSLint(ref,
+			filepath.Join(repoPath, fileName), tsConfigFile, repoPath)
 		if errlog != "" {
 			log.WriteString(errlog + "\n")
 		}
