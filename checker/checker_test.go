@@ -11,14 +11,17 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	common.Conf = config.BuildDefaultConf()
-	err := common.InitLog(common.Conf)
+	conf, err := config.LoadConfig("../testdata/config.yml")
+	if err != nil {
+		panic(err)
+	}
+	common.Conf = conf
+	err = common.InitLog(common.Conf)
 	if err != nil {
 		panic(err)
 	}
 
-	fileDB := "file name.db"
-	err = store.Init(fileDB)
+	err = store.Init(":memory:")
 	if err != nil {
 		panic(err)
 	}
@@ -29,7 +32,6 @@ func TestMain(m *testing.M) {
 
 	// clean up
 	store.Deinit()
-	os.Remove(fileDB)
 
 	os.Exit(code)
 }

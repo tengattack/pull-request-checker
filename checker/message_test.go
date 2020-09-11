@@ -16,8 +16,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tengattack/unified-ci/common"
-	"github.com/tengattack/unified-ci/config"
-	"github.com/tengattack/unified-ci/store"
 	"github.com/tengattack/unified-ci/util"
 )
 
@@ -25,11 +23,7 @@ func TestHandleMessage(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	conf, err := config.LoadConfig("../testdata/config.yml")
-	require.NoError(err)
-	common.Conf = conf
-
-	err = util.InitJWTClient(conf.GitHub.AppID, conf.GitHub.PrivateKey, &http.Transport{})
+	err := util.InitJWTClient(common.Conf.GitHub.AppID, common.Conf.GitHub.PrivateKey, &http.Transport{})
 	require.NoError(err)
 
 	start := time.Now()
@@ -44,14 +38,6 @@ func TestHandleMessage(t *testing.T) {
 func TestGetBaseCoverage(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
-
-	common.Conf = config.BuildDefaultConf()
-	err := common.InitLog(common.Conf)
-	require.NoError(err)
-
-	err = store.Init(":memory:")
-	require.NoError(err)
-	defer store.Deinit()
 
 	_, filename, _, _ := runtime.Caller(0)
 	repoPath := path.Join(path.Dir(filename), "/../testdata/go")
@@ -77,7 +63,7 @@ func TestGetBaseCoverage(t *testing.T) {
 	cmd = exec.Command("git", "rev-parse", "--verify", "HEAD")
 	cmd.Dir = repoPath
 	cmd.Stdout = &sha
-	err = cmd.Run()
+	err := cmd.Run()
 	require.NoError(err)
 
 	repoConf, err := util.ReadProjectConfig(repoPath)

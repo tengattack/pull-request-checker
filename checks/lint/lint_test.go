@@ -123,11 +123,6 @@ var dataSet = []TestsData{
 }
 
 func TestLintIndividually(t *testing.T) {
-	common.Conf = config.BuildDefaultConf()
-
-	err := common.InitLog(common.Conf)
-	require.Nil(t, err)
-
 	_, filename, _, ok := runtime.Caller(0)
 	require.True(t, ok)
 	currentDir := path.Dir(filename)
