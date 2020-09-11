@@ -31,5 +31,6 @@ func TestFileExists(t *testing.T) {
 	assert := assert.New(t)
 
 	assert.False(FileExists("../testdata"))
+	assert.False(FileExists("./filenoexists_test.go"))
 	assert.True(FileExists("./util_test.go"))
 }

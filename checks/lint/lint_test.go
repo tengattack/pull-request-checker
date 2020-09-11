@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -199,4 +200,25 @@ func TestLintFileMode(t *testing.T) {
 			assert.Fail(v.GetPath() + " should not be ok")
 		}
 	}
+}
+
+func TestFindTsConfig(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	_, filename, _, ok := runtime.Caller(0)
+	require.True(ok)
+
+	currentDir := path.Dir(filename)
+	repoDir := path.Join(currentDir, "../../testdata/typescript")
+
+	tsConfigFile := findTsConfig("src/index.tsx", repoDir)
+	assert.Equal(filepath.Join(repoDir, "tsconfig.json"), tsConfigFile)
+
+	tsConfigFile = findTsConfig("config.ts", repoDir)
+	assert.Equal(filepath.Join(repoDir, "tsconfig.json"), tsConfigFile)
+
+	repoDir = path.Join(repoDir, "src")
+	tsConfigFile = findTsConfig("index.tsx", repoDir)
+	assert.Equal("", tsConfigFile)
 }

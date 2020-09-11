@@ -454,7 +454,7 @@ func ESLint(ref common.GithubRef, fileName, cwd, eslintrc string) ([]LintMessage
 }
 
 // TSLint lints the ts and tsx files
-func TSLint(ref common.GithubRef, fileName, cwd string) ([]LintMessage, string, error) {
+func TSLint(ref common.GithubRef, fileName, tsConfigFile, cwd string) ([]LintMessage, string, error) {
 	var stderr bytes.Buffer
 
 	parser := util.NewShellParser(cwd, ref)
@@ -462,6 +462,9 @@ func TSLint(ref common.GithubRef, fileName, cwd string) ([]LintMessage, string, 
 	if err != nil {
 		common.LogError.Error("TSLint: " + err.Error())
 		return nil, stderr.String(), err
+	}
+	if tsConfigFile != "" {
+		words = append(words, "-p", tsConfigFile)
 	}
 	words = append(words, "--format", "json", fileName)
 	cmd := exec.Command(words[0], words[1:]...)
