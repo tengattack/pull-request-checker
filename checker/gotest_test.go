@@ -14,6 +14,7 @@ import (
 	shellwords "github.com/mattn/go-shellwords"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tengattack/unified-ci/util"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -25,7 +26,7 @@ func TestCoverRegex(t *testing.T) {
 	curDir := path.Dir(filepath)
 	repo := curDir + "/../testdata/go"
 
-	repoConf, err := readProjectConfig(repo)
+	repoConf, err := util.ReadProjectConfig(repo)
 	tests := repoConf.Tests
 	require.NoError(err)
 	test, ok := tests["go"]

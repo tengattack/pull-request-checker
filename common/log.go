@@ -1,4 +1,4 @@
-package checker
+package common
 
 import (
 	"github.com/tengattack/unified-ci/config"

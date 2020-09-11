@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/tengattack/unified-ci/checker"
+	"github.com/tengattack/unified-ci/common"
 	"github.com/tengattack/unified-ci/config"
 	"github.com/tengattack/unified-ci/store"
 	"github.com/tengattack/unified-ci/util"
@@ -26,7 +27,7 @@ var (
 )
 
 func main() {
-	checker.SetVersion(Version)
+	common.SetVersion(Version)
 	configPath := flag.String("config", "", "config file")
 	showHelp := flag.Bool("help", false, "show help message")
 	showVerbose := flag.Bool("verbose", false, "show verbose debug log")
@@ -34,12 +35,12 @@ func main() {
 	flag.Parse()
 
 	if *showHelp {
-		fmt.Printf(checker.UserAgent() + "\n\n")
+		fmt.Printf(common.UserAgent() + "\n\n")
 		flag.Usage()
 		return
 	}
 	if *showVersion {
-		fmt.Printf(checker.UserAgent() + "\n")
+		fmt.Printf(common.UserAgent() + "\n")
 		return
 	}
 	if *configPath == "" {
@@ -58,15 +59,15 @@ func main() {
 	}
 
 	// set default parameters.
-	checker.Conf = conf
+	common.Conf = conf
 
-	if err = checker.InitLog(conf); err != nil {
+	if err = common.InitLog(conf); err != nil {
 		log.Fatalf("error: %v", err)
 	}
 
 	var tr http.RoundTripper
-	if checker.Conf.Core.Socks5Proxy != "" {
-		dialSocksProxy, err := proxy.SOCKS5("tcp", checker.Conf.Core.Socks5Proxy, nil, proxy.Direct)
+	if common.Conf.Core.Socks5Proxy != "" {
+		dialSocksProxy, err := proxy.SOCKS5("tcp", common.Conf.Core.Socks5Proxy, nil, proxy.Direct)
 		if err != nil {
 			msg := "Setup proxy failed: " + err.Error()
 			err = errors.New(msg)
@@ -93,7 +94,7 @@ func main() {
 
 	leave := make(chan struct{})
 	go func() {
-		if checker.Conf.Core.EnableRetries {
+		if common.Conf.Core.EnableRetries {
 			g.Go(func() error {
 				// Start error message retries
 				checker.RetryErrorMessages(ctx)
@@ -118,7 +119,7 @@ func main() {
 		})
 
 		if err = g.Wait(); err != nil {
-			checker.LogError.Error(err)
+			common.LogError.Error(err)
 		}
 		close(leave)
 	}()
@@ -133,12 +134,12 @@ func main() {
 	cancel()
 	err = checker.ShutdownHTTPServer(60 * time.Second)
 	if err != nil {
-		checker.LogError.Errorf("Error in ShutdownHTTPServer: %v\n", err)
+		common.LogError.Errorf("Error in ShutdownHTTPServer: %v\n", err)
 	}
 
 	select {
 	case <-leave:
 	case <-time.After(60 * time.Second):
-		checker.LogAccess.Info("Waiting for leave times out.")
+		common.LogAccess.Info("Waiting for leave times out.")
 	}
 }

@@ -2,30 +2,11 @@ package util
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"strings"
 	"sync"
 
 	"github.com/google/go-github/github"
 )
-
-// SearchGithubPR searches for the PR number of one commit
-func SearchGithubPR(ctx context.Context, client *github.Client, repo, sha string) (int, error) {
-	if sha == "" {
-		return 0, errors.New("SHA is empty")
-	}
-	q := fmt.Sprintf("is:pr repo:%s SHA:%s", repo, sha)
-	opts := &github.SearchOptions{Sort: "created", Order: "asc"}
-	result, _, err := client.Search.Issues(ctx, q, opts)
-	if err != nil {
-		return 0, err
-	}
-	if len(result.Issues) == 0 {
-		return 0, nil
-	}
-	return result.Issues[0].GetNumber(), nil
-}
 
 // DiffCoverage generates a diff-format message to show the test coverage's difference between head and base.
 func DiffCoverage(headCoverage, baseCoverage *sync.Map) string {

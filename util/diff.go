@@ -1,12 +1,44 @@
-package checker
+package util
 
 import (
+	"errors"
+	"strconv"
 	"strings"
 
 	"github.com/sourcegraph/go-diff/diff"
 )
 
-func getNumberofContextLines(hunk *diff.Hunk, limit int) int {
+// ParseFileModeInDiff get file mode in diff
+func ParseFileModeInDiff(extended []string) (int, error) {
+	for _, v := range extended {
+		if strings.HasPrefix(v, "index") {
+			subs := strings.Split(v, " ")
+			if len(subs) > 2 {
+				if len(subs[2]) > 3 {
+					mode, err := strconv.ParseInt(subs[2][len(subs[2])-3:], 8, 32)
+					return int(mode), err
+				}
+				return 0, errors.New("Unknown extended lines in git diff")
+			}
+		} else if strings.HasPrefix(v, "new file mode") {
+			mode, err := strconv.ParseInt(v[len(v)-3:], 8, 32)
+			return int(mode), err
+		}
+	}
+	return 0, nil
+}
+
+// GetTrimmedNewName get new file's trimmed name in diff
+func GetTrimmedNewName(d *diff.FileDiff) (string, bool) {
+	newName := Unquote(d.NewName)
+	if strings.HasPrefix(newName, "b/") {
+		return newName[2:], true
+	}
+	return newName, false
+}
+
+// GetNumberOfContextLines get the number of context lines
+func GetNumberOfContextLines(hunk *diff.Hunk, limit int) int {
 	if hunk == nil {
 		return 0
 	}
@@ -74,24 +106,4 @@ func getOffsetToUnifiedDiff(targetLine int, hunk *diff.Hunk) int {
 		}
 	}
 	return currentLineOffset
-}
-
-func getLintsFromDiff(fileDiff *diff.FileDiff, lints []LintMessage, ruleID string) []LintMessage {
-	if fileDiff != nil {
-		for _, hunk := range fileDiff.Hunks {
-			delta := getNumberofContextLines(hunk, int(hunk.OrigLines))
-			size := int(hunk.OrigLines) - delta
-			if hunk.OrigLines == 0 {
-				size = 1
-			}
-			lints = append(lints, LintMessage{
-				RuleID:   ruleID,
-				Line:     int(hunk.OrigStartLine) + delta,
-				Column:   size,
-				Message:  "\n```diff\n" + string(hunk.Body) + "```",
-				Severity: severityLevelError,
-			})
-		}
-	}
-	return lints
 }

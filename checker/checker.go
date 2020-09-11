@@ -4,62 +4,15 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"path/filepath"
 	"time"
 
 	"github.com/google/go-github/github"
-	vul "github.com/tengattack/unified-ci/checks/vulnerability"
-	vulcommon "github.com/tengattack/unified-ci/checks/vulnerability/common"
-	"github.com/tengattack/unified-ci/util"
+	"github.com/tengattack/unified-ci/checks/vulnerability"
+	"github.com/tengattack/unified-ci/common"
 )
 
-// CheckVulnerability checks the package vulnerability of repo
-func CheckVulnerability(projectName, repoPath, commitID, context string) (result []vulcommon.Data, err error) {
-	var lang []vulcommon.Language
-	scanner := vul.NewScanner(projectName, Conf.Vulnerability)
-	scanner.SetCommitID(commitID)
-	scanner.SetContext(context)
-
-	gomod := filepath.Join(repoPath, "go.sum")
-	if util.FileExists(gomod) {
-		_, err := scanner.CheckPackages(vulcommon.Golang, gomod)
-		if err != nil {
-			return nil, err
-		}
-		lang = append(lang, vulcommon.Golang)
-	}
-	composer := filepath.Join(repoPath, "composer.lock")
-	if util.FileExists(composer) {
-		_, err := scanner.CheckPackages(vulcommon.PHP, composer)
-		if err != nil {
-			return nil, err
-		}
-		lang = append(lang, vulcommon.PHP)
-	}
-	nodePackage := filepath.Join(repoPath, "package.json")
-	if util.FileExists(nodePackage) {
-		_, err := scanner.CheckPackages(vulcommon.NodeJS, nodePackage)
-		if err != nil {
-			return nil, err
-		}
-		lang = append(lang, vulcommon.NodeJS)
-	}
-
-	if len(lang) > 0 {
-		scanner.WaitForQuery()
-		for _, v := range lang {
-			data, err := scanner.Query(v)
-			if err != nil {
-				return nil, err
-			}
-			result = append(result, data...)
-		}
-	}
-	return result, nil
-}
-
 // VulnerabilityCheckRun checks and reports package vulnerability.
-func VulnerabilityCheckRun(ctx context.Context, client *github.Client, gpull *github.PullRequest, ref GithubRef,
+func VulnerabilityCheckRun(ctx context.Context, client *github.Client, gpull *github.PullRequest, ref common.GithubRef,
 	repoPath string, targetURL string, log io.Writer) (int, error) {
 	const checkName = "vulnerability"
 	var checkRunID int64
@@ -69,7 +22,7 @@ func VulnerabilityCheckRun(ctx context.Context, client *github.Client, gpull *gi
 		if err != nil {
 			msg := fmt.Sprintf("Update commit state %s failed: %v", checkName, err)
 			_, _ = io.WriteString(log, msg+"\n")
-			LogError.Error(msg)
+			common.LogError.Error(msg)
 			// PASS
 		}
 	} else {
@@ -77,24 +30,24 @@ func VulnerabilityCheckRun(ctx context.Context, client *github.Client, gpull *gi
 		if err != nil {
 			msg := fmt.Sprintf("Creating %s check run failed: %v", checkName, err)
 			_, _ = io.WriteString(log, msg+"\n")
-			LogError.Error(msg)
+			common.LogError.Error(msg)
 			// PASS
 		} else {
 			checkRunID = checkRun.GetID()
 		}
 	}
 
-	data, err := CheckVulnerability(ref.repo, repoPath, ref.Sha, ref.checkRef)
+	data, err := vulnerability.CheckVulnerability(ref.RepoName, repoPath, ref.Sha, ref.CheckRef)
 	if err != nil {
 		msg := fmt.Sprintf("checks package vulnerability failed: %v", err)
 		_, _ = io.WriteString(log, msg+"\n")
-		LogError.Error(msg)
+		common.LogError.Error(msg)
 		if ref.IsBranch() {
 			err := ref.UpdateState(client, checkName, "failure", targetURL, "")
 			if err != nil {
 				msg := fmt.Sprintf("Update commit state %s failed: %v", checkName, err)
 				_, _ = io.WriteString(log, msg+"\n")
-				LogError.Error(msg)
+				common.LogError.Error(msg)
 				// PASS
 			}
 		} else {
@@ -116,7 +69,7 @@ func VulnerabilityCheckRun(ctx context.Context, client *github.Client, gpull *gi
 		if err != nil {
 			msg := fmt.Sprintf("Update commit state %s failed: %v", checkName, err)
 			_, _ = io.WriteString(log, msg+"\n")
-			LogError.Error(msg)
+			common.LogError.Error(msg)
 			// PASS
 		}
 	} else {
@@ -125,7 +78,7 @@ func VulnerabilityCheckRun(ctx context.Context, client *github.Client, gpull *gi
 			if err != nil {
 				msg := fmt.Sprintf("Creating %s check run failed: %v", checkName, err)
 				_, _ = io.WriteString(log, msg+"\n")
-				LogError.Error(msg)
+				common.LogError.Error(msg)
 				return 0, err
 			}
 			checkRunID = checkRun.GetID()
@@ -146,7 +99,7 @@ func VulnerabilityCheckRun(ctx context.Context, client *github.Client, gpull *gi
 		if err != nil {
 			msg := fmt.Sprintf("report package vulnerability to github failed: %v", err)
 			_, _ = io.WriteString(log, msg+"\n")
-			LogError.Error(msg)
+			common.LogError.Error(msg)
 			return 0, err
 		}
 	}
