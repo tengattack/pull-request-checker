@@ -14,9 +14,9 @@ const (
 
 // ProjectConfig CI config for project
 type ProjectConfig struct {
-	LinterAfterTests bool                     `yaml:"linterAfterTests"`
-	Tests            map[string]TestsConfig   `yaml:"tests"`
-	IgnorePatterns   []string                 `yaml:"ignorePatterns"`
+	LinterAfterTests bool                   `yaml:"linterAfterTests"`
+	Tests            map[string]TestsConfig `yaml:"tests"`
+	IgnorePatterns   []string               `yaml:"ignorePatterns"`
 }
 
 type projectConfigRaw struct {

@@ -161,8 +161,8 @@ func webhookHandler(c *gin.Context) {
 		message := messagePrefix + payload.PullRequest.Head.Sha
 		common.LogAccess.WithField("entry", "webhook").Info("Push message: " + message)
 		ref := common.GithubRef{
-			Owner:     payload.Repository.Owner.Login,
-			RepoName:  payload.Repository.Name,
+			Owner:    payload.Repository.Owner.Login,
+			RepoName: payload.Repository.Name,
 
 			Sha: payload.PullRequest.Head.Sha,
 		}
@@ -224,8 +224,8 @@ func webhookHandler(c *gin.Context) {
 		message := messagePrefix + *payload.CheckRun.HeadSHA
 		common.LogAccess.WithField("entry", "webhook").Info("Push message: " + message)
 		ref := common.GithubRef{
-			Owner:     payload.Repository.Owner.Login,
-			RepoName:  payload.Repository.Name,
+			Owner:    payload.Repository.Owner.Login,
+			RepoName: payload.Repository.Name,
 
 			Sha: *payload.CheckRun.HeadSHA,
 		}
