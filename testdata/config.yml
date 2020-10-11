@@ -32,7 +32,7 @@ api:
 
 github:
   app_id: 35105
-  private_key: '../testdata/unified-ci-test.2019-07-09.private-key.pem'
+  private_key: '../testdata/unified-ci-test.2020-10-11.private-key.pem'
   installations:
     tengattack: 1248133
 
