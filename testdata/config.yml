@@ -29,6 +29,7 @@ api:
   address: '' # ip address to bind (default: any)
   port: 8098
   webhook_uri: "/api/webhook"
+  webhook_secret: ''
 
 github:
   app_id: 35105
