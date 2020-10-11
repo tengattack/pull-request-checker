@@ -44,17 +44,17 @@ type SectionCore struct {
 
 // SectionAPI is a sub section of config.
 type SectionAPI struct {
-	Enabled    bool   `yaml:"enabled"`
-	Mode       string `yaml:"mode"`
-	Address    string `yaml:"address"`
-	Port       int    `yaml:"port"`
-	WebHookURI string `yaml:"webhook_uri"`
+	Enabled       bool   `yaml:"enabled"`
+	Mode          string `yaml:"mode"`
+	Address       string `yaml:"address"`
+	Port          int    `yaml:"port"`
+	WebHookURI    string `yaml:"webhook_uri"`
+	WebHookSecret string `yaml:"secret"`
 }
 
 // SectionGitHub is a sub section of config.
 type SectionGitHub struct {
 	AppID         int64            `yaml:"app_id"`
-	Secret        string           `yaml:"secret"`
 	PrivateKey    string           `yaml:"private_key"`
 	Installations map[string]int64 `yaml:"installations"`
 }
@@ -116,10 +116,10 @@ func BuildDefaultConf() Config {
 	conf.API.Address = ""
 	conf.API.Port = 8098
 	conf.API.WebHookURI = "/api/webhook"
+	conf.API.WebHookSecret = ""
 
 	// GitHub
 	conf.GitHub.AppID = 0
-	conf.GitHub.Secret = ""
 	conf.GitHub.PrivateKey = ""
 	conf.GitHub.Installations = make(map[string]int64)
 

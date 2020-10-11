@@ -126,7 +126,7 @@ func badgesHandler(c *gin.Context) {
 }
 
 func webhookHandler(c *gin.Context) {
-	hook, err := githubhook.Parse([]byte(common.Conf.GitHub.Secret), c.Request)
+	hook, err := githubhook.Parse([]byte(common.Conf.API.WebHookSecret), c.Request)
 
 	if err != nil {
 		common.LogAccess.Errorf("Check signature error: " + err.Error())
