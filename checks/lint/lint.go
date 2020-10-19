@@ -278,18 +278,14 @@ func handleSingleFile(ref common.GithubRef, repoPath string, d *diff.FileDiff, l
 	} else if strings.HasSuffix(fileName, ".ts") ||
 		strings.HasSuffix(fileName, ".tsx") {
 		var errlog string
-		if lintEnabled.TypeScript {
+		tsConfigFile := findTsConfig(fileName, repoPath)
+		if lintEnabled.TypeScript && tsConfigFile != "" {
 			log.WriteString(fmt.Sprintf("TSLint '%s'\n", fileName))
-			tsConfigFile := findTsConfig(fileName, repoPath)
-			if tsConfigFile != "" {
-				lints, errlog, lintErr = TSLint(ref,
-					filepath.Join(repoPath, fileName), tsConfigFile, repoPath)
-			} else {
-				// 如果没有 tslint 的配置文件，则用 eslint 检查
-				lints, errlog, lintErr = ESLint(ref, filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
-			}
-			// TypeScript 未开启，尝试用 eslint 检查
+			lints, errlog, lintErr = TSLint(ref,
+				filepath.Join(repoPath, fileName), tsConfigFile, repoPath)
 		} else if lintEnabled.JS != "" {
+			// 如果没有 tslint 的配置文件，则尝试用 eslint 检查
+			log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
 			lints, errlog, lintErr = ESLint(ref, filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
 		}
 		if errlog != "" {
