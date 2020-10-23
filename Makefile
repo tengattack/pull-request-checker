@@ -1,5 +1,5 @@
 NAME=unified-ci
-VERSION=0.1.8
+VERSION=0.2.2
 REGISTRY_PREFIX=$(if $(REGISTRY),$(addsuffix /, $(REGISTRY)))
 
 .PHONY: build publish version
