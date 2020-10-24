@@ -3,6 +3,8 @@ package checker
 import (
 	"context"
 	"errors"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/tengattack/unified-ci/common"
@@ -33,6 +35,13 @@ func InitMessageQueue() error {
 func StartMessageSubscription(ctx context.Context) {
 	common.LogAccess.Info("Start Message Subscription")
 
+	maxQueue := common.Conf.Concurrency.Queue
+	if maxQueue < 1 {
+		maxQueue = 1
+	}
+	pending := make(chan int, maxQueue)
+	var running int64
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -40,30 +49,67 @@ func StartMessageSubscription(ctx context.Context) {
 			return
 		default:
 		}
+
+		pending <- 0
 		common.LogAccess.Info("Waiting for message...")
-		message, err := common.MQ.Subscribe(ctx)
+		var msgsMap sync.Map
+		var messages []string
+		var err error
+		for {
+			select {
+			case <-ctx.Done():
+				common.LogAccess.Warn("StartMessageSubscription canceled.")
+				return
+			case <-time.After(5 * time.Second):
+			}
+			var runningQueue []string
+			msgsMap.Range(func(key, value interface{}) bool {
+				runningQueue = append(runningQueue, key.(string))
+				return true
+			})
+			messages, err = common.MQ.GetN(ctx, maxQueue-int(atomic.LoadInt64(&running)), runningQueue)
+			if err != nil {
+				break
+			}
+			if len(messages) > 0 {
+				break
+			}
+		}
+		<-pending
 		if err != nil && err != context.Canceled {
 			common.LogError.Error("mq subscribe error: " + err.Error())
 			continue
 		}
-		if message == "" {
+		if len(messages) <= 0 {
 			continue
 		}
-		common.LogAccess.Info("Got message: " + message)
+		for _, message := range messages {
+			pending <- 0
+			atomic.AddInt64(&running, 1)
+			msgsMap.Store(message, 1)
+			common.LogAccess.Info("Got message: " + message)
 
-		err = HandleMessage(ctx, message)
-		if err != nil {
-			common.LogError.Error("handle message error: " + err.Error())
-			err = common.MQ.Error(message)
-			if err != nil {
-				common.LogError.Error("mark message error failed: " + err.Error())
-			}
-			continue
-		}
+			go func(message string) {
+				defer func() {
+					msgsMap.Delete(message)
+					atomic.AddInt64(&running, -1)
+					<-pending
+				}()
+				err := HandleMessage(ctx, message)
+				if err != nil {
+					common.LogError.Error("handle message error: " + err.Error())
+					err = common.MQ.Error(message)
+					if err != nil {
+						common.LogError.Error("mark message error failed: " + err.Error())
+					}
+					return
+				}
 
-		err = common.MQ.Finish(message)
-		if err != nil {
-			common.LogError.Error("mq finish error: " + err.Error())
+				err = common.MQ.Finish(message)
+				if err != nil {
+					common.LogError.Error("mq finish error: " + err.Error())
+				}
+			}(message)
 		}
 	}
 }

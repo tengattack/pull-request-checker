@@ -116,6 +116,126 @@ func (s *MessageQueue) Subscribe(ctx context.Context) (string, error) {
 	}
 }
 
+func createScript() *redis.Script {
+	script := redis.NewScript(`
+        local source      = tostring(KEYS[1])
+        local destination = tostring(KEYS[2])
+        local count       = tonumber(ARGV[1])
+        local prefixs     = {}
+        local t           = {}
+
+        local sourceList = redis.call("LRANGE", source, 0, -1)
+
+        if #sourceList <= 0 then
+          return t
+        end
+
+        local function split(s, sep)
+          local parts = {}
+          local fpat = "(.-)" .. sep
+
+          local i, e, cap = s:find(fpat, 1)
+          local last_end = 1
+          while i do
+            if i ~= 1 or cap ~= "" then
+              table.insert(parts, cap)
+            end
+            last_end = e+1
+            i, e, cap = s:find(fpat, last_end)
+          end
+          if last_end <= #s then
+            cap = s:sub(last_end)
+            table.insert(parts, cap)
+          end
+          return parts
+		end
+
+		for i=2,#ARGV do
+          local s = ARGV[i]
+          local parts = split(s, "/")
+          local prefix = parts[1]
+          if #parts > 1 then
+            prefix = prefix .. parts[2]
+          end
+          local found = false
+          for _, p in ipairs(prefixs) do
+            if p == prefix then
+              found = true
+              break
+            end
+          end
+          if not found then
+            prefixs[#prefixs+1] = prefix
+          end
+        end
+
+        for i = #sourceList,1,-1 do
+          local s = sourceList[i]
+          local parts = split(s, "/")
+          local prefix = parts[1]
+          if #parts > 1 then
+            prefix = prefix .. parts[2]
+          end
+          local found = false
+          for _, p in ipairs(prefixs) do
+            if p == prefix then
+              found = true
+              break
+            end
+          end
+          if not found then
+		  prefixs[#prefixs+1] = prefix
+		  t[#t+1] = s
+		  if #t >= count then
+			break
+		  end
+		end
+	  end
+
+	  if #t > 0 then
+		for _, s in ipairs(t) do
+		  redis.call("LREM", source, -1, s)
+		  redis.call("LPUSH", destination, s)
+		end
+	  end
+
+	  return t
+    `)
+	return script
+}
+
+func evalScript(client *redis.Client, source, destination string, n int, running []string) ([]string, error) {
+	script := createScript()
+	sha, err := script.Load(client).Result()
+	if err != nil {
+		return nil, err
+	}
+	args := make([]interface{}, len(running)+1)
+	args[0] = strconv.Itoa(n)
+	for i, s := range running {
+		args[i+1] = s
+	}
+	ret := client.EvalSha(sha, []string{
+		source,
+		destination,
+	}, args...)
+	result, err := ret.Result()
+	if err != nil {
+		return nil, err
+	}
+	list := result.([]interface{})
+	queued := make([]string, len(list))
+	for i, s := range list {
+		queued[i] = s.(string)
+	}
+	return queued, nil
+}
+
+// GetN get N messages from queue.
+func (s *MessageQueue) GetN(ctx context.Context, n int, running []string) ([]string, error) {
+	return evalScript(redisClient, mq.SyncChannelKey, mq.SyncPendingChannelKey, n, running)
+}
+
 // Finish message processing
 func (s *MessageQueue) Finish(message string) error {
 	// remove the message in error channel
