@@ -83,8 +83,9 @@ type SectionVulnerability struct {
 
 // SectionConcurrency is a sub section of config.
 type SectionConcurrency struct {
-	Lint int `yaml:"lint"`
-	Test int `yaml:"test"`
+	Queue int `yaml:"queue"`
+	Lint  int `yaml:"lint"`
+	Test  int `yaml:"test"`
 }
 
 // BuildDefaultConf is the default config setting.
@@ -143,6 +144,7 @@ func BuildDefaultConf() Config {
 	conf.Vulnerability.AppFrom = ""
 
 	// Concurrency
+	conf.Concurrency.Queue = 4
 	conf.Concurrency.Lint = 4
 	conf.Concurrency.Test = 1
 	return conf

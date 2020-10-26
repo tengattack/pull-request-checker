@@ -55,5 +55,6 @@ vulnerability:
   app_from: ''
 
 concurrency:
+  queue: 4
   lint: 4
   test: 1

@@ -20,6 +20,7 @@ type MessageQueue interface {
 	Reset()
 	Push(message string, removePrefix string) error
 	Subscribe(ctx context.Context) (string, error)
+	GetN(ctx context.Context, n int, running []string) ([]string, error)
 	Finish(message string) error
 	Error(message string) error
 	MoveAllPendingToError() (int, error)

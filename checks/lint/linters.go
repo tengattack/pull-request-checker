@@ -588,7 +588,7 @@ func GolangCILint(ctx context.Context, ref common.GithubRef, cwd string) (*Golan
 	if err == nil && len(words) < 1 {
 		err = errors.New("GolangCILint command is not configured")
 	}
-	words = append(words, "run", "--out-format", "json")
+	words = append(words, "run", "--allow-parallel-runners", "--out-format", "json")
 
 	if err != nil {
 		common.LogError.Error("GolangCILint: " + err.Error())
