@@ -41,6 +41,7 @@ func StartMessageSubscription(ctx context.Context) {
 	}
 	pending := make(chan int, maxQueue)
 	var running int64
+	var msgsMap sync.Map
 
 	for {
 		select {
@@ -52,7 +53,6 @@ func StartMessageSubscription(ctx context.Context) {
 
 		pending <- 0
 		common.LogAccess.Info("Waiting for message...")
-		var msgsMap sync.Map
 		var messages []string
 		var err error
 		for {
