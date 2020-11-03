@@ -142,16 +142,6 @@ func CreateCheckRun(ctx context.Context, client *github.Client, gpull *github.Pu
 	return checkRun, err
 }
 
-func isEmptyTest(cmds []string) bool {
-	empty := true
-	for _, c := range cmds {
-		if c != "" {
-			empty = false
-		}
-	}
-	return empty
-}
-
 // FibonacciBinet calculates fibonacci value by analytic (Binet's formula)
 func FibonacciBinet(num int64) int64 {
 	n := float64(num)

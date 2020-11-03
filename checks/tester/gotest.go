@@ -1,7 +1,6 @@
-package checker
+package tester
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -9,8 +8,6 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/google/go-github/github"
 	shellwords "github.com/mattn/go-shellwords"
@@ -47,84 +44,6 @@ func carry(ctx context.Context, p *shellwords.Parser, repo, cmd string, log io.W
 	return cmds.Run()
 }
 
-// ReportTestResults reports the test results to github
-func ReportTestResults(ctx context.Context, testName string, repoPath string, cmds []string, coveragePattern string, client *github.Client, gpull *github.PullRequest,
-	ref common.GithubRef, targetURL string, log io.Writer) (string, error) {
-	outputTitle := testName + " test"
-
-	t := github.Timestamp{Time: time.Now()}
-
-	var checkRunID int64
-	if ref.IsBranch() {
-		err := ref.UpdateState(client, outputTitle, "pending", targetURL, "running")
-		if err != nil {
-			msg := fmt.Sprintf("Update commit state %s failed: %v", outputTitle, err)
-			_, _ = io.WriteString(log, msg+"\n")
-			common.LogError.Error(msg)
-			// PASS
-		}
-	} else {
-		checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
-		if err != nil {
-			msg := fmt.Sprintf("Creating %s check run failed: %v", outputTitle, err)
-			_, _ = io.WriteString(log, msg+"\n")
-			common.LogError.Error(msg)
-			// PASS
-		} else {
-			checkRunID = checkRun.GetID()
-		}
-	}
-
-	conclusion, reportMessage, outputSummary := testAndSaveCoverage(ctx, ref, testName, cmds,
-		coveragePattern, repoPath, gpull, false, log)
-
-	title := ""
-	if coveragePattern == "" {
-		title = conclusion
-	} else {
-		title = "coverage: " + reportMessage
-	}
-	if ref.IsBranch() {
-		state := "success"
-		if conclusion == "failure" {
-			state = "error"
-		}
-		err := ref.UpdateState(client, outputTitle, state, targetURL, title)
-		if err != nil {
-			msg := fmt.Sprintf("Update commit state %s failed: %v", outputTitle, err)
-			_, _ = io.WriteString(log, msg+"\n")
-			common.LogError.Error(msg)
-			// PASS
-		}
-	} else {
-		if checkRunID == 0 {
-			// create check run now if it failed before
-			checkRun, err := CreateCheckRun(ctx, client, gpull, outputTitle, ref, targetURL)
-			if err != nil {
-				msg := fmt.Sprintf("Creating %s check run failed: %v", outputTitle, err)
-				_, _ = io.WriteString(log, msg+"\n")
-				common.LogError.Error(msg)
-				// PASS
-			} else {
-				checkRunID = checkRun.GetID()
-			}
-		}
-
-		if checkRunID != 0 {
-			err := UpdateCheckRun(ctx, client, gpull, checkRunID, outputTitle, conclusion, t, title, "```\n"+outputSummary+"\n```", nil)
-			if err != nil {
-				common.LogError.Errorf("report test results to github failed: %v", err)
-				// PASS
-			}
-		}
-	}
-	if conclusion == "failure" {
-		err := &testNotPass{Title: outputTitle}
-		return reportMessage, err
-	}
-	return reportMessage, nil
-}
-
 func parseCoverage(pattern, output string) (string, float64, error) {
 	coverage := "unknown"
 	r, err := regexp.Compile(pattern)
@@ -144,11 +63,12 @@ func parseCoverage(pattern, output string) (string, float64, error) {
 }
 
 func testAndSaveCoverage(ctx context.Context, ref common.GithubRef, testName string, cmds []string, coveragePattern string,
-	repoPath string, gpull *github.PullRequest, breakOnFails bool, log io.Writer) (conclusion, reportMessage, outputSummary string) {
+	repoPath string, gpull *github.PullRequest, breakOnFails bool, log io.Writer) (result *Result) {
+	var reportMessage, outputSummary string
 	parser := util.NewShellParser(repoPath, ref)
 
 	_, _ = io.WriteString(log, fmt.Sprintf("Testing '%s'\n", testName))
-	conclusion = "success"
+	conclusion := "success"
 	for _, cmd := range cmds {
 		if cmd != "" {
 			_, _ = io.WriteString(log, cmd+"\n")
@@ -232,42 +152,10 @@ func testAndSaveCoverage(ctx context.Context, ref common.GithubRef, testName str
 		}
 	}
 	_, _ = io.WriteString(log, "\n")
+	result = &Result{
+		Conclusion:    conclusion,
+		ReportMessage: reportMessage,
+		OutputSummary: outputSummary,
+	}
 	return
-}
-
-// LogDivider provides the method to log stuff in parallel
-type LogDivider struct {
-	buffered bool
-	log      io.Writer
-	lm       *sync.Mutex
-}
-
-// NewLogDivider returns a new LogDivider
-func NewLogDivider(buffered bool, log io.Writer) *LogDivider {
-	lg := &LogDivider{
-		buffered: buffered,
-		log:      log,
-	}
-	if buffered {
-		lg.lm = new(sync.Mutex)
-	}
-	return lg
-}
-
-// Log logs the given function f using LogDivider lg
-func (lg *LogDivider) Log(f func(io.Writer)) {
-	var w io.Writer
-	if lg.buffered {
-		w = new(bytes.Buffer)
-	} else {
-		w = lg.log
-	}
-
-	f(w)
-
-	if lg.buffered {
-		lg.lm.Lock()
-		defer lg.lm.Unlock()
-		lg.log.Write(w.(*bytes.Buffer).Bytes())
-	}
 }
