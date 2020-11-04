@@ -2,9 +2,7 @@ package checker
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -14,14 +12,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bradleyfalzon/ghinstallation"
 	"github.com/google/go-github/github"
 	"github.com/sourcegraph/go-diff/diff"
 	"github.com/tengattack/unified-ci/checks/lint"
 	"github.com/tengattack/unified-ci/checks/tester"
 	"github.com/tengattack/unified-ci/common"
 	"github.com/tengattack/unified-ci/util"
-	"golang.org/x/net/proxy"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -129,44 +125,14 @@ func HandleMessage(ctx context.Context, message string) error {
 	}
 
 	var client *github.Client
+	var installationID int64
 	var gpull *github.PullRequest
 
-	// Wrap the shared transport for use with the integration ID authenticating with installation ID.
-	// TODO: add installation ID to db
-	installationID, ok := common.Conf.GitHub.Installations[ref.Owner]
-	if ok {
-		var tr http.RoundTripper
-		if common.Conf.Core.Socks5Proxy != "" {
-			dialSocksProxy, err := proxy.SOCKS5("tcp", common.Conf.Core.Socks5Proxy, nil, proxy.Direct)
-			if err != nil {
-				msg := "Setup proxy failed: " + err.Error()
-				// close log manually
-				log.WriteString(msg + "\n")
-				log.Close()
-				return errors.New(msg)
-			}
-			tr = &http.Transport{Dial: dialSocksProxy.Dial}
-		} else {
-			tr = http.DefaultTransport
-		}
-		tr, err := ghinstallation.NewKeyFromFile(tr,
-			common.Conf.GitHub.AppID, installationID, common.Conf.GitHub.PrivateKey)
-		if err != nil {
-			msg := "Load private key failed: " + err.Error()
-			// close log manually
-			log.WriteString(msg + "\n")
-			log.Close()
-			return errors.New(msg)
-		}
-
-		// TODO: refine code
-		client = github.NewClient(&http.Client{Transport: tr})
-	} else {
-		msg := "Installation ID not found, owner: " + ref.Owner
-		// close log manually
-		log.WriteString(msg + "\n")
+	client, installationID, err = common.GetDefaultAPIClient(ref.Owner)
+	if err != nil {
+		log.WriteString(err.Error() + "\n")
 		log.Close()
-		return errors.New(msg)
+		return err
 	}
 
 	defer func() {
@@ -234,7 +200,7 @@ func HandleMessage(ctx context.Context, message string) error {
 		return err
 	}
 
-	installationToken, _, err := util.JWTClient.Apps.CreateInstallationToken(ctx, int64(installationID), nil)
+	installationToken, _, err := util.JWTClient.Apps.CreateInstallationToken(ctx, installationID, nil)
 	if err != nil {
 		return err
 	}

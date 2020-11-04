@@ -11,6 +11,7 @@ import (
 	"github.com/google/go-github/github"
 	"github.com/sourcegraph/go-diff/diff"
 	"github.com/tengattack/unified-ci/mq"
+	"golang.org/x/net/proxy"
 )
 
 const (
@@ -162,25 +163,37 @@ func (ref *GithubRef) CreateReview(client *github.Client, prNum int, event, body
 }
 
 // GetDefaultAPIClient get default github api client
-func GetDefaultAPIClient(owner string) (*github.Client, error) {
-	var client *github.Client
+func GetDefaultAPIClient(owner string) (*github.Client, int64, error) {
+	// Wrap the shared transport for use with the integration ID authenticating with installation ID.
+	// TODO: add installation ID to db
 	installationID, ok := Conf.GitHub.Installations[owner]
-	if ok {
-		tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
-			Conf.GitHub.AppID, installationID, Conf.GitHub.PrivateKey)
-		if err != nil {
-			return nil, err
-		}
-
-		client = github.NewClient(&http.Client{Transport: tr})
-		return client, nil
+	if !ok {
+		return nil, 0, fmt.Errorf("Installation ID not found, owner: %s", owner)
 	}
-	return nil, errors.New("InstallationID not found, owner: " + owner)
+	var tr http.RoundTripper
+	if Conf.Core.Socks5Proxy != "" {
+		dialSocksProxy, err := proxy.SOCKS5("tcp", Conf.Core.Socks5Proxy, nil, proxy.Direct)
+		if err != nil {
+			return nil, 0, fmt.Errorf("Setup proxy failed: ", err)
+		}
+		tr = &http.Transport{Dial: dialSocksProxy.Dial}
+	} else {
+		tr = http.DefaultTransport
+	}
+	tr, err := ghinstallation.NewKeyFromFile(tr,
+		Conf.GitHub.AppID, installationID, Conf.GitHub.PrivateKey)
+	if err != nil {
+		return nil, 0, fmt.Errorf("Load private key failed: %v", err)
+	}
+
+	// TODO: refine code
+	client := github.NewClient(&http.Client{Transport: tr})
+	return client, installationID, nil
 }
 
 // HasLinterChecks check specified commit whether contain the linter checks
 func HasLinterChecks(ref *GithubRef) (bool, error) {
-	client, err := GetDefaultAPIClient(ref.Owner)
+	client, _, err := GetDefaultAPIClient(ref.Owner)
 	if err != nil {
 		LogError.Errorf("load private key failed: %v", err)
 		return false, err
