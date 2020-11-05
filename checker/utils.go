@@ -7,17 +7,12 @@ import (
 	"io/ioutil"
 	"math"
 	"net/http"
-	"regexp"
 	"time"
 
 	"github.com/google/go-github/github"
 	"github.com/pkg/errors"
 	"github.com/tengattack/unified-ci/common"
 	"github.com/tengattack/unified-ci/util"
-)
-
-var (
-	percentageRegexp = regexp.MustCompile(`[-+]?(?:\d*\.\d+|\d+)%`)
 )
 
 type panicError struct {
@@ -140,16 +135,6 @@ func CreateCheckRun(ctx context.Context, client *github.Client, gpull *github.Pu
 		Status:     &checkRunStatus,
 	})
 	return checkRun, err
-}
-
-func isEmptyTest(cmds []string) bool {
-	empty := true
-	for _, c := range cmds {
-		if c != "" {
-			empty = false
-		}
-	}
-	return empty
 }
 
 // FibonacciBinet calculates fibonacci value by analytic (Binet's formula)

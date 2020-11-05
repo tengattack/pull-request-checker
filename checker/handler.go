@@ -171,7 +171,7 @@ func webhookHandler(c *gin.Context) {
 			common.LogAccess.Error("Add message to queue error: " + err.Error())
 			abortWithError(c, 500, "add to queue error: "+err.Error())
 		} else {
-			client, err := common.GetDefaultAPIClient(payload.Repository.Owner.Login)
+			client, _, err := common.GetDefaultAPIClient(payload.Repository.Owner.Login)
 			if err != nil {
 				common.LogAccess.Errorf("getDefaultAPIClient returns error: %v", err)
 				abortWithError(c, 500, "getDefaultAPIClient returns error")
@@ -198,7 +198,7 @@ func webhookHandler(c *gin.Context) {
 			return
 		}
 
-		client, err := common.GetDefaultAPIClient(payload.Repository.Owner.Login)
+		client, _, err := common.GetDefaultAPIClient(payload.Repository.Owner.Login)
 		if err != nil {
 			common.LogAccess.Errorf("getDefaultAPIClient returns error: %v", err)
 			abortWithError(c, 500, "getDefaultAPIClient returns error")
@@ -281,7 +281,7 @@ func WatchLocalRepo(ctx context.Context) error {
 				if err != nil {
 					continue
 				}
-				client, err := common.GetDefaultAPIClient(file.Name())
+				client, _, err := common.GetDefaultAPIClient(file.Name())
 				if err != nil {
 					continue
 				}
