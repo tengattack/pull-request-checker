@@ -49,7 +49,7 @@ type SectionAPI struct {
 	Address       string `yaml:"address"`
 	Port          int    `yaml:"port"`
 	WebHookURI    string `yaml:"webhook_uri"`
-	WebHookSecret string `yaml:"secret"`
+	WebHookSecret string `yaml:"webhook_secret"`
 }
 
 // SectionGitHub is a sub section of config.
