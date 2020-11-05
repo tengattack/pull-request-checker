@@ -174,7 +174,7 @@ func GetDefaultAPIClient(owner string) (*github.Client, int64, error) {
 	if Conf.Core.Socks5Proxy != "" {
 		dialSocksProxy, err := proxy.SOCKS5("tcp", Conf.Core.Socks5Proxy, nil, proxy.Direct)
 		if err != nil {
-			return nil, 0, fmt.Errorf("Setup proxy failed: ", err)
+			return nil, 0, fmt.Errorf("Setup proxy failed: %v", err)
 		}
 		tr = &http.Transport{Dial: dialSocksProxy.Dial}
 	} else {

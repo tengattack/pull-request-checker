@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"path"
+	"regexp"
 	"runtime"
 	"strings"
 	"testing"
@@ -14,13 +15,17 @@ import (
 	"github.com/tengattack/unified-ci/util"
 )
 
+var (
+	percentageRegexp = regexp.MustCompile(`[-+]?(?:\d*\.\d+|\d+)%`)
+)
+
 func TestCoverRegex(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
 	_, filepath, _, _ := runtime.Caller(0)
 	curDir := path.Dir(filepath)
-	repo := curDir + "/../testdata/go"
+	repo := curDir + "/../../testdata/go"
 
 	repoConf, err := util.ReadProjectConfig(repo)
 	tests := repoConf.Tests

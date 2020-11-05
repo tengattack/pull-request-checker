@@ -7,17 +7,12 @@ import (
 	"io/ioutil"
 	"math"
 	"net/http"
-	"regexp"
 	"time"
 
 	"github.com/google/go-github/github"
 	"github.com/pkg/errors"
 	"github.com/tengattack/unified-ci/common"
 	"github.com/tengattack/unified-ci/util"
-)
-
-var (
-	percentageRegexp = regexp.MustCompile(`[-+]?(?:\d*\.\d+|\d+)%`)
 )
 
 type panicError struct {

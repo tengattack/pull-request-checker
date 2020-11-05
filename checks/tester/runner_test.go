@@ -14,15 +14,42 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tengattack/unified-ci/common"
+	"github.com/tengattack/unified-ci/config"
+	"github.com/tengattack/unified-ci/store"
 	"github.com/tengattack/unified-ci/util"
 )
+
+func TestMain(m *testing.M) {
+	conf, err := config.LoadConfig("../../testdata/config.yml")
+	if err != nil {
+		panic(err)
+	}
+	// TODO: fix private key file path
+	common.Conf = conf
+	err = common.InitLog(common.Conf)
+	if err != nil {
+		panic(err)
+	}
+
+	err = store.Init(":memory:")
+	if err != nil {
+		panic(err)
+	}
+
+	code := m.Run()
+
+	// clean up
+	store.Deinit()
+
+	os.Exit(code)
+}
 
 func TestGetBaseCoverage(t *testing.T) {
 	require := require.New(t)
 	assert := assert.New(t)
 
 	_, filename, _, _ := runtime.Caller(0)
-	repoPath := path.Join(path.Dir(filename), "/../testdata/go")
+	repoPath := path.Join(path.Dir(filename), "/../../testdata/go")
 
 	cmd := exec.Command("git", "init")
 	cmd.Dir = repoPath
@@ -60,11 +87,11 @@ func TestGetBaseCoverage(t *testing.T) {
 
 		Sha: baseSHA,
 	}
-	baseSavedRecords, baseTestsNeedToRun := loadBaseFromStore(ref, baseSHA, tests, os.Stdout)
+	baseSavedRecords, baseTestsNeedToRun := LoadBaseFromStore(ref, baseSHA, tests, os.Stdout)
 	assert.Empty(baseSavedRecords)
 	assert.Equal(len(tests), len(baseTestsNeedToRun))
 	var baseCoverage sync.Map
-	err = findBaseCoverage(context.TODO(), baseSavedRecords, baseTestsNeedToRun, repoPath, baseSHA,
+	err = FindBaseCoverage(context.TODO(), baseSavedRecords, baseTestsNeedToRun, repoPath, baseSHA,
 		&github.PullRequest{
 			Head: &github.PullRequestBranch{
 				User: &github.User{
@@ -78,8 +105,8 @@ func TestGetBaseCoverage(t *testing.T) {
 	coverage, _ := value.(string)
 	assert.Regexp(percentageRegexp, coverage)
 
-	baseSavedRecords, baseTestsNeedToRun = loadBaseFromStore(ref, baseSHA, tests, os.Stdout)
+	baseSavedRecords, baseTestsNeedToRun = LoadBaseFromStore(ref, baseSHA, tests, os.Stdout)
 	assert.Empty(baseTestsNeedToRun)
-	assert.True(len(baseSavedRecords) == 1)
+	assert.Len(baseSavedRecords, 1)
 	assert.True(*baseSavedRecords[0].Coverage > 0)
 }

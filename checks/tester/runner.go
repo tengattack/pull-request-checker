@@ -65,9 +65,9 @@ func RunTests(ctx context.Context, tests map[string]util.TestsConfig, t Runner, 
 				wg.Done()
 				<-pendingTests
 			}()
-			percentage, err := t.Run(ctx, testName, testConfig)
+			result, err := t.Run(ctx, testName, testConfig)
 			if testConfig.Coverage != "" {
-				coverageMap.Store(testName, percentage)
+				coverageMap.Store(testName, result.ReportMessage)
 			}
 			if err != nil {
 				if _, ok := err.(*testNotPass); ok {
