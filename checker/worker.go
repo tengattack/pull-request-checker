@@ -19,6 +19,7 @@ import (
 )
 
 var workers sync.Map
+var sw sync.Map /* map[name]ServerWorker */
 
 type WorkerJobDoneType string
 
@@ -27,6 +28,12 @@ const (
 	TypeJobDoneFinish WorkerJobDoneType = "finfish"
 	TypeJobDoneError  WorkerJobDoneType = "error"
 )
+
+type ServerWorker struct {
+	Info        WorkerInfo
+	Projects    []WorkerProjectConfig
+	RunningJobs []string
+}
 
 // Worker ID struct
 type Worker struct {
@@ -239,6 +246,10 @@ func workerJoinHandler(c *gin.Context) {
 		})
 		return
 	}
+	sw.Store(joinReq.Worker.Name, ServerWorker{
+		Info:     joinReq.Worker,
+		Projects: joinReq.Projects,
+	})
 	c.JSON(http.StatusOK, gin.H{
 		"code": 0,
 		"info": "success",
@@ -260,6 +271,11 @@ func workerRequestHandler(c *gin.Context) {
 		})
 		return
 	}
+	sw.Store(requestReq.Worker.Name, ServerWorker{
+		Info:        requestReq.Worker,
+		Projects:    requestReq.Projects,
+		RunningJobs: requestReq.Running,
+	})
 	var within []string
 	for _, p := range requestReq.Projects {
 		within = append(within, p.Name)

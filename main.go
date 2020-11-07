@@ -111,6 +111,10 @@ func main() {
 					return nil
 				})
 			}
+			g.Go(func() error {
+				// Run local repo watcher
+				return checker.WatchServerWorkerRepo(ctx)
+			})
 			/*g.Go(func() error {
 				// Start message subscription
 				checker.StartMessageSubscription(ctx)
