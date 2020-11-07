@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/tengattack/unified-ci/common"
+	"github.com/tengattack/unified-ci/log"
 	"github.com/tengattack/unified-ci/mq/redis"
 )
 
@@ -29,6 +30,97 @@ func InitMessageQueue() error {
 	}
 
 	return nil
+}
+
+// StartWorkerMessageSubscription for worker message subscription and process message
+func StartWorkerMessageSubscription(ctx context.Context) {
+	common.LogAccess.Info("Start Worker Message Subscription")
+
+	worker := NewWorker(&common.Conf.Worker)
+	err := worker.Join()
+	if err != nil {
+		log.LogError.Fatalf("worker join error: %v", err)
+		panic(err)
+	}
+
+	maxQueue := common.Conf.Concurrency.Queue
+	if maxQueue < 1 {
+		maxQueue = 1
+	}
+	pending := make(chan int, maxQueue)
+	var running int64
+	var msgsMap sync.Map
+
+	for {
+		select {
+		case <-ctx.Done():
+			common.LogAccess.Warn("StartMessageSubscription canceled.")
+			return
+		default:
+		}
+
+		pending <- 0
+		common.LogAccess.Info("Waiting for message...")
+		var messages []string
+		var err error
+		for {
+			select {
+			case <-ctx.Done():
+				common.LogAccess.Warn("StartMessageSubscription canceled.")
+				return
+			case <-time.After(5 * time.Second):
+			}
+			var runningQueue []string
+			msgsMap.Range(func(key, value interface{}) bool {
+				runningQueue = append(runningQueue, key.(string))
+				return true
+			})
+			worker.SetRunningQueue(runningQueue)
+			messages, err = worker.Request(maxQueue - int(atomic.LoadInt64(&running)))
+			if err != nil {
+				break
+			}
+			if len(messages) > 0 {
+				break
+			}
+		}
+		<-pending
+		if err != nil && err != context.Canceled {
+			common.LogError.Error("mq subscribe error: " + err.Error())
+			continue
+		}
+		if len(messages) <= 0 {
+			continue
+		}
+		for _, message := range messages {
+			pending <- 0
+			atomic.AddInt64(&running, 1)
+			msgsMap.Store(message, 1)
+			common.LogAccess.Info("Got message: " + message)
+
+			go func(message string) {
+				defer func() {
+					msgsMap.Delete(message)
+					atomic.AddInt64(&running, -1)
+					<-pending
+				}()
+				err := HandleMessage(ctx, message)
+				if err != nil {
+					common.LogError.Error("handle message error: " + err.Error())
+					err = worker.JobDone(TypeJobDoneError, message)
+					if err != nil {
+						common.LogError.Error("mark message error failed: " + err.Error())
+					}
+					return
+				}
+
+				err = worker.JobDone(TypeJobDoneFinish, message)
+				if err != nil {
+					common.LogError.Error("mq finish error: " + err.Error())
+				}
+			}(message)
+		}
+	}
 }
 
 // StartMessageSubscription for main message subscription and process message

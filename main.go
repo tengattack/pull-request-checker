@@ -29,6 +29,7 @@ var (
 func main() {
 	common.SetVersion(Version)
 	configPath := flag.String("config", "", "config file")
+	workerMode := flag.Bool("worker", false, "running in worker mode")
 	showHelp := flag.Bool("help", false, "show help message")
 	showVerbose := flag.Bool("verbose", false, "show verbose debug log")
 	showVersion := flag.Bool("version", false, "show version")
@@ -85,8 +86,10 @@ func main() {
 	}
 	defer store.Deinit()
 
-	if err = checker.InitMessageQueue(); err != nil {
-		log.Fatalf("error: %v", err)
+	if !*workerMode {
+		if err = checker.InitMessageQueue(); err != nil {
+			log.Fatalf("error: %v", err)
+		}
 	}
 
 	parent, cancel := context.WithCancel(context.Background())
@@ -94,28 +97,34 @@ func main() {
 
 	leave := make(chan struct{})
 	go func() {
-		if common.Conf.Core.EnableRetries {
+		if *workerMode {
 			g.Go(func() error {
-				// Start error message retries
-				checker.RetryErrorMessages(ctx)
+				// Start message subscription
+				checker.StartWorkerMessageSubscription(ctx)
 				return nil
+			})
+		} else {
+			if common.Conf.Core.EnableRetries {
+				g.Go(func() error {
+					// Start error message retries
+					checker.RetryErrorMessages(ctx)
+					return nil
+				})
+			}
+			g.Go(func() error {
+				// Start message subscription
+				checker.StartMessageSubscription(ctx)
+				return nil
+			})
+			g.Go(func() error {
+				// Run local repo watcher
+				return checker.WatchLocalRepo(ctx)
 			})
 		}
 
 		g.Go(func() error {
-			// Start message subscription
-			checker.StartMessageSubscription(ctx)
-			return nil
-		})
-
-		g.Go(func() error {
 			// Run httpd server
-			return checker.RunHTTPServer()
-		})
-
-		g.Go(func() error {
-			// Run local repo watcher
-			return checker.WatchLocalRepo(ctx)
+			return checker.RunHTTPServer(*workerMode)
 		})
 
 		if err = g.Wait(); err != nil {
