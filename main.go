@@ -111,7 +111,7 @@ func main() {
 					return nil
 				})
 			}
-			g.Go(func() error {
+			/*g.Go(func() error {
 				// Start message subscription
 				checker.StartMessageSubscription(ctx)
 				return nil
@@ -119,7 +119,7 @@ func main() {
 			g.Go(func() error {
 				// Run local repo watcher
 				return checker.WatchLocalRepo(ctx)
-			})
+			})*/
 		}
 
 		g.Go(func() error {
