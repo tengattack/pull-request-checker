@@ -355,8 +355,8 @@ func checkProjects(ctx context.Context, projects []WorkerProjectConfig, enablePr
 	}
 }
 
-// WatchLocalRepo scans local repo periodically and sends a checking request if a opened PR hasn't any checks
-func WatchLocalRepo(ctx context.Context) error {
+// WatchServerWorkerRepo scans server workers' repo periodically and sends a checking request if a opened PR hasn't any checks
+func WatchServerWorkerRepo(ctx context.Context) error {
 	var err error
 	for {
 		select {
@@ -381,8 +381,8 @@ func WatchLocalRepo(ctx context.Context) error {
 	return err
 }
 
-// WatchServerWorkerRepo scans server workers' repo periodically and sends a checking request if a opened PR hasn't any checks
-func WatchServerWorkerRepo(ctx context.Context) error {
+// WatchLocalRepo scans local repo periodically and sends a checking request if a opened PR hasn't any checks
+func WatchLocalRepo(ctx context.Context) error {
 	var err error
 	for {
 		select {

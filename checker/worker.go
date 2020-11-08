@@ -18,6 +18,19 @@ import (
 	"github.com/tengattack/unified-ci/util"
 )
 
+// Mode working mode
+type Mode string
+
+// modes const
+const (
+	ModeLocal  Mode = "local"
+	ModeServer Mode = "server"
+	ModeWorker Mode = "worker"
+)
+
+// WorkingMode current working mode
+var WorkingMode Mode = ModeLocal
+
 var workers sync.Map
 var sw sync.Map /* map[name]ServerWorker */
 

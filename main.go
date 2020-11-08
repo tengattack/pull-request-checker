@@ -29,7 +29,7 @@ var (
 func main() {
 	common.SetVersion(Version)
 	configPath := flag.String("config", "", "config file")
-	workerMode := flag.Bool("worker", false, "running in worker mode")
+	mode := flag.String("mode", string(checker.ModeLocal), "working mode: local, server, worker")
 	showHelp := flag.Bool("help", false, "show help message")
 	showVerbose := flag.Bool("verbose", false, "show verbose debug log")
 	showVersion := flag.Bool("version", false, "show version")
@@ -50,6 +50,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	switch *mode {
+	case string(checker.ModeLocal):
+		fallthrough
+	case string(checker.ModeServer):
+		fallthrough
+	case string(checker.ModeWorker):
+		checker.WorkingMode = checker.Mode(*mode)
+		// PASS
+	default:
+		fmt.Fprintln(os.Stderr, "Unknown working mode: "+*mode)
+		flag.Usage()
+		os.Exit(1)
+	}
+
 	conf, err := config.LoadConfig(*configPath)
 	if err != nil {
 		panic(err)
@@ -65,6 +79,7 @@ func main() {
 	if err = common.InitLog(conf); err != nil {
 		log.Fatalf("error: %v", err)
 	}
+	common.LogAccess.Infof("Working in %s mode", checker.WorkingMode)
 
 	var tr http.RoundTripper
 	if common.Conf.Core.Socks5Proxy != "" {
@@ -86,7 +101,7 @@ func main() {
 	}
 	defer store.Deinit()
 
-	if !*workerMode {
+	if checker.WorkingMode == checker.ModeLocal || checker.WorkingMode == checker.ModeServer {
 		if err = checker.InitMessageQueue(); err != nil {
 			log.Fatalf("error: %v", err)
 		}
@@ -97,13 +112,25 @@ func main() {
 
 	leave := make(chan struct{})
 	go func() {
-		if *workerMode {
+		switch checker.WorkingMode {
+		case checker.ModeLocal:
+			if common.Conf.Core.EnableRetries {
+				g.Go(func() error {
+					// Start error message retries
+					checker.RetryErrorMessages(ctx)
+					return nil
+				})
+			}
 			g.Go(func() error {
 				// Start message subscription
-				checker.StartWorkerMessageSubscription(ctx)
+				checker.StartMessageSubscription(ctx)
 				return nil
 			})
-		} else {
+			g.Go(func() error {
+				// Run local repo watcher
+				return checker.WatchLocalRepo(ctx)
+			})
+		case checker.ModeServer:
 			if common.Conf.Core.EnableRetries {
 				g.Go(func() error {
 					// Start error message retries
@@ -115,20 +142,17 @@ func main() {
 				// Run local repo watcher
 				return checker.WatchServerWorkerRepo(ctx)
 			})
-			/*g.Go(func() error {
+		case checker.ModeWorker:
+			g.Go(func() error {
 				// Start message subscription
-				checker.StartMessageSubscription(ctx)
+				checker.StartWorkerMessageSubscription(ctx)
 				return nil
 			})
-			g.Go(func() error {
-				// Run local repo watcher
-				return checker.WatchLocalRepo(ctx)
-			})*/
 		}
 
 		g.Go(func() error {
 			// Run httpd server
-			return checker.RunHTTPServer(*workerMode)
+			return checker.RunHTTPServer(checker.WorkingMode)
 		})
 
 		if err = g.Wait(); err != nil {

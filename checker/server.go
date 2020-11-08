@@ -44,7 +44,7 @@ func rootHandler(c *gin.Context) {
 	})
 }
 
-func routerEngine(workerMode bool) *gin.Engine {
+func routerEngine(mode Mode) *gin.Engine {
 	// set server mode
 	gin.SetMode(common.Conf.API.Mode)
 
@@ -59,7 +59,10 @@ func routerEngine(workerMode bool) *gin.Engine {
 
 	r.GET("/api/stat/go", api.StatusHandler)
 	r.GET("/api/stat/sys", sysStatsHandler)
-	if !workerMode {
+	switch mode {
+	case ModeLocal:
+		r.POST(common.Conf.API.WebHookURI, webhookHandler)
+	case ModeServer:
 		r.POST("/api/worker/join", workerJoinHandler)
 		r.POST("/api/worker/request", workerRequestHandler)
 		r.POST("/api/worker/jobdone", workerJobDoneHandler)
@@ -76,7 +79,7 @@ func routerEngine(workerMode bool) *gin.Engine {
 var httpSrv *http.Server
 
 // RunHTTPServer provide run http or https protocol.
-func RunHTTPServer(workerMode bool) (err error) {
+func RunHTTPServer(mode Mode) (err error) {
 	if !common.Conf.API.Enabled {
 		common.LogAccess.Debug("HTTPD server is disabled.")
 		return nil
@@ -91,7 +94,7 @@ func RunHTTPServer(workerMode bool) (err error) {
 	} else { */
 	httpSrv = &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", common.Conf.API.Address, common.Conf.API.Port),
-		Handler: routerEngine(workerMode),
+		Handler: routerEngine(mode),
 	}
 	err = httpSrv.ListenAndServe()
 	// }
