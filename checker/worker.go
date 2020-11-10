@@ -31,7 +31,6 @@ const (
 // WorkingMode current working mode
 var WorkingMode Mode = ModeLocal
 
-var workers sync.Map
 var sw sync.Map /* map[name]ServerWorker */
 
 type WorkerJobDoneType string

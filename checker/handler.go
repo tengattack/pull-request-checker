@@ -276,6 +276,10 @@ func checkProjects(ctx context.Context, projects []WorkerProjectConfig, enablePr
 		}
 		owner, repo := parts[0], parts[1]
 		client, _, err := common.GetDefaultAPIClient(owner)
+		if err != nil {
+			common.LogError.Errorf("checkProjects:GetDefaultAPIClient for %s error: %v", owner, err)
+			continue
+		}
 		if project.CheckMaster {
 			masterBranch, _, err := client.Repositories.GetBranch(ctx, owner, repo, "master")
 			if err != nil {
