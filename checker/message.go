@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -70,40 +69,32 @@ func HandleMessage(ctx context.Context, message string) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Hour)
 	defer cancel()
 
-	s := strings.Split(message, "/")
-
-	var repository, pull, commitSha string
-
-	if len(s) != 6 || (s[2] != "pull" && s[2] != "tree") || s[4] != "commits" {
-		common.LogAccess.Warnf("malformed message: %s", message)
+	m, err := util.ParseMessage(message)
+	if err != nil {
+		common.LogAccess.Warnf("parse message %q error: %v", message, err)
 		return nil
 	}
 
-	checkType := s[2]
-	repository, pull, commitSha = s[0]+"/"+s[1], s[3], s[5]
-	prNum := 0
-	if checkType == "tree" {
+	var repository, pull, commitSha string
+
+	//repository, pull, commitSha = s[0]+"/"+s[1], s[3], s[5]
+	//prNum := 0
+	if m.CheckType == "tree" {
 		// branchs
-		common.LogAccess.Infof("Start handling %s/tree/%s", repository, pull)
+		common.LogAccess.Infof("Start handling %s", m.String())
 	} else {
 		// pulls
-		var err error
-		prNum, err = strconv.Atoi(pull)
-		if err != nil {
-			common.LogAccess.Warnf("malformed message: %s", message)
-			return nil
-		}
-		common.LogAccess.Infof("Start handling %s/pull/%s", repository, pull)
+		common.LogAccess.Infof("Start handling %s", m.String())
 	}
 
 	// ref to be checked in the owner/repo
 	ref := common.GithubRef{
-		Owner:    s[0],
-		RepoName: s[1],
+		Owner:    m.Owner,
+		RepoName: m.Repo,
 
-		Sha: commitSha,
+		Sha: m.CommitSHA,
 	}
-	if checkType == "tree" {
+	if m.CheckType == "tree" {
 		ref.CheckType = common.CheckTypeBranch
 		ref.CheckRef = pull
 	} else {
@@ -162,7 +153,7 @@ func HandleMessage(ctx context.Context, message string) error {
 			return nil
 		}
 
-		gpull, err = common.GetGithubPull(ctx, client, ref.Owner, ref.RepoName, prNum)
+		gpull, err = common.GetGithubPull(ctx, client, ref.Owner, ref.RepoName, m.PRNum)
 		if err != nil {
 			err = fmt.Errorf("GetGithubPull error: %v", err)
 			return err
@@ -232,17 +223,17 @@ func HandleMessage(ctx context.Context, message string) error {
 			fmt.Sprintf("%s:%s", pull, localBranch))
 		cmd = exec.CommandContext(ctx, gitCmds[0], gitCmds[1:]...)
 	} else {
-		localBranch := fmt.Sprintf("pull-%d", prNum)
+		localBranch := fmt.Sprintf("pull-%d", m.PRNum)
 
 		// git fetch -f -u https://x-access-token:token@github.com/octocat/Hello-World.git pull/%d/head:pull-%d
 		// -u option can be used to bypass the restriction which prevents git from fetching into current branch:
 		// link: https://stackoverflow.com/a/32561463/4213218
 		log.WriteString("$ git fetch -f -u " + cloneURL +
-			fmt.Sprintf(" pull/%d/head:%s\n", prNum, localBranch))
+			fmt.Sprintf(" pull/%d/head:%s\n", m.PRNum, localBranch))
 		gitCmds = make([]string, len(words))
 		copy(gitCmds, words)
 		gitCmds = append(gitCmds, "fetch", "-f", "-u", fetchURL,
-			fmt.Sprintf("pull/%d/head:%s", prNum, localBranch))
+			fmt.Sprintf("pull/%d/head:%s", m.PRNum, localBranch))
 		cmd = exec.CommandContext(ctx, gitCmds[0], gitCmds[1:]...)
 	}
 	cmd.Dir = repoPath
@@ -268,7 +259,7 @@ func HandleMessage(ctx context.Context, message string) error {
 	}
 
 	var diffs []*diff.FileDiff
-	if checkType == "pull" {
+	if m.CheckType == "pull" {
 		// this works not accurately
 		// git diff -U3 <base_commits>
 		// log.WriteString("$ git diff -U3 " + p.Base.Sha + "\n")
@@ -280,7 +271,7 @@ func HandleMessage(ctx context.Context, message string) error {
 		// }
 
 		// get diff from github
-		out, err := common.GetGithubPullDiff(ctx, client, ref.Owner, ref.RepoName, prNum)
+		out, err := common.GetGithubPullDiff(ctx, client, ref.Owner, ref.RepoName, m.PRNum)
 		if err != nil {
 			err = fmt.Errorf("GetGithubPullDiff error: %v", err)
 			return err
@@ -293,7 +284,7 @@ func HandleMessage(ctx context.Context, message string) error {
 			return err
 		}
 
-		err = common.LabelPRSize(ctx, client, ref, prNum, diffs)
+		err = common.LabelPRSize(ctx, client, ref, m.PRNum, diffs)
 		if err != nil {
 			log.WriteString("Label PR error: " + err.Error() + "\n")
 			common.LogError.Errorf("Label PR error: %v", err)
@@ -396,7 +387,7 @@ func HandleMessage(ctx context.Context, message string) error {
 		// PASS
 	}
 
-	if checkType == "pull" {
+	if m.CheckType == "pull" {
 		// create review
 		if sumCount > 0 {
 			comment := fmt.Sprintf("**lint**: %d problem(s) found.\n", failedLints)
@@ -405,13 +396,13 @@ func HandleMessage(ctx context.Context, message string) error {
 				comment += fmt.Sprintf("**test**: %d problem(s) found.\n\n", failedTests)
 				comment += testMsg
 			}
-			err = ref.CreateReview(client, prNum, "REQUEST_CHANGES", comment, nil)
+			err = ref.CreateReview(client, m.PRNum, "REQUEST_CHANGES", comment, nil)
 		} else {
 			comment := "**check**: no problems found.\n"
 			if !noTest {
 				comment += ("\n" + testMsg)
 			}
-			err = ref.CreateReview(client, prNum, "APPROVE", comment, nil)
+			err = ref.CreateReview(client, m.PRNum, "APPROVE", comment, nil)
 		}
 		if err != nil {
 			err = fmt.Errorf("CreateReview error: %v", err)
