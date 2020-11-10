@@ -26,6 +26,7 @@ api:
   mode: 'release'
   address: '' # ip address to bind (default: any)
   port: 8098
+  advertise_addr: '127.0.0.1:8098'
   webhook_uri: "/api/webhook"
   webhook_secret: ''
 

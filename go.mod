@@ -16,6 +16,7 @@ require (
 	github.com/mattn/go-shellwords v1.0.6
 	github.com/mattn/go-sqlite3 v2.0.2+incompatible
 	github.com/pkg/errors v0.8.1
+	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.4.2
 	github.com/sourcegraph/go-diff v0.5.1
 	github.com/sqs/goreturns v0.0.0-20181028201513-538ac6014518
@@ -27,6 +28,7 @@ require (
 	golang.org/x/tools v0.0.0-20200109174759-ac4f524c1612
 	gopkg.in/appleboy/gin-status-api.v1 v1.0.1
 	gopkg.in/fukata/golang-stats-api-handler.v1 v1.0.0 // indirect
+	gopkg.in/gin-gonic/gin.v1 v1.3.0
 	gopkg.in/redis.v5 v5.2.9
 	gopkg.in/rjz/githubhook.v0 v0.0.1
 	gopkg.in/yaml.v2 v2.2.7

@@ -2,6 +2,7 @@ package config
 
 import (
 	"io/ioutil"
+	"os"
 
 	mqredis "github.com/tengattack/unified-ci/mq/redis"
 	"gopkg.in/yaml.v2"
@@ -11,6 +12,7 @@ import (
 type Config struct {
 	Core          SectionCore          `yaml:"core"`
 	API           SectionAPI           `yaml:"api"`
+	Worker        SectionWorker        `yaml:"worker"`
 	GitHub        SectionGitHub        `yaml:"github"`
 	Log           SectionLog           `yaml:"log"`
 	MessageQueue  SectionMessageQueue  `yaml:"mq"`
@@ -50,6 +52,12 @@ type SectionAPI struct {
 	Port          int    `yaml:"port"`
 	WebHookURI    string `yaml:"webhook_uri"`
 	WebHookSecret string `yaml:"webhook_secret"`
+}
+
+// SectionWorker is a sub section of config.
+type SectionWorker struct {
+	Name       string `yaml:"name"`
+	ServerAddr string `yaml:"server_addr"`
 }
 
 // SectionGitHub is a sub section of config.
@@ -118,6 +126,10 @@ func BuildDefaultConf() Config {
 	conf.API.Port = 8098
 	conf.API.WebHookURI = "/api/webhook"
 	conf.API.WebHookSecret = ""
+
+	// Worker
+	hostname, _ := os.Hostname()
+	conf.Worker.Name = hostname
 
 	// GitHub
 	conf.GitHub.AppID = 0
