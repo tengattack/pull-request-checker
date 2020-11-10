@@ -75,10 +75,6 @@ func HandleMessage(ctx context.Context, message string) error {
 		return nil
 	}
 
-	var repository, pull, commitSha string
-
-	//repository, pull, commitSha = s[0]+"/"+s[1], s[3], s[5]
-	//prNum := 0
 	if m.CheckType == "tree" {
 		// branchs
 		common.LogAccess.Infof("Start handling %s", m.String())
@@ -96,18 +92,18 @@ func HandleMessage(ctx context.Context, message string) error {
 	}
 	if m.CheckType == "tree" {
 		ref.CheckType = common.CheckTypeBranch
-		ref.CheckRef = pull
+		ref.CheckRef = m.Branch
 	} else {
 		ref.CheckType = common.CheckTypePRHead
-		ref.CheckRef = "pr/" + pull
+		ref.CheckRef = fmt.Sprintf("pr/%d", m.PRNum)
 	}
 
 	targetURL := ""
 	if len(common.Conf.Core.CheckLogURI) > 0 {
-		targetURL = common.Conf.Core.CheckLogURI + repository + "/" + ref.Sha + ".log"
+		targetURL = common.Conf.Core.CheckLogURI + m.Repository() + "/" + ref.Sha + ".log"
 	}
 
-	repoLogsPath := filepath.Join(common.Conf.Core.LogsDir, repository)
+	repoLogsPath := filepath.Join(common.Conf.Core.LogsDir, m.Repository())
 	_ = os.MkdirAll(repoLogsPath, os.ModePerm)
 
 	log, err := os.Create(filepath.Join(repoLogsPath, fmt.Sprintf("%s.log", ref.Sha)))
@@ -139,17 +135,17 @@ func HandleMessage(ctx context.Context, message string) error {
 	log.WriteString(common.UserAgent() + " Date: " + time.Now().Format(time.RFC1123) + "\n\n")
 
 	if ref.IsBranch() {
-		log.WriteString(fmt.Sprintf("Start fetching %s/tree/%s\n", repository, pull))
+		log.WriteString(fmt.Sprintf("Start fetching %s\n", m.String()))
 	} else {
-		log.WriteString(fmt.Sprintf("Start fetching %s/pull/%s\n", repository, pull))
+		log.WriteString(fmt.Sprintf("Start fetching %s\n", m.String()))
 
-		exist, err := common.SearchGithubPR(ctx, client, repository, commitSha)
+		exist, err := common.SearchGithubPR(ctx, client, m.Repository(), m.CommitSHA)
 		if err != nil {
 			err = fmt.Errorf("SearchGithubPR error: %v", err)
 			return err
 		}
 		if exist == 0 {
-			log.WriteString(fmt.Sprintf("commit: %s no longer exists.\n", commitSha))
+			log.WriteString(fmt.Sprintf("commit: %s no longer exists.\n", m.CommitSHA))
 			return nil
 		}
 
@@ -170,7 +166,7 @@ func HandleMessage(ctx context.Context, message string) error {
 		return err
 	}
 
-	repoPath := filepath.Join(common.Conf.Core.WorkDir, repository)
+	repoPath := filepath.Join(common.Conf.Core.WorkDir, m.Repository())
 	_ = os.MkdirAll(repoPath, os.ModePerm)
 
 	parser := util.NewShellParser(repoPath, ref)
@@ -213,14 +209,14 @@ func HandleMessage(ctx context.Context, message string) error {
 
 	fetchURL := originURL.String()
 	if ref.IsBranch() {
-		localBranch := pull
+		localBranch := m.Branch
 
 		log.WriteString("$ git fetch -f -u " + cloneURL +
-			fmt.Sprintf(" %s:%s\n", pull, localBranch))
+			fmt.Sprintf(" %s:%s\n", m.Branch, localBranch))
 		gitCmds = make([]string, len(words))
 		copy(gitCmds, words)
 		gitCmds = append(gitCmds, "fetch", "-f", "-u", fetchURL,
-			fmt.Sprintf("%s:%s", pull, localBranch))
+			fmt.Sprintf("%s:%s", m.Branch, localBranch))
 		cmd = exec.CommandContext(ctx, gitCmds[0], gitCmds[1:]...)
 	} else {
 		localBranch := fmt.Sprintf("pull-%d", m.PRNum)

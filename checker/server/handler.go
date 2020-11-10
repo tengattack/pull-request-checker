@@ -144,7 +144,7 @@ func addMessageHandler(c *gin.Context) {
 		}
 		u, err := url.Parse(urlParam)
 		if err != nil {
-			abortWithError(c, 400, fmt.Sprintf("malformed url message"))
+			abortWithError(c, 400, "malformed url message")
 			return
 		}
 		if u.Host != "github.com" {
@@ -156,7 +156,7 @@ func addMessageHandler(c *gin.Context) {
 		s := strings.Split(u.Path, "/")
 		if s[0] != "" {
 			// the message should starts with "/"
-			abortWithError(c, 400, fmt.Sprintf("malformed url message"))
+			abortWithError(c, 400, "malformed url message")
 			return
 		}
 		s = s[1:] // strip the first "/"
@@ -173,7 +173,7 @@ func addMessageHandler(c *gin.Context) {
 				// pull
 				prNum, err = strconv.Atoi(s[3])
 				if err != nil {
-					abortWithError(c, 400, fmt.Sprintf("malformed url message"))
+					abortWithError(c, 400, "malformed url message")
 					return
 				}
 			}
@@ -181,7 +181,7 @@ func addMessageHandler(c *gin.Context) {
 			// default message path
 			message = strings.Join(s, "/")
 		default:
-			abortWithError(c, 400, fmt.Sprintf("malformed url message"))
+			abortWithError(c, 400, "malformed url message")
 			return
 		}
 
@@ -222,7 +222,7 @@ func addMessageHandler(c *gin.Context) {
 
 	m, err := util.ParseMessage(message)
 	if err == util.ErrMalformedMessage {
-		abortWithError(c, 400, fmt.Sprintf("malformed message"))
+		abortWithError(c, 400, "malformed message")
 		return
 	}
 	if err != nil {
