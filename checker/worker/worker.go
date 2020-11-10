@@ -37,6 +37,8 @@ type ServerWorker struct {
 	Info        WorkerInfo
 	Projects    []WorkerProjectConfig
 	RunningJobs []string
+
+	Addr string // TODO: advertise addr
 }
 
 // Worker ID struct

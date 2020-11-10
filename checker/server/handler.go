@@ -3,122 +3,12 @@ package server
 import (
 	"context"
 	"fmt"
-	"math"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 	"github.com/tengattack/unified-ci/common"
-	"github.com/tengattack/unified-ci/store"
 	githubhook "gopkg.in/rjz/githubhook.v0"
 )
-
-func badgesHandler(c *gin.Context) {
-	owner := c.Param("owner")
-	repo := c.Param("repo")
-	badgeType := c.Param("type")
-
-	switch badgeType {
-	case "build.svg":
-	case "coverage.svg":
-	default:
-		abortWithError(c, 400, "error params")
-		return
-	}
-
-	commitsInfo, err := store.GetLatestCommitsInfo(owner, repo)
-	if err != nil {
-		abortWithError(c, 500, "get latest commits info for "+owner+"/"+repo+" error: "+err.Error())
-		return
-	}
-
-	build := "unknown"
-	coverage := "unknown"
-	for _, info := range commitsInfo {
-		if info.Passing == 1 {
-			build = "passing"
-		} else {
-			build = "failing"
-			break
-		}
-	}
-
-	var coverageNum int
-	if len(commitsInfo) > 0 {
-		var pct float64
-		coverage = ""
-		for _, info := range commitsInfo {
-			if info.Coverage == nil {
-				coverage = "unknown"
-				break
-			} else {
-				pct += *info.Coverage
-			}
-		}
-		if coverage == "" {
-			coverageNum = int(math.Round(100 * pct / float64(len(commitsInfo))))
-			coverage = strconv.Itoa(coverageNum) + "%"
-		}
-	}
-
-	var color string
-	unknownColor := "#9f9f9f"
-	colors := []string{"#4c1", "#97ca00", "#a4a61d", "#dfb317", "#fe7d37", "#e05d44"}
-	// TODO: common template
-	buildTemplate := `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="88" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h37v20H0z"/><path fill="%s" d="M37 0h51v20H37z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"> <text x="185" y="140" transform="scale(.1)" textLength="270">build</text><text x="615" y="140" transform="scale(.1)" textLength="410">%s</text></g> </svg>`
-	buildFailingTemplate := `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="80" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h37v20H0z"/><path fill="%s" d="M37 0h43v20H37z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"> <text x="185" y="140" transform="scale(.1)" textLength="270">build</text><text x="575" y="140" transform="scale(.1)" textLength="330">%s</text></g> </svg>`
-	buildUnknownTemplate := `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="98" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h37v20H0z"/><path fill="%s" d="M37 0h61v20H37z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"> <text x="185" y="140" transform="scale(.1)" textLength="270">build</text><text x="665" y="140" transform="scale(.1)" textLength="510">%s</text></g> </svg>`
-	coverageTemplate := `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="98" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="%s" d="M61 0h37v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"> <text x="305" y="140" transform="scale(.1)" textLength="510">coverage</text><text x="785" y="140" transform="scale(.1)" textLength="270">%s</text></g> </svg>`
-	coverageSmallTemplate := `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="90" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="%s" d="M61 0h29v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"> <text x="305" y="140" transform="scale(.1)" textLength="510">coverage</text><text x="745" y="140" transform="scale(.1)" textLength="190">%s</text></g> </svg>`
-	coverageUnknownTemplate := `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="122" height="20"><g shape-rendering="crispEdges"><path fill="#555" d="M0 0h61v20H0z"/><path fill="%s" d="M61 0h61v20H61z"/></g><g fill="#fff" text-anchor="middle" font-family="DejaVu Sans,Verdana,Geneva,sans-serif" font-size="110"> <text x="305" y="140" transform="scale(.1)" textLength="510">coverage</text><text x="905" y="140" transform="scale(.1)" textLength="510">%s</text></g> </svg>`
-
-	// make camo do not cache our responses
-	c.Header("Cache-Control", "no-cache, max-age=0")
-
-	switch badgeType {
-	case "build.svg":
-		switch build {
-		case "passing":
-			color = colors[0]
-			c.Data(http.StatusOK, "image/svg+xml; charset=utf-8", []byte(fmt.Sprintf(buildTemplate, color, build)))
-		case "failing":
-			color = colors[len(colors)-1]
-			c.Data(http.StatusOK, "image/svg+xml; charset=utf-8", []byte(fmt.Sprintf(buildFailingTemplate, color, build)))
-		default:
-			// unknown
-			color = unknownColor
-			c.Data(http.StatusOK, "image/svg+xml; charset=utf-8", []byte(fmt.Sprintf(buildUnknownTemplate, color, build)))
-		}
-	case "coverage.svg":
-		if coverage == "unknown" {
-			color = unknownColor
-			c.Data(http.StatusOK, "image/svg+xml; charset=utf-8", []byte(fmt.Sprintf(coverageUnknownTemplate, color, coverage)))
-			return
-		}
-
-		if coverageNum >= 93 { // or starts from 97%
-			color = colors[0]
-		} else if coverageNum >= 80 {
-			color = colors[1]
-		} else if coverageNum >= 65 {
-			color = colors[2]
-		} else if coverageNum >= 45 {
-			color = colors[3]
-		} else if coverageNum >= 15 {
-			color = colors[4]
-		} else if coverageNum >= 10 {
-			color = colors[5]
-		} else {
-			// small coverage
-			color = colors[5]
-			c.Data(http.StatusOK, "image/svg+xml; charset=utf-8", []byte(fmt.Sprintf(coverageSmallTemplate, color, coverage)))
-			return
-		}
-		c.Data(http.StatusOK, "image/svg+xml; charset=utf-8", []byte(fmt.Sprintf(coverageTemplate, color, coverage)))
-	default:
-		panic("unexpected params")
-	}
-}
 
 func webhookHandler(c *gin.Context) {
 	hook, err := githubhook.Parse([]byte(common.Conf.API.WebHookSecret), c.Request)

@@ -1,4 +1,4 @@
-package server
+package worker
 
 import (
 	"net/http"
@@ -18,7 +18,7 @@ func TestBadgesHandler(t *testing.T) {
 	resp := httptest.NewRecorder()
 	c, r := gin.CreateTestContext(resp)
 
-	r.GET("/badges/:owner/:repo/:type", badgesHandler)
+	r.GET("/badges/:owner/:repo/:type", BadgesHandler)
 
 	// bad request
 	resp = httptest.NewRecorder()
