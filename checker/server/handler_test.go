@@ -1,4 +1,4 @@
-package checker
+package server
 
 import (
 	"net/http"

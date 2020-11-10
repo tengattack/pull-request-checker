@@ -7,6 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/tengattack/unified-ci/checker/worker"
 	"github.com/tengattack/unified-ci/common"
 	"github.com/tengattack/unified-ci/log"
 	"github.com/tengattack/unified-ci/mq/redis"
@@ -36,8 +37,8 @@ func InitMessageQueue() error {
 func StartWorkerMessageSubscription(ctx context.Context) {
 	common.LogAccess.Info("Start Worker Message Subscription")
 
-	worker := NewWorker(&common.Conf.Worker)
-	err := worker.Join()
+	w := worker.NewWorker(&common.Conf.Worker)
+	err := w.Join()
 	if err != nil {
 		log.LogError.Fatalf("worker join error: %v", err)
 		panic(err)
@@ -75,8 +76,8 @@ func StartWorkerMessageSubscription(ctx context.Context) {
 				runningQueue = append(runningQueue, key.(string))
 				return true
 			})
-			worker.SetRunningQueue(runningQueue)
-			messages, err = worker.Request(maxQueue - int(atomic.LoadInt64(&running)))
+			w.SetRunningQueue(runningQueue)
+			messages, err = w.Request(maxQueue - int(atomic.LoadInt64(&running)))
 			if err != nil {
 				break
 			}
@@ -107,14 +108,14 @@ func StartWorkerMessageSubscription(ctx context.Context) {
 				err := HandleMessage(ctx, message)
 				if err != nil {
 					common.LogError.Error("handle message error: " + err.Error())
-					err = worker.JobDone(TypeJobDoneError, message)
+					err = w.JobDone(worker.TypeJobDoneError, message)
 					if err != nil {
 						common.LogError.Error("mark message error failed: " + err.Error())
 					}
 					return
 				}
 
-				err = worker.JobDone(TypeJobDoneFinish, message)
+				err = w.JobDone(worker.TypeJobDoneFinish, message)
 				if err != nil {
 					common.LogError.Error("mq finish error: " + err.Error())
 				}
