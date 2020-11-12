@@ -61,7 +61,7 @@ func (s *MessageQueue) Reset() {
 }
 
 // Push message to queue
-func (s *MessageQueue) Push(message string, removePrefix string) error {
+func (s *MessageQueue) Push(message string, removePrefix string, top bool) error {
 	list, err := redisClient.LRange(mq.SyncChannelKey, 0, -1).Result()
 	if err != nil {
 		return err
@@ -69,16 +69,19 @@ func (s *MessageQueue) Push(message string, removePrefix string) error {
 
 	found := false
 	if removePrefix == "" {
-		for _, v := range list {
-			if v == message {
-				found = true
-				break
+		if !top {
+			for _, v := range list {
+				if v == message {
+					found = true
+					break
+				}
 			}
 		}
 	} else {
 		for _, v := range list {
 			if strings.HasPrefix(v, removePrefix) {
-				if v == message && !found {
+				// top message always required RPUSH
+				if !top && v == message && !found {
 					found = true
 				} else {
 					err = redisClient.LRem(mq.SyncChannelKey, 1, v).Err()
@@ -90,10 +93,16 @@ func (s *MessageQueue) Push(message string, removePrefix string) error {
 		}
 	}
 
-	if found {
-		return nil
+	if top {
+		// Move to top
+		err = redisClient.RPush(mq.SyncChannelKey, message).Err()
+	} else {
+		if found {
+			return nil
+		}
+		err = redisClient.LPush(mq.SyncChannelKey, message).Err()
 	}
-	return redisClient.LPush(mq.SyncChannelKey, message).Err()
+	return err
 }
 
 // Subscribe message from queue.

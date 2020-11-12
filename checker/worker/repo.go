@@ -153,7 +153,7 @@ func checkProjects(ctx context.Context, projects []WorkerProjectConfig, enablePr
 					if needCheck {
 						// no statuses, need check
 						common.LogAccess.WithField("entry", "local").Info("Push message: " + message)
-						err = common.MQ.Push(message, messagePrefix)
+						err = common.MQ.Push(message, messagePrefix, false)
 						if err == nil {
 							common.MarkAsPending(client, ref)
 						} else {
@@ -192,7 +192,7 @@ func checkProjects(ctx context.Context, projects []WorkerProjectConfig, enablePr
 			if needCheck {
 				// no statuses, need check
 				common.LogAccess.WithField("entry", "local").Info("Push message: " + message)
-				err = common.MQ.Push(message, messagePrefix)
+				err = common.MQ.Push(message, messagePrefix, false)
 				if err == nil {
 					common.MarkAsPending(client, ref)
 				} else {

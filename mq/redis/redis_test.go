@@ -37,13 +37,13 @@ func TestPush(t *testing.T) {
 
 	MQ.Reset()
 
-	err := MQ.Push("tengattack/playground/pull/2/commits/ae26afcc1d5c268ba751a5903828e0423bd87cf2", "tengattack/playground/pull/2/")
+	err := MQ.Push("tengattack/playground/pull/2/commits/ae26afcc1d5c268ba751a5903828e0423bd87cf2", "tengattack/playground/pull/2/", false)
 	require.NoError(err)
 
-	err = MQ.Push("tengattack/playground/pull/3/commits/2941c50a0126ea878203ac72272ea46aeee148f6", "tengattack/playground/pull/3/")
+	err = MQ.Push("tengattack/playground/pull/3/commits/2941c50a0126ea878203ac72272ea46aeee148f6", "tengattack/playground/pull/3/", false)
 	require.NoError(err)
 
-	err = MQ.Push("tengattack/playground/pull/3/commits/73c5f8a45a4f02b595fbe1713ee3172749b7fc0c", "tengattack/playground/pull/3/")
+	err = MQ.Push("tengattack/playground/pull/3/commits/73c5f8a45a4f02b595fbe1713ee3172749b7fc0c", "tengattack/playground/pull/3/", false)
 	require.NoError(err)
 
 	list, err := redisClient.LRange(mq.SyncChannelKey, 0, -1).Result()
@@ -53,7 +53,8 @@ func TestPush(t *testing.T) {
 		"tengattack/playground/pull/2/commits/ae26afcc1d5c268ba751a5903828e0423bd87cf2",
 	}, list)
 
-	err = MQ.Push("tengattack/playground/pull/3/commits/73c5f8a45a4f02b595fbe1713ee3172749b7fc0c", "")
+	// push same message
+	err = MQ.Push("tengattack/playground/pull/3/commits/73c5f8a45a4f02b595fbe1713ee3172749b7fc0c", "", false)
 	require.NoError(err)
 
 	list, err = redisClient.LRange(mq.SyncChannelKey, 0, -1).Result()
@@ -61,6 +62,18 @@ func TestPush(t *testing.T) {
 	assert.Equal([]string{
 		"tengattack/playground/pull/3/commits/73c5f8a45a4f02b595fbe1713ee3172749b7fc0c",
 		"tengattack/playground/pull/2/commits/ae26afcc1d5c268ba751a5903828e0423bd87cf2",
+	}, list)
+
+	// push to top
+	err = MQ.Push("tengattack/playground/pull/3/commits/2941c50a0126ea878203ac72272ea46aeee148f6", "", true)
+	require.NoError(err)
+
+	list, err = redisClient.LRange(mq.SyncChannelKey, 0, -1).Result()
+	require.NoError(err)
+	assert.Equal([]string{
+		"tengattack/playground/pull/3/commits/73c5f8a45a4f02b595fbe1713ee3172749b7fc0c",
+		"tengattack/playground/pull/2/commits/ae26afcc1d5c268ba751a5903828e0423bd87cf2",
+		"tengattack/playground/pull/3/commits/2941c50a0126ea878203ac72272ea46aeee148f6",
 	}, list)
 }
 

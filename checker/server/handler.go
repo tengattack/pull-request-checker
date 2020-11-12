@@ -55,7 +55,7 @@ func webhookHandler(c *gin.Context) {
 
 			Sha: payload.PullRequest.Head.Sha,
 		}
-		err = common.MQ.Push(message, messagePrefix)
+		err = common.MQ.Push(message, messagePrefix, false)
 		if err != nil {
 			common.LogAccess.Error("Add message to queue error: " + err.Error())
 			abortWithError(c, 500, "add to queue error: "+err.Error())
@@ -118,7 +118,7 @@ func webhookHandler(c *gin.Context) {
 
 			Sha: *payload.CheckRun.HeadSHA,
 		}
-		err = common.MQ.Push(message, messagePrefix)
+		err = common.MQ.Push(message, messagePrefix, false)
 		if err != nil {
 			common.LogAccess.Error("Add message to queue error: " + err.Error())
 			abortWithError(c, 500, "add to queue error: "+err.Error())
@@ -230,7 +230,7 @@ func addMessageHandler(c *gin.Context) {
 		return
 	}
 
-	err = common.MQ.Push(message, m.Prefix())
+	err = common.MQ.Push(message, m.Prefix(), true) // push to top
 	if err != nil {
 		abortWithError(c, 500, fmt.Sprintf("add message error: %v", err))
 		return
