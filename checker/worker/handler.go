@@ -30,14 +30,23 @@ func abortWithError(c *gin.Context, code int, message string) {
 // ServerBadgesHandler get project badge route by server worker
 func ServerBadgesHandler(c *gin.Context) {
 	owner := c.Param("owner")
+	repo := c.Param("repo")
 
+	if owner == "" || repo == "" {
+		abortWithError(c, 400, "params error")
+		return
+	}
+
+	projectName := owner + "/" + repo
 	var w ServerWorker
 	var found bool
 	sw.Range(func(key, value interface{}) bool {
-		if key.(string) == owner {
-			w = value.(ServerWorker)
-			found = true
-			return false
+		w = value.(ServerWorker)
+		for _, p := range w.Projects {
+			if p.Name == projectName {
+				found = true
+				return false
+			}
 		}
 		return true
 	})
@@ -66,7 +75,7 @@ func ServerBadgesHandler(c *gin.Context) {
 		abortWithError(c, 500, fmt.Sprintf("read resp body error: %v", err))
 		return
 	}
-	c.JSON(resp.StatusCode, body)
+	c.Data(resp.StatusCode, resp.Header.Get("Content-Type"), body)
 }
 
 // BadgesHandler get project badge
@@ -75,11 +84,16 @@ func BadgesHandler(c *gin.Context) {
 	repo := c.Param("repo")
 	badgeType := c.Param("type")
 
+	if owner == "" || repo == "" {
+		abortWithError(c, 400, "params error")
+		return
+	}
+
 	switch badgeType {
 	case "build.svg":
 	case "coverage.svg":
 	default:
-		abortWithError(c, 400, "error params")
+		abortWithError(c, 400, "params error")
 		return
 	}
 

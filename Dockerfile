@@ -16,7 +16,7 @@ RUN cd /go/src/github.com/tengattack/unified-ci/ && \
 COPY . /go/src/github.com/tengattack/unified-ci/
 
 RUN cd /go/src/github.com/tengattack/unified-ci/ && \
-    go install -ldflags "-X main.Version=$version" && \
+    go install -v -ldflags "-X main.Version=$version" && \
     /go/bin/unified-ci -version
 
 FROM golang:1.13-alpine3.10
@@ -71,7 +71,7 @@ RUN adduser -D ci && \
     apk del --no-network .build-deps && \
     rm -rf ~/.gem/ && \
 # golangci-lint
-    wget -O- -nv https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.24.0 && \
+    wget -O- -nv https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.31.0 && \
     ln -s /go/bin/golangci-lint /usr/local/bin/ && \
     golangci-lint --version
 
