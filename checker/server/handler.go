@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/tengattack/unified-ci/checker/worker"
 	"github.com/tengattack/unified-ci/common"
 	"github.com/tengattack/unified-ci/util"
 	githubhook "gopkg.in/rjz/githubhook.v0"
@@ -134,7 +135,7 @@ func webhookHandler(c *gin.Context) {
 	}
 }
 
-func addMessageHandler(c *gin.Context) {
+func addQueueHandler(c *gin.Context) {
 	message := c.PostForm("message")
 	if message == "" {
 		urlParam := c.PostForm("url")
@@ -239,4 +240,69 @@ func addMessageHandler(c *gin.Context) {
 		"code": 0,
 		"info": "add to queue successfully",
 	})
+}
+
+func showQueueStatusHandler(c *gin.Context) {
+	// simplejson datasource action
+	action := c.Param("action")
+	switch action {
+	case "":
+		fallthrough
+	case "tag-keys":
+		fallthrough
+	case "tag-values":
+		c.JSON(http.StatusOK, gin.H{})
+		return
+	case "search":
+		c.JSON(http.StatusOK, []gin.H{
+			{"text": "Running", "value": "running"},
+			{"text": "Pending", "value": "pending"},
+		})
+		return
+	case "query":
+		var req struct {
+			Targets []struct {
+				Type   string `json:"type"`
+				Target string `json:"target"`
+			} `json:"targets"`
+		}
+		err := c.BindJSON(&req)
+		if err == nil && len(req.Targets) > 0 && req.Targets[0].Type == "table" {
+			target := req.Targets[0]
+			var resp struct {
+				Type    string     `json:"type"`
+				Columns []gin.H    `json:"columns"`
+				Rows    [][]string `json:"rows"`
+			}
+			resp.Type = "table"
+			resp.Columns = []gin.H{
+				{"type": "string", "text": "worker_name"},
+				{"type": "string", "text": "job"},
+			}
+
+			var jobs []worker.QueueJob
+			if target.Target == "running" {
+				jobs, err = worker.GetRunningJobs()
+			} else if target.Target == "pending" {
+				jobs, err = worker.GetPendingJobs()
+			} else {
+				abortWithError(c, 400, "params error")
+				return
+			}
+			if err != nil {
+				abortWithError(c, 500, fmt.Sprintf("get jobs error: %v", err))
+				return
+			}
+
+			resp.Rows = make([][]string, 0)
+			for _, job := range jobs {
+				row := make([]string, 2)
+				row[0] = job.WorkerName
+				row[1] = job.Job
+				resp.Rows = append(resp.Rows, row)
+			}
+			c.JSON(http.StatusOK, []interface{}{resp})
+		}
+	}
+	abortWithError(c, 400, "params error")
 }
