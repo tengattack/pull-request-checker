@@ -14,6 +14,7 @@ type QueueJob struct {
 
 // GetRunningJobs get running jobs
 func GetRunningJobs() (jobs []QueueJob, err error) {
+	// TODO: local mode running jobs
 	sw.Range(func(key, value interface{}) bool {
 		w := value.(ServerWorker)
 		for _, j := range w.RunningJobs {
@@ -34,7 +35,7 @@ func GetPendingJobs() (jobs []QueueJob, err error) {
 	if err != nil {
 		return nil, err
 	}
-	var prefixMap map[string]WorkerInfo
+	prefixMap := make(map[string]WorkerInfo)
 	sw.Range(func(key, value interface{}) bool {
 		w := value.(ServerWorker)
 		for _, p := range w.Projects {
@@ -46,7 +47,7 @@ func GetPendingJobs() (jobs []QueueJob, err error) {
 		parts := strings.Split(j, "/")
 		prefix := parts[0]
 		if len(parts) > 1 {
-			prefix += "/" + parts[2]
+			prefix += "/" + parts[1]
 		}
 		if w, ok := prefixMap[prefix]; ok {
 			jobs = append(jobs, QueueJob{

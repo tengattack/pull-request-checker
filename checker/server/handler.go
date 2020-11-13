@@ -302,6 +302,7 @@ func showQueueStatusHandler(c *gin.Context) {
 				resp.Rows = append(resp.Rows, row)
 			}
 			c.JSON(http.StatusOK, []interface{}{resp})
+			return
 		}
 	}
 	abortWithError(c, 400, "params error")
