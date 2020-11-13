@@ -18,7 +18,7 @@ func newReq(uri, body string) (resp *httptest.ResponseRecorder) {
 	c, r := gin.CreateTestContext(resp)
 
 	// routes
-	r.POST("/api/message/add", addMessageHandler)
+	r.POST("/api/queue/add", addQueueHandler)
 
 	c.Request = httptest.NewRequest(http.MethodPost, uri, strings.NewReader(body))
 	c.Request.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -27,13 +27,13 @@ func newReq(uri, body string) (resp *httptest.ResponseRecorder) {
 	return
 }
 
-func TestAddMessageHandler(t *testing.T) {
+func TestAddQueueHandler(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
 	require.NotPanics(func() { common.MQ.Reset() })
 
-	uri := "/api/message/add"
+	uri := "/api/queue/add"
 
 	form := url.Values{}
 

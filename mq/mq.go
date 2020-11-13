@@ -30,4 +30,5 @@ type MessageQueue interface {
 	Retry(message string) error
 
 	Exists(message string) (bool, error)
+	ListAll() ([]string, error)
 }

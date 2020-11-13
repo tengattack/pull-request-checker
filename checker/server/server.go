@@ -63,11 +63,15 @@ func routerEngine(mode worker.Mode) *gin.Engine {
 	// r.GET("/api/stat/app", appStatusHandler)
 	switch mode {
 	case worker.ModeLocal:
-		r.POST("/api/message/add", addMessageHandler)
+		r.POST("/api/queue/add", addQueueHandler)
+		r.Any("/api/queue/status", showQueueStatusHandler)
+		r.Any("/api/queue/status/:action", showQueueStatusHandler)
 		r.POST(common.Conf.API.WebHookURI, webhookHandler)
 		r.GET("/badges/:owner/:repo/:type", worker.BadgesHandler)
 	case worker.ModeServer:
-		r.POST("/api/message/add", addMessageHandler)
+		r.POST("/api/queue/add", addQueueHandler)
+		r.Any("/api/queue/status", showQueueStatusHandler)
+		r.Any("/api/queue/status/:action", showQueueStatusHandler)
 		r.POST("/api/worker/join", worker.JoinHandler)
 		r.POST("/api/worker/request", worker.RequestHandler)
 		r.POST("/api/worker/jobdone", worker.JobDoneHandler)
