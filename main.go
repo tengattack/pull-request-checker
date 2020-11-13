@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/tengattack/unified-ci/checker"
+	"github.com/tengattack/unified-ci/checker/server"
+	"github.com/tengattack/unified-ci/checker/worker"
 	"github.com/tengattack/unified-ci/common"
 	"github.com/tengattack/unified-ci/config"
 	"github.com/tengattack/unified-ci/store"
@@ -23,13 +25,13 @@ import (
 
 var (
 	// Version is the version of unified-ci
-	Version = "0.2.3-dev"
+	Version = "0.3.0-dev"
 )
 
 func main() {
 	common.SetVersion(Version)
 	configPath := flag.String("config", "", "config file")
-	mode := flag.String("mode", string(checker.ModeLocal), "working mode: local, server, worker")
+	mode := flag.String("mode", string(worker.ModeLocal), "working mode: local, server, worker")
 	showHelp := flag.Bool("help", false, "show help message")
 	showVerbose := flag.Bool("verbose", false, "show verbose debug log")
 	showVersion := flag.Bool("version", false, "show version")
@@ -51,12 +53,12 @@ func main() {
 	}
 
 	switch *mode {
-	case string(checker.ModeLocal):
+	case string(worker.ModeLocal):
 		fallthrough
-	case string(checker.ModeServer):
+	case string(worker.ModeServer):
 		fallthrough
-	case string(checker.ModeWorker):
-		checker.WorkingMode = checker.Mode(*mode)
+	case string(worker.ModeWorker):
+		checker.WorkingMode = worker.Mode(*mode)
 		// PASS
 	default:
 		fmt.Fprintln(os.Stderr, "Unknown working mode: "+*mode)
@@ -101,7 +103,7 @@ func main() {
 	}
 	defer store.Deinit()
 
-	if checker.WorkingMode == checker.ModeLocal || checker.WorkingMode == checker.ModeServer {
+	if checker.WorkingMode == worker.ModeLocal || checker.WorkingMode == worker.ModeServer {
 		if err = checker.InitMessageQueue(); err != nil {
 			log.Fatalf("error: %v", err)
 		}
@@ -113,7 +115,7 @@ func main() {
 	leave := make(chan struct{})
 	go func() {
 		switch checker.WorkingMode {
-		case checker.ModeLocal:
+		case worker.ModeLocal:
 			if common.Conf.Core.EnableRetries {
 				g.Go(func() error {
 					// Start error message retries
@@ -128,9 +130,9 @@ func main() {
 			})
 			g.Go(func() error {
 				// Run local repo watcher
-				return checker.WatchLocalRepo(ctx)
+				return worker.WatchLocalRepo(ctx)
 			})
-		case checker.ModeServer:
+		case worker.ModeServer:
 			if common.Conf.Core.EnableRetries {
 				g.Go(func() error {
 					// Start error message retries
@@ -140,9 +142,9 @@ func main() {
 			}
 			g.Go(func() error {
 				// Run local repo watcher
-				return checker.WatchServerWorkerRepo(ctx)
+				return worker.WatchServerWorkerRepo(ctx)
 			})
-		case checker.ModeWorker:
+		case worker.ModeWorker:
 			g.Go(func() error {
 				// Start message subscription
 				checker.StartWorkerMessageSubscription(ctx)
@@ -152,7 +154,7 @@ func main() {
 
 		g.Go(func() error {
 			// Run httpd server
-			return checker.RunHTTPServer(checker.WorkingMode)
+			return server.RunHTTPServer(checker.WorkingMode)
 		})
 
 		if err = g.Wait(); err != nil {
@@ -169,7 +171,7 @@ func main() {
 	}
 
 	cancel()
-	err = checker.ShutdownHTTPServer(60 * time.Second)
+	err = server.ShutdownHTTPServer(60 * time.Second)
 	if err != nil {
 		common.LogError.Errorf("Error in ShutdownHTTPServer: %v\n", err)
 	}

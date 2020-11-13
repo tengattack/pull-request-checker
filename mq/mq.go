@@ -18,7 +18,7 @@ const (
 type MessageQueue interface {
 	Init() error
 	Reset()
-	Push(message string, removePrefix string) error
+	Push(message string, removePrefix string, top bool) error
 	Subscribe(ctx context.Context) (string, error)
 	GetN(ctx context.Context, n int, running []string) ([]string, error)
 	GetNWithin(ctx context.Context, n int, running []string, within []string) ([]string, error)

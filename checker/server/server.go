@@ -1,4 +1,4 @@
-package checker
+package server
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/tengattack/unified-ci/checker/worker"
 	"github.com/tengattack/unified-ci/common"
 	"github.com/tengattack/unified-ci/log"
 	api "gopkg.in/appleboy/gin-status-api.v1"
@@ -44,7 +45,7 @@ func rootHandler(c *gin.Context) {
 	})
 }
 
-func routerEngine(mode Mode) *gin.Engine {
+func routerEngine(mode worker.Mode) *gin.Engine {
 	// set server mode
 	gin.SetMode(common.Conf.API.Mode)
 
@@ -59,18 +60,23 @@ func routerEngine(mode Mode) *gin.Engine {
 
 	r.GET("/api/stat/go", api.StatusHandler)
 	r.GET("/api/stat/sys", sysStatsHandler)
-	switch mode {
-	case ModeLocal:
-		r.POST(common.Conf.API.WebHookURI, webhookHandler)
-	case ModeServer:
-		r.POST("/api/worker/join", workerJoinHandler)
-		r.POST("/api/worker/request", workerRequestHandler)
-		r.POST("/api/worker/jobdone", workerJobDoneHandler)
-		r.POST(common.Conf.API.WebHookURI, webhookHandler)
-	}
 	// r.GET("/api/stat/app", appStatusHandler)
+	switch mode {
+	case worker.ModeLocal:
+		r.POST("/api/message/add", addMessageHandler)
+		r.POST(common.Conf.API.WebHookURI, webhookHandler)
+		r.GET("/badges/:owner/:repo/:type", worker.BadgesHandler)
+	case worker.ModeServer:
+		r.POST("/api/message/add", addMessageHandler)
+		r.POST("/api/worker/join", worker.JoinHandler)
+		r.POST("/api/worker/request", worker.RequestHandler)
+		r.POST("/api/worker/jobdone", worker.JobDoneHandler)
+		r.POST(common.Conf.API.WebHookURI, webhookHandler)
+		r.GET("/badges/:owner/:repo/:type", worker.ServerBadgesHandler)
+	case worker.ModeWorker:
+		r.GET("/badges/:owner/:repo/:type", worker.BadgesHandler)
+	}
 	r.GET("/version", versionHandler)
-	r.GET("/badges/:owner/:repo/:type", badgesHandler)
 	r.GET("/", rootHandler)
 
 	return r
@@ -79,7 +85,7 @@ func routerEngine(mode Mode) *gin.Engine {
 var httpSrv *http.Server
 
 // RunHTTPServer provide run http or https protocol.
-func RunHTTPServer(mode Mode) (err error) {
+func RunHTTPServer(mode worker.Mode) (err error) {
 	if !common.Conf.API.Enabled {
 		common.LogAccess.Debug("HTTPD server is disabled.")
 		return nil

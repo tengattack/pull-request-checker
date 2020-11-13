@@ -8,11 +8,15 @@ import (
 	"time"
 
 	"github.com/google/go-github/github"
+	"github.com/tengattack/unified-ci/checker/worker"
 	"github.com/tengattack/unified-ci/checks/tester"
 	"github.com/tengattack/unified-ci/checks/vulnerability"
 	"github.com/tengattack/unified-ci/common"
 	"github.com/tengattack/unified-ci/util"
 )
+
+// WorkingMode current checker working mode
+var WorkingMode worker.Mode = worker.ModeLocal
 
 type testCheckRun struct {
 	*util.LogDivider
