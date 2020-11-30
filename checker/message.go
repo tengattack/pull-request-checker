@@ -484,6 +484,7 @@ func checkTests(ctx context.Context, repoPath string, tests map[string]util.Test
 			log.WriteString(msg)
 			return
 		}
+		ref.BaseSha = baseSHA
 		baseSavedRecords, baseTestsNeedToRun := tester.LoadBaseFromStore(ref, baseSHA, tests, log)
 		var baseCoverage sync.Map
 		_ = tester.FindBaseCoverage(ctx, baseSavedRecords, baseTestsNeedToRun, repoPath, baseSHA, gpull, ref, log, &baseCoverage)

@@ -48,10 +48,11 @@ type GithubRef struct {
 		SSHURL   string     `json:"ssh_url"`
 		CloneURL string     `json:"clone_url"`
 	} `json:"repo"`
-	Label string     `json:"label"`
-	Ref   string     `json:"ref"`
-	Sha   string     `json:"sha"`
-	User  githubUser `json:"user"`
+	Label   string     `json:"label"`
+	Ref     string     `json:"ref"`
+	BaseSha string     `json:"base_sha"`
+	Sha     string     `json:"sha"`
+	User    githubUser `json:"user"`
 }
 
 // IsBranch returns true if the checked type is checking of named branch such as master, stable.

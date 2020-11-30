@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"os/exec"
+	"path"
 	"regexp"
 	"strings"
 
@@ -28,6 +30,35 @@ func (t *testNotPass) Error() (s string) {
 }
 
 func carry(ctx context.Context, p *shellwords.Parser, repo, cmd string, log io.Writer) error {
+	if strings.Contains(cmd, "|") {
+		pipelineCmds := strings.Split(cmd, "|")
+		if len(pipelineCmds) != 2 {
+			return errors.New("invalid command")
+		}
+		word0, err := p.Parse(pipelineCmds[0])
+		if err != nil {
+			return err
+		}
+		if len(word0) < 1 {
+			return errors.New("invalid command")
+		}
+		cmd0 := exec.Command(word0[0], word0[1:]...)
+		cmd0.Dir = repo
+		var outFile *os.File
+		if strings.Contains(pipelineCmds[1], ">") {
+			cmds := strings.Split(pipelineCmds[1], " ")
+			fileName := cmds[len(cmds)-1]
+			outFile, _ = os.Create(path.Join(repo, fileName))
+		}
+		word1, err := p.Parse(pipelineCmds[1])
+		if err != nil {
+			return err
+		}
+		cmd1 := exec.Command(word1[0], word1[1:]...)
+		cmd1.Dir = repo
+		pipelineSupport(cmd0, cmd1, log, outFile)
+		return nil
+	}
 	words, err := p.Parse(cmd)
 	if err != nil {
 		return err
@@ -36,12 +67,28 @@ func carry(ctx context.Context, p *shellwords.Parser, repo, cmd string, log io.W
 		return errors.New("invalid command")
 	}
 
-	cmds := exec.CommandContext(ctx, words[0], words[1:]...)
+	cmds := exec.Command(words[0], words[1:]...)
 	cmds.Dir = repo
 	cmds.Stdout = log
 	cmds.Stderr = log
 
 	return cmds.Run()
+}
+
+func pipelineSupport(c1, c2 *exec.Cmd, log io.Writer, outFile *os.File) {
+	r, w := io.Pipe()
+	c1.Stdout = w
+	c2.Stdin = r
+	c2.Stdout = log
+	c2.Stderr = log
+	if outFile != nil {
+		c2.Stdout = outFile
+	}
+	c1.Start()
+	c2.Start()
+	c1.Wait()
+	w.Close()
+	c2.Wait()
 }
 
 func parseCoverage(pattern, output string) (string, float64, error) {
@@ -62,7 +109,7 @@ func parseCoverage(pattern, output string) (string, float64, error) {
 	return coverage, pct, nil
 }
 
-func testAndSaveCoverage(ctx context.Context, ref common.GithubRef, testName string, cmds []string, coveragePattern string,
+func testAndSaveCoverage(ctx context.Context, ref common.GithubRef, testName string, cmds []string, coveragePattern string, deltaCoveragePattern string,
 	repoPath string, gpull *github.PullRequest, breakOnFails bool, log io.Writer) (result *Result) {
 	var reportMessage, outputSummary string
 	parser := util.NewShellParser(repoPath, ref)
@@ -149,6 +196,21 @@ func testAndSaveCoverage(ctx context.Context, ref common.GithubRef, testName str
 			msg := fmt.Sprintf("Error: %v. Failed to save %v\n", err, c)
 			common.LogError.Error(msg)
 			_, _ = io.WriteString(log, msg)
+		}
+	}
+	if deltaCoveragePattern != "" && (conclusion == "success" || !breakOnFails) && ref.CheckType == common.CheckTypePRHead {
+		deltaPercentage, _, err := parseCoverage(deltaCoveragePattern, outputSummary)
+		if err != nil {
+			msg := fmt.Sprintf("Failed to parse %s test coverage: %v\n", testName, err)
+			common.LogError.Error(msg)
+			_, _ = io.WriteString(log, msg)
+			// PASS
+		}
+		outputSummary += ("Delta Test coverage: " + deltaPercentage + "\n")
+		if reportMessage != "" {
+			reportMessage = fmt.Sprintf("%s, %s", reportMessage, deltaPercentage)
+		} else {
+			reportMessage = deltaPercentage
 		}
 	}
 	_, _ = io.WriteString(log, "\n")
