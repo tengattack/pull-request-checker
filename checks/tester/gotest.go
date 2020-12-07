@@ -32,32 +32,34 @@ func (t *testNotPass) Error() (s string) {
 func carry(ctx context.Context, p *shellwords.Parser, repo, cmd string, log io.Writer) error {
 	if strings.Contains(cmd, "|") {
 		pipelineCmds := strings.Split(cmd, "|")
-		if len(pipelineCmds) != 2 {
-			return errors.New("invalid command")
+		execCommands := make([]*exec.Cmd, 0, len(pipelineCmds))
+		for idx, cmd := range pipelineCmds {
+			word, err := p.Parse(cmd)
+			if err != nil {
+				return err
+			}
+			if len(word) < 1 {
+				return errors.New("invalid command")
+			}
+			exeCmd := exec.Command(word[0], word[1:]...)
+			exeCmd.Dir = repo
+			if idx == len(pipelineCmds)-1 {
+				exeCmd.Stdout = log
+				exeCmd.Stderr = log
+			}
+			if strings.Contains(cmd, ">") {
+				// 最后一个 cmd 才可以重定向标准输出到文件
+				if idx != len(pipelineCmds)-1 {
+					return errors.New("invalid command")
+				}
+				cmds := strings.Split(cmd, " ")
+				fileName := cmds[len(cmds)-1]
+				outFile, _ := os.Create(path.Join(repo, fileName))
+				exeCmd.Stdout = outFile
+			}
+			execCommands = append(execCommands, exeCmd)
 		}
-		word0, err := p.Parse(pipelineCmds[0])
-		if err != nil {
-			return err
-		}
-		if len(word0) < 1 {
-			return errors.New("invalid command")
-		}
-		cmd0 := exec.Command(word0[0], word0[1:]...)
-		cmd0.Dir = repo
-		var outFile *os.File
-		if strings.Contains(pipelineCmds[1], ">") {
-			cmds := strings.Split(pipelineCmds[1], " ")
-			fileName := cmds[len(cmds)-1]
-			outFile, _ = os.Create(path.Join(repo, fileName))
-		}
-		word1, err := p.Parse(pipelineCmds[1])
-		if err != nil {
-			return err
-		}
-		cmd1 := exec.Command(word1[0], word1[1:]...)
-		cmd1.Dir = repo
-		pipelineSupport(cmd0, cmd1, log, outFile)
-		return nil
+		return execute(execCommands...)
 	}
 	words, err := p.Parse(cmd)
 	if err != nil {
@@ -75,20 +77,37 @@ func carry(ctx context.Context, p *shellwords.Parser, repo, cmd string, log io.W
 	return cmds.Run()
 }
 
-func pipelineSupport(c1, c2 *exec.Cmd, log io.Writer, outFile *os.File) {
-	r, w := io.Pipe()
-	c1.Stdout = w
-	c2.Stdin = r
-	c2.Stdout = log
-	c2.Stderr = log
-	if outFile != nil {
-		c2.Stdout = outFile
+func execute(stack ...*exec.Cmd) (err error) {
+	pipeStack := make([]*io.PipeWriter, len(stack)-1)
+	i := 0
+	for ; i < len(stack)-1; i++ {
+		stdinPipe, stdoutPipe := io.Pipe()
+		stack[i].Stdout = stdoutPipe
+		stack[i+1].Stdin = stdinPipe
+		pipeStack[i] = stdoutPipe
 	}
-	c1.Start()
-	c2.Start()
-	c1.Wait()
-	w.Close()
-	c2.Wait()
+
+	return call(stack, pipeStack)
+}
+
+func call(stack []*exec.Cmd, pipes []*io.PipeWriter) (err error) {
+	if stack[0].Process == nil {
+		if err = stack[0].Start(); err != nil {
+			return err
+		}
+	}
+	if len(stack) > 1 {
+		if err = stack[1].Start(); err != nil {
+			return err
+		}
+		defer func() {
+			if err == nil {
+				pipes[0].Close()
+				err = call(stack[1:], pipes[1:])
+			}
+		}()
+	}
+	return stack[0].Wait()
 }
 
 func parseCoverage(pattern, output string) (string, float64, error) {
