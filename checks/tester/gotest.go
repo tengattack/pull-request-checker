@@ -69,7 +69,7 @@ func carry(ctx context.Context, p *shellwords.Parser, repo, cmd string, log io.W
 		return errors.New("invalid command")
 	}
 
-	cmds := exec.Command(words[0], words[1:]...)
+	cmds := exec.CommandContext(ctx, words[0], words[1:]...)
 	cmds.Dir = repo
 	cmds.Stdout = log
 	cmds.Stderr = log

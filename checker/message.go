@@ -470,11 +470,7 @@ func checkTests(ctx context.Context, repoPath string, tests map[string]util.Test
 	client *github.Client, gpull *github.PullRequest, ref common.GithubRef,
 	targetURL string, log *os.File) (failedTests, passedTests, errTests int, testMsg string) {
 
-	var headCoverage sync.Map
-	failedTests, passedTests, errTests, _ = TestCheckRun(ctx,
-		repoPath, client, gpull, ref,
-		targetURL, tests, &headCoverage, log)
-
+	var baseSHA string
 	if !ref.IsBranch() {
 		// compare test coverage with base
 		baseSHA, err := util.GetBaseSHA(ctx, client, ref.Owner, ref.RepoName, gpull.GetNumber())
@@ -485,6 +481,13 @@ func checkTests(ctx context.Context, repoPath string, tests map[string]util.Test
 			return
 		}
 		ref.BaseSha = baseSHA
+	}
+	var headCoverage sync.Map
+	failedTests, passedTests, errTests, _ = TestCheckRun(ctx,
+		repoPath, client, gpull, ref,
+		targetURL, tests, &headCoverage, log)
+
+	if !ref.IsBranch() {
 		baseSavedRecords, baseTestsNeedToRun := tester.LoadBaseFromStore(ref, baseSHA, tests, log)
 		var baseCoverage sync.Map
 		_ = tester.FindBaseCoverage(ctx, baseSavedRecords, baseTestsNeedToRun, repoPath, baseSHA, gpull, ref, log, &baseCoverage)
