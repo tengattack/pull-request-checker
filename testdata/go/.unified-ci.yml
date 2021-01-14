@@ -5,5 +5,5 @@ tests:
     cmds:
       - 'go test -coverprofile=cover.out ./...'
       - 'go tool cover -func=cover.out'
-      - 'gocov convert cover.out | gocov-xml > cover.xml'
+      - 'sh -c "gocov convert cover.out | gocov-xml > cover.xml"'
       - 'diff-cover cover.xml --compare-branch=$BASE_COMMIT'

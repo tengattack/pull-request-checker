@@ -5,9 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"os/exec"
-	"path"
 	"regexp"
 	"strings"
 
@@ -30,37 +28,6 @@ func (t *testNotPass) Error() (s string) {
 }
 
 func carry(ctx context.Context, p *shellwords.Parser, repo, cmd string, log io.Writer) error {
-	if strings.Contains(cmd, "|") {
-		pipelineCmds := strings.Split(cmd, "|")
-		execCommands := make([]*exec.Cmd, 0, len(pipelineCmds))
-		for idx, cmd := range pipelineCmds {
-			word, err := p.Parse(cmd)
-			if err != nil {
-				return err
-			}
-			if len(word) < 1 {
-				return errors.New("invalid command")
-			}
-			exeCmd := exec.Command(word[0], word[1:]...)
-			exeCmd.Dir = repo
-			if idx == len(pipelineCmds)-1 {
-				exeCmd.Stdout = log
-				exeCmd.Stderr = log
-			}
-			if strings.Contains(cmd, ">") {
-				// 最后一个 cmd 才可以重定向标准输出到文件
-				if idx != len(pipelineCmds)-1 {
-					return errors.New("invalid command")
-				}
-				cmds := strings.Split(cmd, " ")
-				fileName := cmds[len(cmds)-1]
-				outFile, _ := os.Create(path.Join(repo, fileName))
-				exeCmd.Stdout = outFile
-			}
-			execCommands = append(execCommands, exeCmd)
-		}
-		return execute(execCommands...)
-	}
 	words, err := p.Parse(cmd)
 	if err != nil {
 		return err
@@ -75,39 +42,6 @@ func carry(ctx context.Context, p *shellwords.Parser, repo, cmd string, log io.W
 	cmds.Stderr = log
 
 	return cmds.Run()
-}
-
-func execute(stack ...*exec.Cmd) (err error) {
-	pipeStack := make([]*io.PipeWriter, len(stack)-1)
-	i := 0
-	for ; i < len(stack)-1; i++ {
-		stdinPipe, stdoutPipe := io.Pipe()
-		stack[i].Stdout = stdoutPipe
-		stack[i+1].Stdin = stdinPipe
-		pipeStack[i] = stdoutPipe
-	}
-
-	return call(stack, pipeStack)
-}
-
-func call(stack []*exec.Cmd, pipes []*io.PipeWriter) (err error) {
-	if stack[0].Process == nil {
-		if err = stack[0].Start(); err != nil {
-			return err
-		}
-	}
-	if len(stack) > 1 {
-		if err = stack[1].Start(); err != nil {
-			return err
-		}
-		defer func() {
-			if err == nil {
-				pipes[0].Close()
-				err = call(stack[1:], pipes[1:])
-			}
-		}()
-	}
-	return stack[0].Wait()
 }
 
 func parseCoverage(pattern, output string) (string, float64, error) {
@@ -226,10 +160,12 @@ func testAndSaveCoverage(ctx context.Context, ref common.GithubRef, testName str
 			// PASS
 		}
 		outputSummary += ("Delta Test coverage: " + deltaPercentage + "\n")
+		deltaMessage := fmt.Sprintf("delta: %s", deltaPercentage)
 		if reportMessage != "" {
-			reportMessage = fmt.Sprintf("%s, %s", reportMessage, deltaPercentage)
+			// 第二个是 delta 的覆盖率
+			reportMessage = fmt.Sprintf("%s, %s", reportMessage, deltaMessage)
 		} else {
-			reportMessage = deltaPercentage
+			reportMessage = deltaMessage
 		}
 	}
 	_, _ = io.WriteString(log, "\n")
