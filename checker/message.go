@@ -473,7 +473,8 @@ func checkTests(ctx context.Context, repoPath string, tests map[string]util.Test
 	var baseSHA string
 	if !ref.IsBranch() {
 		// compare test coverage with base
-		baseSHA, err := util.GetBaseSHA(ctx, client, ref.Owner, ref.RepoName, gpull.GetNumber())
+		var err error
+		baseSHA, err = util.GetBaseSHA(ctx, client, ref.Owner, ref.RepoName, gpull.GetNumber())
 		if err != nil {
 			msg := fmt.Sprintf("Cannot get BaseSHA: %v\n", err)
 			common.LogError.Error(msg)
