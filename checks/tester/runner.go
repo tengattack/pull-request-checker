@@ -201,7 +201,7 @@ func (t *baseTest) Run(ctx context.Context, testName string, testConfig util.Tes
 		}
 
 		result = testAndSaveCoverage(ctx, ref,
-			testName, testConfig.Cmds, testConfig.Coverage, t.RepoPath, t.Pull, true, w)
+			testName, testConfig.Cmds, testConfig.Coverage, testConfig.DeltaCoverage, t.RepoPath, t.Pull, true, w)
 	})
 	return result, nil
 }
@@ -219,7 +219,7 @@ type HeadTest struct {
 func (t *HeadTest) Run(ctx context.Context, testName string, testConfig util.TestsConfig) (result *Result, err error) {
 	t.Log(func(w io.Writer) {
 		result = testAndSaveCoverage(ctx, t.Ref,
-			testName, testConfig.Cmds, testConfig.Coverage, t.RepoPath, t.Pull, false, w)
+			testName, testConfig.Cmds, testConfig.Coverage, testConfig.DeltaCoverage, t.RepoPath, t.Pull, false, w)
 		if result.Conclusion == "failure" {
 			err = &testNotPass{Title: ""}
 		}

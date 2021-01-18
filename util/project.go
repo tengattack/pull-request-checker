@@ -27,8 +27,9 @@ type projectConfigRaw struct {
 
 // TestsConfig config for tests
 type TestsConfig struct {
-	Coverage string   `yaml:"coverage"`
-	Cmds     []string `yaml:"cmds"`
+	Coverage      string   `yaml:"coverage"`
+	DeltaCoverage string   `yaml:"delta_coverage"`
+	Cmds          []string `yaml:"cmds"`
 }
 
 // ReadProjectConfig get project config from CI config file

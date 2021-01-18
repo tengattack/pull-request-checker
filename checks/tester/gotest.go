@@ -62,7 +62,7 @@ func parseCoverage(pattern, output string) (string, float64, error) {
 	return coverage, pct, nil
 }
 
-func testAndSaveCoverage(ctx context.Context, ref common.GithubRef, testName string, cmds []string, coveragePattern string,
+func testAndSaveCoverage(ctx context.Context, ref common.GithubRef, testName string, cmds []string, coveragePattern string, deltaCoveragePattern string,
 	repoPath string, gpull *github.PullRequest, breakOnFails bool, log io.Writer) (result *Result) {
 	var reportMessage, outputSummary string
 	parser := util.NewShellParser(repoPath, ref)
@@ -149,6 +149,23 @@ func testAndSaveCoverage(ctx context.Context, ref common.GithubRef, testName str
 			msg := fmt.Sprintf("Error: %v. Failed to save %v\n", err, c)
 			common.LogError.Error(msg)
 			_, _ = io.WriteString(log, msg)
+		}
+	}
+	if deltaCoveragePattern != "" && (conclusion == "success" || !breakOnFails) && ref.CheckType == common.CheckTypePRHead {
+		deltaPercentage, _, err := parseCoverage(deltaCoveragePattern, outputSummary)
+		if err != nil {
+			msg := fmt.Sprintf("Failed to parse %s test coverage: %v\n", testName, err)
+			common.LogError.Error(msg)
+			_, _ = io.WriteString(log, msg)
+			// PASS
+		}
+		outputSummary += ("Delta Test coverage: " + deltaPercentage + "\n")
+		deltaMessage := fmt.Sprintf("delta: %s", deltaPercentage)
+		if reportMessage != "" {
+			// 第二个是 delta 的覆盖率
+			reportMessage = fmt.Sprintf("%s, %s", reportMessage, deltaMessage)
+		} else {
+			reportMessage = deltaMessage
 		}
 	}
 	_, _ = io.WriteString(log, "\n")

@@ -27,6 +27,8 @@ func NewShellParser(repoPath string, ref common.GithubRef) *shellwords.Parser {
 			return ref.CheckType
 		case "CI_CHECK_REF":
 			return ref.CheckRef
+		case "BASE_COMMIT":
+			return ref.BaseSha
 		}
 		return os.Getenv(key)
 	}

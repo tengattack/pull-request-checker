@@ -1,6 +1,9 @@
 tests:
   go:
     coverage: 'total:.*?[-+]?((?:\d*\.\d+|\d+)%)'
+    delta_coverage: 'Coverage:.*?[-+]?((?:\d*\.\d+|\d+)%)'
     cmds:
       - 'go test -coverprofile=cover.out ./...'
       - 'go tool cover -func=cover.out'
+      - 'sh -c "gocov convert cover.out | gocov-xml > cover.xml"'
+      - 'diff-cover cover.xml --compare-branch=$BASE_COMMIT'
