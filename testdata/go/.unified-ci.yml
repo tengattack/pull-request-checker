@@ -1,7 +1,7 @@
 tests:
   go:
     coverage: 'total:.*?[-+]?((?:\d*\.\d+|\d+)%)'
-    delta_coverage: 'Coverage:.*?[-+]?((?:\d*\.\d+|\d+)%)'
+    delta_coverage: 'Diff Coverage[\s\S]*Coverage:.*?[-+]?((?:\d*\.\d+|\d+)%)'
     cmds:
       - 'go test -coverprofile=cover.out ./...'
       - 'go tool cover -func=cover.out'
