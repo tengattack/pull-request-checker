@@ -112,7 +112,7 @@ func TestDeltaTest(t *testing.T) {
 		assert.NoError(errCmd)
 		output += ("\n" + out.String())
 	}
-	if test.Coverage != "" {
+	if test.DeltaCoverage != "" {
 		result, pct, err = parseCoverage(test.DeltaCoverage, output)
 		assert.NoError(err)
 	}
