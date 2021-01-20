@@ -76,10 +76,9 @@ RUN adduser -D ci && \
     golangci-lint --version && \
 # go delta test tools
     go get github.com/axw/gocov/gocov && \
-    go get github.com/axw/gocov/... && \
     go get github.com/AlekSi/gocov-xml && \
     pip3 install diff_cover && \
-    diff-cover --help
+    diff-cover --version
 
 COPY --from=builder /go/bin/unified-ci /unified-ci
 
