@@ -126,6 +126,7 @@ func UpdateCheckRun(ctx context.Context, client *github.Client, gpull *github.Pu
 func CreateCheckRun(ctx context.Context, client *github.Client, gpull *github.PullRequest, checkName string, ref common.GithubRef, targetURL string) (*github.CheckRun, error) {
 	checkRunStatus := "in_progress"
 
+	t := github.Timestamp{Time: time.Now()}
 	owner := gpull.GetBase().GetRepo().GetOwner().GetLogin()
 	repo := gpull.GetBase().GetRepo().GetName()
 	checkRun, _, err := client.Checks.CreateCheckRun(ctx, owner, repo, github.CreateCheckRunOptions{
@@ -133,6 +134,7 @@ func CreateCheckRun(ctx context.Context, client *github.Client, gpull *github.Pu
 		HeadSHA:    ref.Sha,
 		DetailsURL: &targetURL,
 		Status:     &checkRunStatus,
+		StartedAt:  &t,
 	})
 	return checkRun, err
 }
