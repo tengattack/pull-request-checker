@@ -65,7 +65,7 @@ func TestAddQueueHandler(t *testing.T) {
 
 	// repo PR url
 	form = url.Values{}
-	form.Set("url", "https://github.com/tengattack/playground/pull/3")
+	form.Set("url", "https://github.com/tengattack/playground/pull/2")
 	resp = newReq(uri, form.Encode())
 	assert.Equal(http.StatusOK, resp.Code)
 
@@ -77,7 +77,7 @@ func TestAddQueueHandler(t *testing.T) {
 
 	// direct url message
 	form = url.Values{}
-	form.Set("url", "https://github.com/tengattack/playground/pull/3/commits/73c5f8a45a4f02b595fbe1713ee3172749b7fc0c")
+	form.Set("url", "https://github.com/tengattack/playground/pull/2/commits/83295acbd3f4a676931c233735157b5470cef5aa")
 	resp = newReq(uri, form.Encode())
 	assert.Equal(http.StatusOK, resp.Code)
 }
