@@ -73,7 +73,12 @@ RUN adduser -D ci && \
 # golangci-lint
     wget -O- -nv https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s v1.31.0 && \
     ln -s /go/bin/golangci-lint /usr/local/bin/ && \
-    golangci-lint --version
+    golangci-lint --version && \
+# go delta test tools
+    go get github.com/axw/gocov/gocov && \
+    go get github.com/AlekSi/gocov-xml && \
+    pip3 install diff_cover && \
+    diff-cover --version
 
 COPY --from=builder /go/bin/unified-ci /unified-ci
 
