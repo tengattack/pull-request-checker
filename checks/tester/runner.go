@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os/exec"
 	"sync"
 	"sync/atomic"
 
@@ -130,23 +129,10 @@ func FindBaseCoverage(ctx context.Context, baseSavedRecords []store.CommitsInfo,
 		}
 	}
 
-	parser := util.NewShellParser(repoPath, ref)
-	words, err := parser.Parse(common.Conf.Core.GitCommand)
-	if err != nil {
-		err = fmt.Errorf("parse git command error: %v", err)
-		return err
-	}
-
 	if len(baseTestsNeedToRun) > 0 {
 		io.WriteString(log, "$ git checkout -f "+baseSHA+"\n")
-		gitCmds := make([]string, len(words))
-		copy(gitCmds, words)
-		gitCmds = append(gitCmds, "checkout", "-f", baseSHA)
-		cmd := exec.Command(gitCmds[0], gitCmds[1:]...)
-		cmd.Dir = repoPath
-		cmd.Stdout = log
-		cmd.Stderr = log
-		err := cmd.Run()
+		gitCmds := []string{"checkout", "-f", baseSHA}
+		err := util.RunGitCommand(ref, repoPath, gitCmds, log)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to checkout to base: %v\n", err)
 			common.LogError.Error(msg)
@@ -164,14 +150,8 @@ func FindBaseCoverage(ctx context.Context, baseSavedRecords []store.CommitsInfo,
 		RunTests(ctx, baseTestsNeedToRun, t, baseCoverage)
 
 		io.WriteString(log, "$ git checkout -f "+ref.Sha+"\n")
-		gitCmds = make([]string, len(words))
-		copy(gitCmds, words)
-		gitCmds = append(gitCmds, "checkout", "-f", ref.Sha)
-		cmd = exec.Command(gitCmds[0], gitCmds[1:]...)
-		cmd.Dir = repoPath
-		cmd.Stdout = log
-		cmd.Stderr = log
-		err = cmd.Run()
+		gitCmds = []string{"checkout", "-f", ref.Sha}
+		err = util.RunGitCommand(ref, repoPath, gitCmds, log)
 		if err != nil {
 			msg := fmt.Sprintf("Failed to checkout back: %v\n", err)
 			common.LogError.Error(msg)

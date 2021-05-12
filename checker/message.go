@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -169,25 +168,13 @@ func HandleMessage(ctx context.Context, message string) error {
 	repoPath := filepath.Join(common.Conf.Core.WorkDir, m.Repository())
 	_ = os.MkdirAll(repoPath, os.ModePerm)
 
-	parser := util.NewShellParser(repoPath, ref)
-	words, err := parser.Parse(common.Conf.Core.GitCommand)
-	if err != nil {
-		err = fmt.Errorf("parse git command error: %v", err)
-		return err
-	}
-
 	log.WriteString("$ git init\n")
-	gitCmds := make([]string, len(words))
-	copy(gitCmds, words)
-	gitCmds = append(gitCmds, "init")
-	cmd := exec.CommandContext(ctx, gitCmds[0], gitCmds[1:]...)
-	cmd.Dir = repoPath
-	err = cmd.Run()
+	err = util.RunGitCommand(ref, repoPath, []string{"init"}, nil)
 	if err != nil {
 		return err
 	}
 
-	installationToken, _, err := util.JWTClient.Apps.CreateInstallationToken(ctx, installationID, nil)
+	installationToken, _, err := common.JWTClient.Apps.CreateInstallationToken(ctx, installationID, nil)
 	if err != nil {
 		return err
 	}
@@ -207,17 +194,15 @@ func HandleMessage(ctx context.Context, message string) error {
 	}
 	originURL.User = url.UserPassword("x-access-token", installationToken.GetToken())
 
+	var gitCmds []string
 	fetchURL := originURL.String()
 	if ref.IsBranch() {
 		localBranch := m.Branch
 
 		log.WriteString("$ git fetch -f -u " + cloneURL +
 			fmt.Sprintf(" %s:%s\n", m.Branch, localBranch))
-		gitCmds = make([]string, len(words))
-		copy(gitCmds, words)
-		gitCmds = append(gitCmds, "fetch", "-f", "-u", fetchURL,
-			fmt.Sprintf("%s:%s", m.Branch, localBranch))
-		cmd = exec.CommandContext(ctx, gitCmds[0], gitCmds[1:]...)
+		gitCmds = []string{"fetch", "-f", "-u", fetchURL,
+			fmt.Sprintf("%s:%s", m.Branch, localBranch)}
 	} else {
 		localBranch := fmt.Sprintf("pull-%d", m.PRNum)
 
@@ -226,30 +211,18 @@ func HandleMessage(ctx context.Context, message string) error {
 		// link: https://stackoverflow.com/a/32561463/4213218
 		log.WriteString("$ git fetch -f -u " + cloneURL +
 			fmt.Sprintf(" pull/%d/head:%s\n", m.PRNum, localBranch))
-		gitCmds = make([]string, len(words))
-		copy(gitCmds, words)
-		gitCmds = append(gitCmds, "fetch", "-f", "-u", fetchURL,
-			fmt.Sprintf("pull/%d/head:%s", m.PRNum, localBranch))
-		cmd = exec.CommandContext(ctx, gitCmds[0], gitCmds[1:]...)
+		gitCmds = []string{"fetch", "-f", "-u", fetchURL,
+			fmt.Sprintf("pull/%d/head:%s", m.PRNum, localBranch)}
 	}
-	cmd.Dir = repoPath
-	cmd.Stdout = log
-	cmd.Stderr = log
-	err = cmd.Run()
+	err = util.RunGitCommand(ref, repoPath, gitCmds, log)
 	if err != nil {
 		return err
 	}
 
 	// git checkout -f <commits>/<branch>
 	log.WriteString("$ git checkout -f " + ref.Sha + "\n")
-	gitCmds = make([]string, len(words))
-	copy(gitCmds, words)
-	gitCmds = append(gitCmds, "checkout", "-f", ref.Sha)
-	cmd = exec.CommandContext(ctx, gitCmds[0], gitCmds[1:]...)
-	cmd.Dir = repoPath
-	cmd.Stdout = log
-	cmd.Stderr = log
-	err = cmd.Run()
+	gitCmds = []string{"checkout", "-f", ref.Sha}
+	err = util.RunGitCommand(ref, repoPath, gitCmds, log)
 	if err != nil {
 		return err
 	}
