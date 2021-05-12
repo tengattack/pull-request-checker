@@ -1,32 +1,58 @@
-package util
+package common
 
 import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/google/go-github/github"
 	"github.com/pkg/errors"
+	"golang.org/x/net/proxy"
 )
 
 // JWTClient is used for JWT authorization
 var JWTClient *github.Client
 
 // InitJWTClient initializes the jwtClient
-func InitJWTClient(id int64, privateKeyFile string, tr http.RoundTripper) error {
+func InitJWTClient(id int64, privateKeyFile string) error {
 	privateKey, err := ioutil.ReadFile(privateKeyFile)
 	if err != nil {
 		return fmt.Errorf("could not read private key: %s", err)
 	}
-	if tr == nil {
-		tr = http.DefaultTransport
+	tr, err := newProxyRoundTripper()
+	if err != nil {
+		return err
 	}
 	tr = newJWTRoundTripper(id, privateKey, tr)
 	JWTClient = github.NewClient(&http.Client{Transport: tr})
 	return nil
+}
+
+func newProxyRoundTripper() (http.RoundTripper, error) {
+	var tr http.RoundTripper
+	if Conf.Core.Socks5Proxy != "" {
+		dialSocksProxy, err := proxy.SOCKS5("tcp", Conf.Core.Socks5Proxy, nil, proxy.Direct)
+		if err != nil {
+			return nil, fmt.Errorf("Setup proxy failed: %v", err)
+		}
+		tr = &http.Transport{Dial: dialSocksProxy.Dial}
+	} else if Conf.Core.HTTPProxy != "" {
+		proxy, err := url.Parse(Conf.Core.HTTPProxy)
+		if err != nil {
+			return nil, fmt.Errorf("Setup proxy failed: %v", err)
+		}
+		if proxy.Scheme != "http" && proxy.Scheme != "https" {
+			return nil, fmt.Errorf("Setup proxy failed: unknown http proxy url")
+		}
+		tr = &http.Transport{Proxy: http.ProxyURL(proxy)}
+	} else {
+		tr = http.DefaultTransport
+	}
+	return tr, nil
 }
 
 type jwtRoundTripper struct {

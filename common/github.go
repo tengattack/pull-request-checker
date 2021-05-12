@@ -11,7 +11,6 @@ import (
 	"github.com/google/go-github/github"
 	"github.com/sourcegraph/go-diff/diff"
 	"github.com/tengattack/unified-ci/mq"
-	"golang.org/x/net/proxy"
 )
 
 const (
@@ -171,17 +170,11 @@ func GetDefaultAPIClient(owner string) (*github.Client, int64, error) {
 	if !ok {
 		return nil, 0, fmt.Errorf("Installation ID not found, owner: %s", owner)
 	}
-	var tr http.RoundTripper
-	if Conf.Core.Socks5Proxy != "" {
-		dialSocksProxy, err := proxy.SOCKS5("tcp", Conf.Core.Socks5Proxy, nil, proxy.Direct)
-		if err != nil {
-			return nil, 0, fmt.Errorf("Setup proxy failed: %v", err)
-		}
-		tr = &http.Transport{Dial: dialSocksProxy.Dial}
-	} else {
-		tr = http.DefaultTransport
+	tr, err := newProxyRoundTripper()
+	if err != nil {
+		return nil, 0, err
 	}
-	tr, err := ghinstallation.NewKeyFromFile(tr,
+	tr, err = ghinstallation.NewKeyFromFile(tr,
 		Conf.GitHub.AppID, installationID, Conf.GitHub.PrivateKey)
 	if err != nil {
 		return nil, 0, fmt.Errorf("Load private key failed: %v", err)

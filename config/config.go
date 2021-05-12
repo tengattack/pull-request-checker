@@ -25,6 +25,7 @@ type SectionCore struct {
 	EnableRetries bool   `yaml:"enable_retries"`
 	MaxRetries    int64  `yaml:"max_retries"`
 	Socks5Proxy   string `yaml:"socks5_proxy"`
+	HTTPProxy     string `yaml:"http_proxy"`
 	GitCommand    string `yaml:"git_command"`
 	DBFile        string `yaml:"db_file"`
 	WorkDir       string `yaml:"work_dir"`
@@ -104,6 +105,7 @@ func BuildDefaultConf() Config {
 	conf.Core.EnableRetries = true
 	conf.Core.MaxRetries = 50
 	conf.Core.Socks5Proxy = ""
+	conf.Core.HTTPProxy = ""
 	conf.Core.GitCommand = "git"
 	conf.Core.DBFile = "file.db"
 	conf.Core.WorkDir = "tmp"

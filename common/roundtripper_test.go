@@ -1,4 +1,4 @@
-package util
+package common
 
 import (
 	"io/ioutil"
@@ -27,4 +27,18 @@ func TestJWT(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "https://api.github.com/app", nil)
 	ts.RoundTrip(req)
 	assert.NotEmpty(req.Header.Get("Authorization"))
+}
+
+func TestNewProxyRoundTripper(t *testing.T) {
+	assert := assert.New(t)
+	require := require.New(t)
+
+	Conf.Core.HTTPProxy = "abc"
+	_, err := newProxyRoundTripper()
+	require.Error(err)
+
+	Conf.Core.HTTPProxy = ""
+	tr, err := newProxyRoundTripper()
+	require.NoError(err)
+	assert.NotNil(tr)
 }

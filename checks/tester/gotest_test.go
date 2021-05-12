@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 	"os"
-	"os/exec"
 	"path"
 	"regexp"
 	"runtime"
@@ -71,28 +70,25 @@ func TestDeltaTest(t *testing.T) {
 	ref := common.GithubRef{
 		BaseSha: "master",
 	}
-	parser := util.NewShellParser(repo, ref)
-	words, err := parser.Parse(common.Conf.Core.GitCommand)
-	assert.NoError(err)
 
 	// 初始化项目
 	require.NoError(os.RemoveAll(path.Join(repo, ".git")))
 	// git init
-	assert.NoError(runGitCommand(repo, words, []string{"init"}))
+	assert.NoError(util.RunGitCommand(ref, repo, []string{"init"}, nil))
 	// git add .
-	assert.NoError(runGitCommand(repo, words, []string{"add", "."}))
+	assert.NoError(util.RunGitCommand(ref, repo, []string{"add", "."}, nil))
 	// git reset HEAD -- delta_sample.go
-	assert.NoError(runGitCommand(repo, words, []string{"reset", "HEAD", "--", "delta_sample.go"}))
+	assert.NoError(util.RunGitCommand(ref, repo, []string{"reset", "HEAD", "--", "delta_sample.go"}, nil))
 	// git reset HEAD -- delta_sample_test.go
-	assert.NoError(runGitCommand(repo, words, []string{"reset", "HEAD", "--", "delta_sample_test.go"}))
+	assert.NoError(util.RunGitCommand(ref, repo, []string{"reset", "HEAD", "--", "delta_sample_test.go"}, nil))
 	// git commit -m "master"
-	assert.NoError(runGitCommand(repo, words, []string{"commit", "-m", "'master'"}))
+	assert.NoError(util.RunGitCommand(ref, repo, []string{"commit", "-m", "'master'"}, nil))
 	// git checkout -b delta
-	assert.NoError(runGitCommand(repo, words, []string{"checkout", "-b", "delta"}))
+	assert.NoError(util.RunGitCommand(ref, repo, []string{"checkout", "-b", "delta"}, nil))
 	// git add .
-	assert.NoError(runGitCommand(repo, words, []string{"add", "."}))
+	assert.NoError(util.RunGitCommand(ref, repo, []string{"add", "."}, nil))
 	// git commit -m "delta"
-	assert.NoError(runGitCommand(repo, words, []string{"commit", "-m", "'delta'"}))
+	assert.NoError(util.RunGitCommand(ref, repo, []string{"commit", "-m", "'delta'"}, nil))
 
 	// 执行增量测试的命令
 	repoConf, err := util.ReadProjectConfig(repo)
@@ -100,6 +96,11 @@ func TestDeltaTest(t *testing.T) {
 	tests := repoConf.Tests
 	test, ok := tests["go"]
 	require.True(ok)
+
+	parser := shellwords.NewParser()
+	parser.ParseEnv = true
+	parser.ParseBacktick = true
+	parser.Dir = repo
 
 	var result string
 	var output string
@@ -119,13 +120,4 @@ func TestDeltaTest(t *testing.T) {
 	assert.Regexp(percentageRegexp, result)
 	assert.Equal("60%", result)
 	assert.Equal(0.6, pct)
-}
-
-func runGitCommand(dir string, command, args []string) error {
-	gitCmds := make([]string, len(command))
-	copy(gitCmds, command)
-	gitCmds = append(gitCmds, args...)
-	cmds := exec.CommandContext(context.Background(), gitCmds[0], gitCmds[1:]...)
-	cmds.Dir = dir
-	return cmds.Run()
 }

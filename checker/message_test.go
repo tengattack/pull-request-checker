@@ -2,9 +2,6 @@ package checker
 
 import (
 	"context"
-	"errors"
-	"log"
-	"net/http"
 	"testing"
 	"time"
 
@@ -12,25 +9,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tengattack/unified-ci/common"
-	"github.com/tengattack/unified-ci/util"
-	"golang.org/x/net/proxy"
 )
 
 func TestHandleMessage(t *testing.T) {
 	assert := assert.New(t)
 	require := require.New(t)
 
-	var tr http.RoundTripper
-	if common.Conf.Core.Socks5Proxy != "" {
-		dialSocksProxy, err := proxy.SOCKS5("tcp", common.Conf.Core.Socks5Proxy, nil, proxy.Direct)
-		if err != nil {
-			msg := "Setup proxy failed: " + err.Error()
-			err = errors.New(msg)
-			log.Fatalf("error: %v", err)
-		}
-		tr = &http.Transport{Dial: dialSocksProxy.Dial}
-	}
-	err := util.InitJWTClient(common.Conf.GitHub.AppID, common.Conf.GitHub.PrivateKey, tr)
+	err := common.InitJWTClient(common.Conf.GitHub.AppID, common.Conf.GitHub.PrivateKey)
 	require.NoError(err)
 
 	start := time.Now()
