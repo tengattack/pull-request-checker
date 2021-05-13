@@ -24,12 +24,19 @@ func RunGitCommand(ref common.GithubRef, dir string, args []string, output io.Wr
 		cmd.Stdout = output
 		cmd.Stderr = output
 	}
-	if common.Conf.Core.Socks5Proxy != "" {
-		cmd.Env = []string{"all_proxy=" + common.Conf.Core.Socks5Proxy}
-	} else if common.Conf.Core.HTTPProxy != "" {
+
+	proxy, err := common.ProxyURL()
+	if err != nil {
+		return err
+	}
+	if proxy == nil {
+		// PASS
+	} else if proxy.Scheme == "socks5" {
+		cmd.Env = []string{"all_proxy=" + proxy.String()}
+	} else {
 		cmd.Env = []string{
-			"http_proxy=" + common.Conf.Core.HTTPProxy,
-			"https_proxy=" + common.Conf.Core.HTTPProxy,
+			"http_proxy=" + proxy.String(),
+			"https_proxy=" + proxy.String(),
 		}
 	}
 	cmd.Dir = dir

@@ -180,7 +180,6 @@ func GetDefaultAPIClient(owner string) (*github.Client, int64, error) {
 		return nil, 0, fmt.Errorf("Load private key failed: %v", err)
 	}
 
-	// TODO: refine code
 	client := github.NewClient(&http.Client{Transport: tr})
 	return client, installationID, nil
 }

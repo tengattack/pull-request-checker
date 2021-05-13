@@ -3,6 +3,7 @@ package common
 import (
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"sync"
@@ -16,6 +17,8 @@ import (
 
 // JWTClient is used for JWT authorization
 var JWTClient *github.Client
+var discoveryLock sync.RWMutex
+var discoveryClients = make(map[string]*DiscoveryClient)
 
 // InitJWTClient initializes the jwtClient
 func InitJWTClient(id int64, privateKeyFile string) error {
@@ -32,26 +35,105 @@ func InitJWTClient(id int64, privateKeyFile string) error {
 	return nil
 }
 
+func getDiscoveryClient(appid string) *DiscoveryClient {
+	discoveryLock.RLock()
+	c, ok := discoveryClients[appid]
+	discoveryLock.RUnlock()
+	if !ok {
+		discoveryLock.Lock()
+		defer discoveryLock.Unlock()
+		c, ok = discoveryClients[appid]
+		if ok {
+			return c
+		}
+		c = NewDiscoveryClient(appid)
+		discoveryClients[appid] = c
+	}
+	return c
+}
+
+func getDiscoveryAddr(appid string, schemes []string) (*url.URL, error) {
+	client := getDiscoveryClient(appid)
+	instance, err := client.Instance()
+	if err != nil {
+		return nil, err
+	}
+	var urls []*url.URL
+	for _, addr := range instance.Addrs {
+		u, err := url.Parse(addr)
+		if err != nil {
+			continue
+		}
+		for _, scheme := range schemes {
+			if u.Scheme == scheme {
+				urls = append(urls, u)
+			}
+		}
+	}
+	if len(urls) == 0 {
+		return nil, errors.New("no available discovery addr")
+	}
+	return urls[rand.Intn(len(urls))], nil
+}
+
+func ProxyURL() (*url.URL, error) {
+	if Conf.Core.Socks5Proxy != "" {
+		u, err := url.Parse(Conf.Core.Socks5Proxy)
+		if err != nil {
+			return nil, fmt.Errorf("Setup proxy failed: %v", err)
+		}
+		if u.Scheme == "discovery" {
+			u, err = getDiscoveryAddr(u.Host, []string{"socks5"})
+			if err != nil {
+				return nil, fmt.Errorf("Setup proxy failed: %v", err)
+			}
+		}
+		if u.Scheme != "socks5" {
+			return nil, fmt.Errorf("Setup proxy failed: unknown socks5 proxy url")
+		}
+		return u, nil
+	}
+
+	if Conf.Core.HTTPProxy != "" {
+		u, err := url.Parse(Conf.Core.HTTPProxy)
+		if err != nil {
+			return nil, fmt.Errorf("Setup proxy failed: %v", err)
+		}
+		if u.Scheme == "discovery" {
+			u, err = getDiscoveryAddr(u.Host, []string{"http", "https"})
+			if err != nil {
+				return nil, fmt.Errorf("Setup proxy failed: %v", err)
+			}
+		}
+		if u.Scheme != "http" && u.Scheme != "https" {
+			return nil, fmt.Errorf("Setup proxy failed: unknown http proxy url")
+		}
+		return u, nil
+	}
+
+	return nil, nil
+}
+
 func newProxyRoundTripper() (http.RoundTripper, error) {
 	var tr http.RoundTripper
-	if Conf.Core.Socks5Proxy != "" {
+
+	u, err := ProxyURL()
+	if err != nil {
+		return nil, err
+	}
+
+	if u == nil {
+		tr = http.DefaultTransport
+	} else if u.Scheme == "socks5" {
 		dialSocksProxy, err := proxy.SOCKS5("tcp", Conf.Core.Socks5Proxy, nil, proxy.Direct)
 		if err != nil {
 			return nil, fmt.Errorf("Setup proxy failed: %v", err)
 		}
 		tr = &http.Transport{Dial: dialSocksProxy.Dial}
-	} else if Conf.Core.HTTPProxy != "" {
-		proxy, err := url.Parse(Conf.Core.HTTPProxy)
-		if err != nil {
-			return nil, fmt.Errorf("Setup proxy failed: %v", err)
-		}
-		if proxy.Scheme != "http" && proxy.Scheme != "https" {
-			return nil, fmt.Errorf("Setup proxy failed: unknown http proxy url")
-		}
-		tr = &http.Transport{Proxy: http.ProxyURL(proxy)}
 	} else {
-		tr = http.DefaultTransport
+		tr = &http.Transport{Proxy: http.ProxyURL(u)}
 	}
+
 	return tr, nil
 }
 

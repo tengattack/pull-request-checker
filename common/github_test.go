@@ -57,7 +57,9 @@ func TestLabelPRSize(t *testing.T) {
 	// TODO: add installation ID to db
 	appID := int64(35105)
 	installationID := int64(1248133) // tengattack/playground
-	tr, err := ghinstallation.NewKeyFromFile(http.DefaultTransport,
+	tr, err := newProxyRoundTripper()
+	require.NoError(err)
+	tr, err = ghinstallation.NewKeyFromFile(tr,
 		appID, installationID, path.Join(currentDir, "../testdata/unified-ci-test.2020-10-11.private-key.pem"))
 	require.NoError(err)
 
