@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -52,12 +54,16 @@ func getDiscoveryClient(appid string) *DiscoveryClient {
 	return c
 }
 
-func getDiscoveryAddr(appid string, schemes []string) (*url.URL, error) {
+func getDiscoveryAddr(appid string, u *url.URL, schemes []string) (*url.URL, error) {
 	client := getDiscoveryClient(appid)
 	instance, err := client.Instance()
 	if err != nil {
 		return nil, err
 	}
+
+	q := u.Query()
+	overwriteScheme := q.Get("scheme")
+
 	var urls []*url.URL
 	for _, addr := range instance.Addrs {
 		u, err := url.Parse(addr)
@@ -65,7 +71,7 @@ func getDiscoveryAddr(appid string, schemes []string) (*url.URL, error) {
 			continue
 		}
 		for _, scheme := range schemes {
-			if u.Scheme == scheme {
+			if u.Scheme == scheme || overwriteScheme == scheme {
 				urls = append(urls, u)
 			}
 		}
@@ -73,7 +79,26 @@ func getDiscoveryAddr(appid string, schemes []string) (*url.URL, error) {
 	if len(urls) == 0 {
 		return nil, errors.New("no available discovery addr")
 	}
-	return urls[rand.Intn(len(urls))], nil
+
+	addr := urls[rand.Intn(len(urls))]
+
+	overwritePort := q.Get("port")
+	if overwriteScheme != "" {
+		addr.Scheme = overwriteScheme
+	}
+	if overwritePort != "" {
+		port, _ := strconv.Atoi(overwritePort)
+		if port != 0 {
+			colon := strings.LastIndexByte(addr.Host, ':')
+			if colon != -1 {
+				// remove port
+				addr.Host = addr.Host[:colon]
+			}
+			addr.Host += fmt.Sprintf(":%d", port)
+		}
+	}
+
+	return addr, nil
 }
 
 func ProxyURL() (*url.URL, error) {
@@ -83,7 +108,7 @@ func ProxyURL() (*url.URL, error) {
 			return nil, fmt.Errorf("Setup proxy failed: %v", err)
 		}
 		if u.Scheme == "discovery" {
-			u, err = getDiscoveryAddr(u.Host, []string{"socks5"})
+			u, err = getDiscoveryAddr(u.Host, u, []string{"socks5"})
 			if err != nil {
 				return nil, fmt.Errorf("Setup proxy failed: %v", err)
 			}
@@ -100,7 +125,7 @@ func ProxyURL() (*url.URL, error) {
 			return nil, fmt.Errorf("Setup proxy failed: %v", err)
 		}
 		if u.Scheme == "discovery" {
-			u, err = getDiscoveryAddr(u.Host, []string{"http", "https"})
+			u, err = getDiscoveryAddr(u.Host, u, []string{"http", "https"})
 			if err != nil {
 				return nil, fmt.Errorf("Setup proxy failed: %v", err)
 			}
@@ -125,7 +150,7 @@ func newProxyRoundTripper() (http.RoundTripper, error) {
 	if u == nil {
 		tr = http.DefaultTransport
 	} else if u.Scheme == "socks5" {
-		dialSocksProxy, err := proxy.SOCKS5("tcp", Conf.Core.Socks5Proxy, nil, proxy.Direct)
+		dialSocksProxy, err := proxy.SOCKS5("tcp", u.Host, nil, proxy.Direct)
 		if err != nil {
 			return nil, fmt.Errorf("Setup proxy failed: %v", err)
 		}
