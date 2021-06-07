@@ -235,7 +235,7 @@ func handleSingleFile(ctx context.Context, ref common.GithubRef, repoPath string
 	var lints []LintMessage
 	var lintErr error
 	if lintEnabled.MD && strings.HasSuffix(fileName, ".md") {
-		log.WriteString(fmt.Sprintf("Markdown '%s'\n", fileName))
+		log.WriteString(fmt.Sprintf("RemarkLint '%s'\n", fileName))
 		rps, out, err := remark(ctx, ref, fileName, repoPath)
 		if err != nil {
 			logError(err)

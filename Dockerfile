@@ -47,7 +47,7 @@ RUN adduser -D ci && \
       --cache=$HOME/.npm/.cache/cnpm \
       --disturl=https://npm.taobao.org/dist \
       --userconfig=$HOME/.cnpmrc \
-      i -g apidoc@0.19.0 htmllint/htmllint-cli remark-cli vfile-reporter-json && \
+      i -g apidoc@0.19.0 htmllint/htmllint-cli remark-cli vfile-reporter-json@2.0.1 && \
     sh -c "apidoc -v --simulate || exit 0" && \
     htmllint --version && \
     remark --version && \
