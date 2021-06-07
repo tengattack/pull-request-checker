@@ -196,7 +196,7 @@ func (lintEnabled *LintEnabled) Init(cwd string) {
 }
 
 // CPPLint lints the cpp language files using github.com/cpplint/cpplint
-func CPPLint(ref common.GithubRef, filePath string, cwd string) (lints []LintMessage, err error) {
+func CPPLint(ctx context.Context, ref common.GithubRef, filePath string, cwd string) (lints []LintMessage, err error) {
 	parser := util.NewShellParser(cwd, ref)
 	words, err := parser.Parse(common.Conf.Core.CPPLint)
 	if err != nil {
@@ -204,7 +204,7 @@ func CPPLint(ref common.GithubRef, filePath string, cwd string) (lints []LintMes
 		return nil, err
 	}
 	words = append(words, "--quiet", filePath)
-	cmd := exec.Command(words[0], words[1:]...)
+	cmd := exec.CommandContext(ctx, words[0], words[1:]...)
 	cmd.Dir = cwd
 
 	var output bytes.Buffer
@@ -382,7 +382,7 @@ func Ktlint(ctx context.Context, ref common.GithubRef, filepath, cwd string) ([]
 }
 
 // PHPLint lints the php files
-func PHPLint(ref common.GithubRef, fileName, cwd string) ([]LintMessage, string, error) {
+func PHPLint(ctx context.Context, ref common.GithubRef, fileName, cwd string) ([]LintMessage, string, error) {
 	var stderr bytes.Buffer
 
 	parser := util.NewShellParser(cwd, ref)
@@ -392,7 +392,7 @@ func PHPLint(ref common.GithubRef, fileName, cwd string) ([]LintMessage, string,
 		return nil, stderr.String(), err
 	}
 	words = append(words, "-f", "json", fileName)
-	cmd := exec.Command(words[0], words[1:]...)
+	cmd := exec.CommandContext(ctx, words[0], words[1:]...)
 	cmd.Stderr = &stderr
 	cmd.Dir = cwd
 	out, err := cmd.Output()
@@ -414,8 +414,8 @@ func PHPLint(ref common.GithubRef, fileName, cwd string) ([]LintMessage, string,
 	return results[0].Messages, stderr.String(), nil
 }
 
-// ESLint lints the js, jsx, es, esx files
-func ESLint(ref common.GithubRef, fileName, cwd, eslintrc string) ([]LintMessage, string, error) {
+// ESLint lints the js, jsx, es, esx, ts, tsx files
+func ESLint(ctx context.Context, ref common.GithubRef, fileName, cwd, eslintrc string) ([]LintMessage, string, error) {
 	var stderr bytes.Buffer
 
 	parser := util.NewShellParser(cwd, ref)
@@ -429,7 +429,7 @@ func ESLint(ref common.GithubRef, fileName, cwd, eslintrc string) ([]LintMessage
 	} else {
 		words = append(words, "-f", "json", fileName)
 	}
-	cmd := exec.Command(words[0], words[1:]...)
+	cmd := exec.CommandContext(ctx, words[0], words[1:]...)
 	cmd.Dir = cwd
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
@@ -454,7 +454,7 @@ func ESLint(ref common.GithubRef, fileName, cwd, eslintrc string) ([]LintMessage
 }
 
 // TSLint lints the ts and tsx files
-func TSLint(ref common.GithubRef, fileName, tsConfigFile, cwd string) ([]LintMessage, string, error) {
+func TSLint(ctx context.Context, ref common.GithubRef, fileName, tsConfigFile, cwd string) ([]LintMessage, string, error) {
 	var stderr bytes.Buffer
 
 	parser := util.NewShellParser(cwd, ref)
@@ -467,7 +467,7 @@ func TSLint(ref common.GithubRef, fileName, tsConfigFile, cwd string) ([]LintMes
 		words = append(words, "-p", tsConfigFile)
 	}
 	words = append(words, "--format", "json", fileName)
-	cmd := exec.Command(words[0], words[1:]...)
+	cmd := exec.CommandContext(ctx, words[0], words[1:]...)
 	cmd.Dir = cwd
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
@@ -509,7 +509,7 @@ func TSLint(ref common.GithubRef, fileName, tsConfigFile, cwd string) ([]LintMes
 }
 
 // SCSSLint lints the scss files
-func SCSSLint(ref common.GithubRef, fileName, cwd string) ([]LintMessage, string, error) {
+func SCSSLint(ctx context.Context, ref common.GithubRef, fileName, cwd string) ([]LintMessage, string, error) {
 	var stderr bytes.Buffer
 
 	parser := util.NewShellParser(cwd, ref)
@@ -519,7 +519,7 @@ func SCSSLint(ref common.GithubRef, fileName, cwd string) ([]LintMessage, string
 		return nil, stderr.String(), err
 	}
 	words = append(words, "--format=JSON", fileName)
-	cmd := exec.Command(words[0], words[1:]...)
+	cmd := exec.CommandContext(ctx, words[0], words[1:]...)
 	cmd.Dir = cwd
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()
@@ -750,7 +750,7 @@ type remarkMessage struct {
 	RuleID string
 }
 
-func remark(ref common.GithubRef, fileName string, cwd string) (reports []remarkReport, out []byte, err error) {
+func remark(ctx context.Context, ref common.GithubRef, fileName string, cwd string) (reports []remarkReport, out []byte, err error) {
 	parser := util.NewShellParser(cwd, ref)
 	words, err := parser.Parse(common.Conf.Core.RemarkLint)
 	if err != nil {
@@ -758,7 +758,7 @@ func remark(ref common.GithubRef, fileName string, cwd string) (reports []remark
 		return nil, nil, err
 	}
 	words = append(words, "--quiet", "--report", "json", fileName)
-	cmd := exec.Command(words[0], words[1:]...)
+	cmd := exec.CommandContext(ctx, words[0], words[1:]...)
 	cmd.Dir = cwd
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -786,7 +786,7 @@ func remark(ref common.GithubRef, fileName string, cwd string) (reports []remark
 	}
 	err = json.Unmarshal(stderrStr, &reports)
 	if err != nil {
-		return nil, stdoutStr, err
+		return nil, stdoutStr, fmt.Errorf("stderr json unmarshal error: %v\n%s", err, stderrStr)
 	}
 	return reports, stdoutStr, cmd.Wait()
 }

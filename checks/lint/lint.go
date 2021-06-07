@@ -186,7 +186,7 @@ func LintIndividually(ctx context.Context, ref common.GithubRef, repoPath string
 				problems_    int
 			)
 
-			err := handleSingleFile(ref, repoPath, d, lintEnabled, annotationLevel, &buf, &annotations_, &problems_)
+			err := handleSingleFile(ctx, ref, repoPath, d, lintEnabled, annotationLevel, &buf, &annotations_, &problems_)
 
 			mtx.Lock()
 			defer mtx.Unlock()
@@ -219,7 +219,7 @@ func findTsConfig(fileName string, repoPath string) string {
 	return ""
 }
 
-func handleSingleFile(ref common.GithubRef, repoPath string, d *diff.FileDiff, lintEnabled LintEnabled, annotationLevel string, log *bytes.Buffer, annotations *[]*github.CheckRunAnnotation, problems *int) error {
+func handleSingleFile(ctx context.Context, ref common.GithubRef, repoPath string, d *diff.FileDiff, lintEnabled LintEnabled, annotationLevel string, log *bytes.Buffer, annotations *[]*github.CheckRunAnnotation, problems *int) error {
 	fileName, ok := util.GetTrimmedNewName(d)
 	if !ok {
 		log.WriteString("No need to process " + fileName + "\n")
@@ -227,11 +227,13 @@ func handleSingleFile(ref common.GithubRef, repoPath string, d *diff.FileDiff, l
 	}
 	log.WriteString(fmt.Sprintf("Checking '%s'\n", fileName))
 
+	// use ctx for linters
+
 	var lints []LintMessage
 	var lintErr error
 	if lintEnabled.MD && strings.HasSuffix(fileName, ".md") {
 		log.WriteString(fmt.Sprintf("Markdown '%s'\n", fileName))
-		rps, out, err := remark(ref, fileName, repoPath)
+		rps, out, err := remark(ctx, ref, fileName, repoPath)
 		if err != nil {
 			return err
 		}
@@ -243,22 +245,22 @@ func handleSingleFile(ref common.GithubRef, repoPath string, d *diff.FileDiff, l
 		lints, lintErr = MDLint(rps)
 	} else if lintEnabled.CPP && isCPP(fileName) {
 		log.WriteString(fmt.Sprintf("CPPLint '%s'\n", fileName))
-		lints, lintErr = CPPLint(ref, fileName, repoPath)
+		lints, lintErr = CPPLint(ctx, ref, fileName, repoPath)
 	} else if isOC(fileName) {
 		if lintEnabled.OC {
 			log.WriteString(fmt.Sprintf("OCLint '%s'\n", fileName))
-			lints, lintErr = OCLint(context.TODO(), ref, fileName, repoPath)
+			lints, lintErr = OCLint(ctx, ref, fileName, repoPath)
 		}
 		if lintEnabled.ClangLint {
 			log.WriteString(fmt.Sprintf("ClangLint '%s'\n", fileName))
-			lintsDiff, err := ClangLint(context.TODO(), ref, repoPath, filepath.Join(repoPath, fileName))
+			lintsDiff, err := ClangLint(ctx, ref, repoPath, filepath.Join(repoPath, fileName))
 			if err != nil {
 				return err
 			}
 			pickDiffLintMessages(lintsDiff, d, annotations, problems, log, fileName)
 		}
 	} else if strings.HasSuffix(fileName, ".kt") {
-		lints, lintErr = Ktlint(context.TODO(), ref, fileName, repoPath)
+		lints, lintErr = Ktlint(ctx, ref, fileName, repoPath)
 	} else if lintEnabled.Go && strings.HasSuffix(fileName, ".go") {
 		log.WriteString(fmt.Sprintf("Goreturns '%s'\n", fileName))
 		lintsGoreturns, err := Goreturns(filepath.Join(repoPath, fileName), repoPath)
@@ -271,7 +273,7 @@ func handleSingleFile(ref common.GithubRef, repoPath string, d *diff.FileDiff, l
 	} else if lintEnabled.PHP && strings.HasSuffix(fileName, ".php") {
 		log.WriteString(fmt.Sprintf("PHPLint '%s'\n", fileName))
 		var errlog string
-		lints, errlog, lintErr = PHPLint(ref, filepath.Join(repoPath, fileName), repoPath)
+		lints, errlog, lintErr = PHPLint(ctx, ref, filepath.Join(repoPath, fileName), repoPath)
 		if errlog != "" {
 			log.WriteString(errlog + "\n")
 		}
@@ -281,12 +283,12 @@ func handleSingleFile(ref common.GithubRef, repoPath string, d *diff.FileDiff, l
 		tsConfigFile := findTsConfig(fileName, repoPath)
 		if lintEnabled.TypeScript && tsConfigFile != "" {
 			log.WriteString(fmt.Sprintf("TSLint '%s'\n", fileName))
-			lints, errlog, lintErr = TSLint(ref,
+			lints, errlog, lintErr = TSLint(ctx, ref,
 				filepath.Join(repoPath, fileName), tsConfigFile, repoPath)
 		} else if lintEnabled.JS != "" {
 			// 如果没有 tslint 的配置文件，则尝试用 eslint 检查
 			log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
-			lints, errlog, lintErr = ESLint(ref, filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
+			lints, errlog, lintErr = ESLint(ctx, ref, filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
 		}
 		if errlog != "" {
 			log.WriteString(errlog + "\n")
@@ -295,14 +297,14 @@ func handleSingleFile(ref common.GithubRef, repoPath string, d *diff.FileDiff, l
 		strings.HasSuffix(fileName, ".css")) {
 		log.WriteString(fmt.Sprintf("SCSSLint '%s'\n", fileName))
 		var errlog string
-		lints, errlog, lintErr = SCSSLint(ref, filepath.Join(repoPath, fileName), repoPath)
+		lints, errlog, lintErr = SCSSLint(ctx, ref, filepath.Join(repoPath, fileName), repoPath)
 		if errlog != "" {
 			log.WriteString(errlog + "\n")
 		}
 	} else if lintEnabled.JS != "" && strings.HasSuffix(fileName, ".js") {
 		log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
 		var errlog string
-		lints, errlog, lintErr = ESLint(ref, filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
+		lints, errlog, lintErr = ESLint(ctx, ref, filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
 		if errlog != "" {
 			log.WriteString(errlog + "\n")
 		}
@@ -310,7 +312,7 @@ func handleSingleFile(ref common.GithubRef, repoPath string, d *diff.FileDiff, l
 		strings.HasSuffix(fileName, ".esx") || strings.HasSuffix(fileName, ".jsx")) {
 		log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
 		var errlog string
-		lints, errlog, lintErr = ESLint(ref, filepath.Join(repoPath, fileName), repoPath, lintEnabled.ES)
+		lints, errlog, lintErr = ESLint(ctx, ref, filepath.Join(repoPath, fileName), repoPath, lintEnabled.ES)
 		if errlog != "" {
 			log.WriteString(errlog + "\n")
 		}
@@ -322,7 +324,7 @@ func handleSingleFile(ref common.GithubRef, repoPath string, d *diff.FileDiff, l
 		strings.HasSuffix(fileName, ".php")) {
 		// ESLint for HTML & PHP files (ES5)
 		log.WriteString(fmt.Sprintf("ESLint '%s'\n", fileName))
-		lints2, errlog, err := ESLint(ref, filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
+		lints2, errlog, err := ESLint(ctx, ref, filepath.Join(repoPath, fileName), repoPath, lintEnabled.JS)
 		if errlog != "" {
 			log.WriteString(errlog + "\n")
 		}
