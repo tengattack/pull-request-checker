@@ -226,6 +226,9 @@ func handleSingleFile(ctx context.Context, ref common.GithubRef, repoPath string
 		return nil
 	}
 	log.WriteString(fmt.Sprintf("Checking '%s'\n", fileName))
+	logError := func(err error) {
+		log.WriteString(fmt.Sprintf("Error: %v\n", err))
+	}
 
 	// use ctx for linters
 
@@ -235,10 +238,12 @@ func handleSingleFile(ctx context.Context, ref common.GithubRef, repoPath string
 		log.WriteString(fmt.Sprintf("Markdown '%s'\n", fileName))
 		rps, out, err := remark(ctx, ref, fileName, repoPath)
 		if err != nil {
+			logError(err)
 			return err
 		}
 		lintsFormatted, err := MDFormattedLint(filepath.Join(repoPath, fileName), out)
 		if err != nil {
+			logError(err)
 			return err
 		}
 		pickDiffLintMessages(lintsFormatted, d, annotations, problems, log, fileName)
@@ -255,6 +260,7 @@ func handleSingleFile(ctx context.Context, ref common.GithubRef, repoPath string
 			log.WriteString(fmt.Sprintf("ClangLint '%s'\n", fileName))
 			lintsDiff, err := ClangLint(ctx, ref, repoPath, filepath.Join(repoPath, fileName))
 			if err != nil {
+				logError(err)
 				return err
 			}
 			pickDiffLintMessages(lintsDiff, d, annotations, problems, log, fileName)
@@ -265,6 +271,7 @@ func handleSingleFile(ctx context.Context, ref common.GithubRef, repoPath string
 		log.WriteString(fmt.Sprintf("Goreturns '%s'\n", fileName))
 		lintsGoreturns, err := Goreturns(filepath.Join(repoPath, fileName), repoPath)
 		if err != nil {
+			logError(err)
 			return err
 		}
 		pickDiffLintMessages(lintsGoreturns, d, annotations, problems, log, fileName)
@@ -318,6 +325,7 @@ func handleSingleFile(ctx context.Context, ref common.GithubRef, repoPath string
 		}
 	}
 	if lintErr != nil {
+		logError(lintErr)
 		return lintErr
 	}
 	if lintEnabled.JS != "" && (strings.HasSuffix(fileName, ".html") ||
@@ -329,6 +337,7 @@ func handleSingleFile(ctx context.Context, ref common.GithubRef, repoPath string
 			log.WriteString(errlog + "\n")
 		}
 		if err != nil {
+			logError(err)
 			return err
 		}
 		if lints2 != nil {
