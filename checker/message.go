@@ -37,7 +37,6 @@ func GenerateAnnotations(ctx context.Context, ref common.GithubRef, repoPath str
 	})
 	eg.Go(func() error {
 		var err error
-		// TODO: use ctx
 		annotationsArr[1], problemsArr[1], err = lint.LintIndividually(ctx, ref, repoPath, diffs, lintEnabled, ignoredPath, &bufArr[1])
 		return err
 	})
